@@ -138,6 +138,11 @@ class SimpleSwitch(app_manager.RyuApp):
         # learn a mac address to avoid FLOOD next time.
         self.mac_to_port[dpid][src] = msg.in_port
 
+        # Dynamic gateway discovery
+        is_gateway_src = self.is_gateway(src)
+        if is_gateway_src:
+            self.register_gateway_dynamic(src, dpid, msg.in_port)
+
         is_iot_src = self.is_iot(src)
         is_iot_dst = self.is_iot(dst)
         if is_iot_src:
