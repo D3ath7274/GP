@@ -26,6 +26,8 @@ from ryu.ofproto import ofproto_v1_0
 from ryu.lib.mac import haddr_to_bin
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
+from ryu.lib.packet import ipv4
+from ryu.lib.packet import udp
 from ryu.lib.packet import ether_types
 
 
@@ -138,7 +140,72 @@ class SimpleSwitch(app_manager.RyuApp):
         # learn a mac address to avoid FLOOD next time.
         self.mac_to_port[dpid][src] = msg.in_port
 
-        # Dynamic gateway discovery
+        # --- Dynamic Registration Logic ---
+        
+        # 1. Explicit UDP Registration (Port 9999)
+        if eth.ethertype == ether_types.ETH_TYPE_IP:
+            ip_pkt = pkt.get_protocol(ipv4.ipv4)
+            if ip_pkt.proto == 17:  # UDP
+                udp_pkt = pkt.get_protocol(udp.udp)
+                # Ensure it's not DHCP (67/68) before interpreting as custom registration
+                if udp_pkt and udp_pkt.dst_port == 9999:
+                    try:
+                        payload_data = msg.data[14+20+8:] # Approximate offset
+                        message = payload_data.decode('utf-8', errors='ignore').strip()
+                        if message.startswith("REGISTER:"):
+                            _, type_str, info = message.split(':', 2)
+                            self.logger.info("Registration request received from %s", src)
+                            if type_str == "IOT":
+                                self.iot_devices[src] = info
+                                self.logger.info("Registered IoT Device: %s (Type: %s)", src, info)
+                            elif type_str == "GATEWAY":
+                                self.register_gateway_dynamic(src, dpid, msg.in_port)
+                                self.logger.info("Registered Gateway: %s (Info: %s)", src, info)
+                            return # Stop processing explicit registration packet
+                    except Exception:
+                        pass
+                
+                # 2. Passive Discovery via DHCP (Port 67 - BootP Server / Port 68 - BootP Client)
+                # Devices request IP on connection. We can catch this.
+                if udp_pkt and (udp_pkt.src_port == 68 or udp_pkt.dst_port == 67):
+                    # Check if already registered
+                    if src not in self.iot_devices and src not in self.discovered_gateways:
+                        # Register as unknown/potential IoT
+                        is_iot_oui = self.is_iot(src) # Checks prefixes
+                        is_gw_oui = self.is_gateway(src)
+                        
+                        if is_gw_oui:
+                            self.register_gateway_dynamic(src, dpid, msg.in_port)
+                            self.logger.info("Passive Discovery: Gateway detected via DHCP %s", src)
+                        elif is_iot_oui:
+                             self.iot_devices[src] = "IOT:known_OUI"
+                             self.logger.info("Passive Discovery: IoT Device detected via DHCP %s", src)
+                        else:
+                             # Should we register ALL unknown devices? Maybe as Generic host?
+                             # For this task "IoT devices", let's be generous and assume unknown MACs on this network might be new sensors.
+                             # Or stick to strict OUI check.
+                             # If user connects a REAL device, we might not know its OUI prefix.
+                             # Let's add it as "Potential IoT".
+                             self.iot_devices[src] = "IOT:Detected_DHCP"
+                             self.logger.info("Passive Discovery: New Device detected via DHCP %s", src)
+
+        # 3. Passive Discovery via ARP
+        if eth.ethertype == ether_types.ETH_TYPE_ARP:
+             if src not in self.iot_devices and src not in self.discovered_gateways:
+                 if self.is_gateway(src):
+                     self.register_gateway_dynamic(src, dpid, msg.in_port)
+                     self.logger.info("Passive Discovery: Gateway detected via ARP %s", src)
+                 elif self.is_iot(src): # strict check?
+                     self.iot_devices[src] = "IOT:Unknown_OUI"
+                     self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
+                 else:
+                     # For demonstration, register any new device seen via ARP as potentially IoT
+                     self.iot_devices[src] = "IOT:Detected_ARP"
+                     self.logger.info("Passive Discovery: New Device detected via ARP %s", src)
+
+        # ----------------------------------
+
+        # Dynamic gateway discovery (Legacy Check)
         is_gateway_src = self.is_gateway(src)
         if is_gateway_src:
             self.register_gateway_dynamic(src, dpid, msg.in_port)
