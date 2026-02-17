@@ -30,6 +30,13 @@ from ryu.lib.packet import ipv4
 from ryu.lib.packet import udp
 from ryu.lib.packet import ether_types
 
+# Snort 3 IDS Integration
+import os
+import sys
+# Add Controller directory to path so snort_monitor can be found
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from snort_monitor import SnortManager
+
 
 class SimpleSwitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_0.OFP_VERSION]
@@ -37,6 +44,32 @@ class SimpleSwitch(app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
+
+        # ===================================================================
+        # Snort 3 IDS Integration
+        # ===================================================================
+        # Configure: change interface/paths if your setup differs.
+        # The SnortManager will:
+        #   1. Start Snort 3 listening on the specified interface
+        #   2. Tail /var/log/snort/alert_fast.txt in a background thread
+        #   3. Parse alerts and call _handle_snort_alert() for each one
+        # ===================================================================
+        self.snort_manager = SnortManager(
+            interface='ens33',               # Controller's network interface
+            config_path='/etc/snort/snort.lua',
+            log_dir='/var/log/snort',
+            logger=self.logger,
+            on_alert=self._handle_snort_alert
+        )
+        snort_started = self.snort_manager.start_snort()
+        if snort_started:
+            self.snort_manager.start_monitoring()
+        else:
+            self.logger.error(
+                "Snort IDS failed to start! Run snort_setup.sh first. "
+                "Controller will continue without IDS."
+            )
+
         # IoT configuration
         # Vendor/OUI prefixes (lowercase, without separators) commonly used by IoT devices.
         # Edit these prefixes or populate `self.iot_devices` with exact MACs as needed.
@@ -59,6 +92,43 @@ class SimpleSwitch(app_manager.RyuApp):
         ]
         # Discovered gateways: { 'mac': {'dpid': <id>, 'port': <port>, 'first_seen': <timestamp>} }
         self.discovered_gateways = {}
+
+    # ===================================================================
+    # Snort IDS Alert Handler
+    # ===================================================================
+    def _handle_snort_alert(self, alert):
+        """
+        Called by SnortManager for each new Snort alert.
+        Logs the attack type and source to the Ryu controller output.
+        
+        This covers traffic on ALL controller ports including:
+        - Physical interface (ens33)
+        - Any Mininet-wifi virtual network traffic routed through the controller
+        """
+        self.logger.warning(
+            "\n"
+            "╔══════════════════════════════════════════════════════════╗\n"
+            "║  🚨 IDS ALERT: %-40s ║\n"
+            "╠══════════════════════════════════════════════════════════╣\n"
+            "║  Attack : %-46s ║\n"
+            "║  Source : %-46s ║\n"
+            "║  Target : %-46s ║\n"
+            "║  Proto  : %-46s ║\n"
+            "║  Rule   : SID %-42s ║\n"
+            "╚══════════════════════════════════════════════════════════╝",
+            alert.get('attack_type', 'Unknown')[:40],
+            alert.get('attack_type', 'Unknown'),
+            '%s:%s' % (alert.get('src_ip', '?'), alert.get('src_port', '?')),
+            '%s:%s' % (alert.get('dst_ip', '?'), alert.get('dst_port', '?')),
+            alert.get('proto', '?'),
+            alert.get('sid', '?'),
+        )
+
+    def close(self):
+        """Clean up: stop Snort when the controller shuts down."""
+        self.logger.info("Controller shutting down — stopping Snort IDS...")
+        self.snort_manager.stop_snort()
+        super(SimpleSwitch, self).close()
 
     def add_flow(self, datapath, in_port, dst, src, actions, idle_timeout=0, hard_timeout=0, priority=None):
         ofproto = datapath.ofproto
