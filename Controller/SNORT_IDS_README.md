@@ -203,4 +203,7 @@ The system classifies ~50 attack categories including:
 | "TAP mirror unavailable" | Non-fatal. Snort uses physical interface only. Ensure `sudo modprobe tun`. |
 | No alerts appearing | Check `/var/log/snort/ids_*/alert_fast.txt` (Snort 3) or `.../alert` (Snort 2) |
 | Snort crashes on start | Validate: `snort -c /etc/snort/snort.lua -T` (Snort 3) or `snort -c /etc/snort/snort.conf -T` (Snort 2) |
-| Flood of "BAD-TRAFFIC same SRC/DST" | False positives from TAP mirroring. Alerts are rate-limited (1 per 2 min). To disable: edit `/etc/snort/rules/bad-traffic.rules` and comment out rule sid 527 |
+| Flood of "BAD-TRAFFIC same SRC/DST" | False positives from TAP mirroring. Rate-limited. To disable: comment out rule 527 in `/etc/snort/rules/bad-traffic.rules` |
+| ICMP PING / Echo Reply alerts during pingall | Normal ping traffic. Rules 366, 384, 408 are rate-limited. To disable: edit `icmp-info.rules` |
+| "IoT device detected" for Mininet hosts | Mininet MACs (42:00:00, etc.) are excluded. Add custom MACs to `iot_exclude_prefixes` in the controller |
+| UPnP service discover attempt at startup | Legitimate UPnP discovery. Rule 1917 is rate-limited |

@@ -308,7 +308,12 @@ class SnortManager:
         self._alert_count = 0
         self._lock = threading.Lock()
         # Rate-limit noisy rules (e.g. false positives from TAP/mirrored traffic)
-        self._noisy_sids = {527}  # BAD-TRAFFIC same SRC/DST
+        # Rate-limit rules that fire on normal traffic (ping, TAP mirror, UPnP discovery, etc.)
+        self._noisy_sids = {
+            527,   # BAD-TRAFFIC same SRC/DST
+            366, 384, 408,  # ICMP PING, ICMP Echo Reply (normal pingall)
+            1917,  # SCAN UPnP service discover (legitimate UPnP discovery at startup)
+        }
         self._last_alert_per_sid = {}  # sid -> timestamp
         self._rate_limit_seconds = 120
 

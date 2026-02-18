@@ -78,9 +78,10 @@ class SimpleSwitch(app_manager.RyuApp):
             )
 
         # IoT configuration
-        # Vendor/OUI prefixes (lowercase, without separators) commonly used by IoT devices.
-        # Edit these prefixes or populate `self.iot_devices` with exact MACs as needed.
+        # Vendor/OUI prefixes (lowercase) commonly used by IoT devices.
         self.iot_mac_prefixes = ['00:11:22', 'aa:bb:cc']
+        # Excluded prefixes: Mininet-wifi, virtual interfaces, known non-IoT.
+        self.iot_exclude_prefixes = ['42:00:00', '0a:f7:8a', '16:ca:de', '3a:10:75', '92:01:13', 'ba:e2:67', 'aa:45:c7']
         # Explicit IoT device MAC -> type mapping (example):
         # {'00:11:22:33:44:55': 'home_sensor'}
         self.iot_devices = {}
@@ -158,14 +159,17 @@ class SimpleSwitch(app_manager.RyuApp):
     def is_iot(self, mac):
         if not mac:
             return False
-        m = mac.lower()
-        # exact device match
-        if any(m == k.lower() for k in self.iot_devices.keys()):
+        m = mac.lower().replace(':', '')
+        # Exclude known non-IoT (Mininet, virtual, etc.)
+        for p in getattr(self, 'iot_exclude_prefixes', []):
+            if m.startswith(p.lower().replace(':', '')):
+                return False
+        # exact device match (only if explicitly registered)
+        if any(m == k.lower().replace(':', '') for k in self.iot_devices.keys()):
             return True
-        # prefix/OUI match (support colon-separated MACs)
+        # prefix/OUI match
         for p in self.iot_mac_prefixes:
-            lp = p.lower()
-            if m.replace(':', '').startswith(lp.replace(':', '')):
+            if m.startswith(p.lower().replace(':', '')):
                 return True
         return False
 
@@ -264,14 +268,9 @@ class SimpleSwitch(app_manager.RyuApp):
                         elif is_iot_oui:
                              self.iot_devices[src] = "IOT:known_OUI"
                              self.logger.info("Passive Discovery: IoT Device detected via DHCP %s", src)
-                        else:
-                             # Should we register ALL unknown devices? Maybe as Generic host?
-                             # For this task "IoT devices", let's be generous and assume unknown MACs on this network might be new sensors.
-                             # Or stick to strict OUI check.
-                             # If user connects a REAL device, we might not know its OUI prefix.
-                             # Let's add it as "Potential IoT".
+                        elif self.is_iot(src):
                              self.iot_devices[src] = "IOT:Detected_DHCP"
-                             self.logger.info("Passive Discovery: New Device detected via DHCP %s", src)
+                             self.logger.info("Passive Discovery: IoT Device detected via DHCP %s", src)
 
         # 3. Passive Discovery via ARP
         if eth.ethertype == ether_types.ETH_TYPE_ARP:
@@ -282,10 +281,10 @@ class SimpleSwitch(app_manager.RyuApp):
                  elif self.is_iot(src): # strict check?
                      self.iot_devices[src] = "IOT:Unknown_OUI"
                      self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
-                 else:
-                     # For demonstration, register any new device seen via ARP as potentially IoT
+                 elif self.is_iot(src):
+                     # Only register if OUI matches IoT prefix (no auto-register of unknowns)
                      self.iot_devices[src] = "IOT:Detected_ARP"
-                     self.logger.info("Passive Discovery: New Device detected via ARP %s", src)
+                     self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
 
         # ----------------------------------
 
@@ -297,7 +296,7 @@ class SimpleSwitch(app_manager.RyuApp):
         is_iot_src = self.is_iot(src)
         is_iot_dst = self.is_iot(dst)
         if is_iot_src:
-            self.logger.info("IoT device detected: %s on dpid %s port %s", src, dpid, msg.in_port)
+            self.logger.debug("IoT device traffic: %s on dpid %s port %s", src, dpid, msg.in_port)
 
         if dst in self.mac_to_port[dpid]:
             out_port = self.mac_to_port[dpid][dst]
