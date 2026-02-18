@@ -51,8 +51,7 @@ All data-plane traffic (10.0.0.x Mininet + 192.168.1.x management) is mirrored t
 
 ```bash
 cd Controller/
-# Replace eth0/ens33 with your controller's interface (ip link show)
-sudo bash snort_setup.sh eth0 "10.0.0.0/24,192.168.1.0/24"
+sudo bash snort_setup.sh ens33 "10.0.0.0/24,192.168.1.0/24"
 ```
 
 Or single network only:
@@ -134,12 +133,9 @@ Controller/
 
 ### Changing the Network Interface
 
-Edit `Controller network only .py`, line with `interface='ens33'`:
+Edit `Controller network only .py`, line with `_physical_interface`:
 ```python
-self.snort_manager = SnortManager(
-    interface='eth0',  # Change to your interface
-    ...
-)
+self._physical_interface = 'ens33'
 ```
 
 ### Changing HOME_NET
@@ -150,7 +146,7 @@ Re-run setup with your subnet(s):
 sudo bash snort_setup.sh ens33 192.168.1.0/24
 
 # Multiple networks (controller + Mininet)
-sudo bash snort_setup.sh eth0 "10.0.0.0/24,192.168.1.0/24"
+sudo bash snort_setup.sh ens33 "10.0.0.0/24,192.168.1.0/24"
 ```
 
 ### Standalone Snort Monitor Test

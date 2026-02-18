@@ -50,7 +50,7 @@ class SimpleSwitch(app_manager.RyuApp):
         # is mirrored to the controller via OpenFlow and injected into a TAP
         # so Snort can detect malicious behavior. Prepares for ML anomaly detection.
         # ===================================================================
-        self._physical_interface = 'ens33'  # Edit: eth0, ens33, or your NIC (ip link show)
+        self._physical_interface = 'ens33'
         self._tap_name = 'snort_tap'
 
         self.traffic_mirror = TrafficMirror(

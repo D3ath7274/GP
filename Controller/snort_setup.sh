@@ -7,7 +7,7 @@
 #
 # Usage:  sudo bash snort_setup.sh [INTERFACE] [HOME_NET]
 # Example: sudo bash snort_setup.sh ens33 10.0.0.0/24
-# Example (multi-network): sudo bash snort_setup.sh eth0 "10.0.0.0/24,192.168.1.0/24"
+# Example (multi-network): sudo bash snort_setup.sh ens33 "10.0.0.0/24,192.168.1.0/24"
 # =============================================================================
 
 set -e
