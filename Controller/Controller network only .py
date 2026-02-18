@@ -30,12 +30,12 @@ from ryu.lib.packet import ipv4
 from ryu.lib.packet import udp
 from ryu.lib.packet import ether_types
 
-# Snort 3 IDS Integration
+# Snort 3 IDS Integration + Traffic Mirroring
 import os
 import sys
-# Add Controller directory to path so snort_monitor can be found
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snort_monitor import SnortManager
+from traffic_mirror import TrafficMirror
 
 
 class SimpleSwitch(app_manager.RyuApp):
@@ -46,16 +46,23 @@ class SimpleSwitch(app_manager.RyuApp):
         self.mac_to_port = {}
 
         # ===================================================================
-        # Snort 3 IDS Integration
+        # Traffic Mirroring: All data-plane traffic (10.0.0.x + 192.168.1.x)
+        # is mirrored to the controller via OpenFlow and injected into a TAP
+        # so Snort can detect malicious behavior. Prepares for ML anomaly detection.
         # ===================================================================
-        # Configure: change interface/paths if your setup differs.
-        # The SnortManager will:
-        #   1. Start Snort 3 listening on the specified interface
-        #   2. Tail /var/log/snort/alert_fast.txt in a background thread
-        #   3. Parse alerts and call _handle_snort_alert() for each one
-        # ===================================================================
+        self._physical_interface = 'ens33'  # Edit: eth0, ens33, or your NIC (ip link show)
+        self._tap_name = 'snort_tap'
+
+        self.traffic_mirror = TrafficMirror(
+            tap_name=self._tap_name,
+            logger=self.logger
+        )
+        mirror_ok = self.traffic_mirror.start()
+
+        # Snort monitors both: physical (192.168.1.x) + TAP (mirrored 10.0.0.x)
         self.snort_manager = SnortManager(
-            interface='ens33',               # Controller's network interface
+            interfaces=[self._physical_interface, self._tap_name] if mirror_ok
+                       else [self._physical_interface],
             config_path='/etc/snort/snort.lua',
             log_dir='/var/log/snort',
             logger=self.logger,
@@ -125,9 +132,11 @@ class SimpleSwitch(app_manager.RyuApp):
         )
 
     def close(self):
-        """Clean up: stop Snort when the controller shuts down."""
+        """Clean up: stop Snort and traffic mirror when the controller shuts down."""
         self.logger.info("Controller shutting down — stopping Snort IDS...")
         self.snort_manager.stop_snort()
+        if hasattr(self, 'traffic_mirror') and self.traffic_mirror:
+            self.traffic_mirror.stop()
         super(SimpleSwitch, self).close()
 
     def add_flow(self, datapath, in_port, dst, src, actions, idle_timeout=0, hard_timeout=0, priority=None):
@@ -199,6 +208,11 @@ class SimpleSwitch(app_manager.RyuApp):
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             # ignore lldp packet
             return
+
+        # Inject packet into TAP for Snort (mirrors all data-plane traffic)
+        if hasattr(self, 'traffic_mirror') and self.traffic_mirror:
+            self.traffic_mirror.inject(msg.data)
+
         dst = eth.dst
         src = eth.src
 
@@ -297,7 +311,11 @@ class SimpleSwitch(app_manager.RyuApp):
             else:
                 out_port = ofproto.OFPP_FLOOD
 
+        # Forward to destination AND send copy to controller (for IDS/ML monitoring)
         actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
+        actions.append(datapath.ofproto_parser.OFPActionOutput(
+            ofproto.OFPP_CONTROLLER, 0  # 0 = send full packet
+        ))
 
         # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:

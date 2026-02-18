@@ -268,10 +268,15 @@ class SnortManager:
         max_alerts (int): Max number of recent alerts to keep in memory
     """
 
-    def __init__(self, interface='ens33', config_path='/etc/snort/snort.lua',
+    def __init__(self, interface='ens33', interfaces=None, config_path='/etc/snort/snort.lua',
                  log_dir='/var/log/snort', logger=None, on_alert=None,
                  max_alerts=1000):
-        self.interface = interface
+        # Support single interface or multiple (for physical + TAP mirror)
+        if interfaces is not None:
+            self.interfaces = list(interfaces)
+        else:
+            self.interfaces = [interface]
+        self.interface = self.interfaces[0]  # backward compat
         self.config_path = config_path
         self.log_dir = log_dir
         self.alert_file = os.path.join(log_dir, 'alert_fast.txt')
@@ -279,9 +284,9 @@ class SnortManager:
         self.on_alert = on_alert
         self.max_alerts = max_alerts
 
-        # State
-        self._snort_process = None
-        self._monitor_thread = None
+        # State (lists for multi-interface)
+        self._snort_processes = []
+        self._monitor_threads = []
         self._running = False
         self._alerts = deque(maxlen=max_alerts)
         self._alert_count = 0
@@ -314,154 +319,134 @@ class SnortManager:
         Start the Snort 3 process in IDS mode on the configured interface.
         Snort writes alerts to alert_fast.txt in the log directory.
         """
-        if self._snort_process and self._snort_process.poll() is None:
-            self._log_warning("Snort is already running (PID: %s)", self._snort_process.pid)
+        running = [p for p in self._snort_processes if p and p.poll() is None]
+        if running:
+            self._log_warning("Snort already running on %d interface(s).", len(running))
             return True
 
-        # Ensure log directory exists
-        os.makedirs(self.log_dir, exist_ok=True)
-
-        # Ensure alert file exists (for tailing)
-        if not os.path.exists(self.alert_file):
-            with open(self.alert_file, 'w') as f:
-                pass
-
-        # Check config exists
         if not os.path.exists(self.config_path):
             self._log_error(
                 "Snort config not found at %s. Run snort_setup.sh first!", self.config_path
             )
             return False
 
-        # Build Snort command
-        cmd = [
-            'snort',
-            '-c', self.config_path,
-            '-i', self.interface,
-            '-l', self.log_dir,
-            '-A', 'alert_fast',
-            '--warn-all',
-            '-q',   # Quiet mode (suppress banner)
-            '-D',   # Daemon mode
-        ]
+        self._snort_processes = []
+        any_ok = False
+        for iface in self.interfaces:
+            log_subdir = os.path.join(self.log_dir, 'ids_' + iface.replace('/', '_'))
+            alert_path = os.path.join(log_subdir, 'alert_fast.txt')
+            os.makedirs(log_subdir, exist_ok=True)
+            if not os.path.exists(alert_path):
+                open(alert_path, 'w').close()
 
-        self._log_info("Starting Snort IDS on interface %s...", self.interface)
-        self._log_info("Command: %s", ' '.join(cmd))
+            cmd = ['snort', '-c', self.config_path, '-i', iface, '-l', log_subdir,
+                   '-A', 'alert_fast', '--warn-all', '-q', '-D']
+            self._log_info("Starting Snort IDS on interface %s...", iface)
+            try:
+                proc = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    preexec_fn=os.setsid if hasattr(os, 'setsid') else None
+                )
+                time.sleep(1.5)
+                if proc.poll() is not None:
+                    err = proc.stderr.read().decode('utf-8', errors='ignore')[:500]
+                    self._log_error("Snort on %s failed: %s", iface, err or "(no stderr)")
+                    continue
+                self._snort_processes.append(proc)
+                any_ok = True
+                self._log_info("Snort on %s started (PID: %s)", iface, proc.pid)
+            except FileNotFoundError:
+                self._log_error("Snort binary not found! sudo apt install snort")
+                break
+            except PermissionError:
+                self._log_error("Permission denied. Run with sudo.")
+                break
+            except Exception as e:
+                self._log_error("Snort on %s: %s", iface, str(e))
 
-        try:
-            self._snort_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                preexec_fn=os.setsid if hasattr(os, 'setsid') else None
-            )
-
-            # Wait briefly to check if it started OK
-            time.sleep(2)
-            if self._snort_process.poll() is not None:
-                # Process already exited — something went wrong
-                stderr = self._snort_process.stderr.read().decode('utf-8', errors='ignore')
-                stdout = self._snort_process.stdout.read().decode('utf-8', errors='ignore')
-                self._log_error("Snort failed to start!")
-                if stderr:
-                    self._log_error("STDERR: %s", stderr[:500])
-                if stdout:
-                    self._log_error("STDOUT: %s", stdout[:500])
-                self._snort_process = None
-                return False
-
-            self._log_info("Snort IDS started successfully (PID: %s)", self._snort_process.pid)
-            return True
-
-        except FileNotFoundError:
-            self._log_error(
-                "Snort binary not found! Install Snort 3: sudo apt install snort"
-            )
-            return False
-        except PermissionError:
-            self._log_error(
-                "Permission denied. Run the controller with sudo to allow Snort packet capture."
-            )
-            return False
-        except Exception as e:
-            self._log_error("Failed to start Snort: %s", str(e))
-            return False
+        return any_ok
 
     def stop_snort(self):
-        """Gracefully stop the Snort process."""
+        """Gracefully stop all Snort processes."""
         self._running = False
 
-        if self._snort_process:
-            self._log_info("Stopping Snort IDS (PID: %s)...", self._snort_process.pid)
+        for proc in self._snort_processes:
+            if proc and proc.poll() is None:
+                self._log_info("Stopping Snort IDS (PID: %s)...", proc.pid)
+                try:
+                    if hasattr(os, 'killpg'):
+                        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    else:
+                        proc.terminate()
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+                except (ProcessLookupError, OSError):
+                    pass
+        self._snort_processes = []
+
+        for iface in self.interfaces:
             try:
-                # Send SIGTERM to the process group
-                if hasattr(os, 'killpg'):
-                    os.killpg(os.getpgid(self._snort_process.pid), signal.SIGTERM)
-                else:
-                    self._snort_process.terminate()
-                self._snort_process.wait(timeout=10)
-                self._log_info("Snort stopped gracefully.")
-            except subprocess.TimeoutExpired:
-                self._log_warning("Snort did not stop in time, forcing kill...")
-                self._snort_process.kill()
-                self._snort_process.wait()
-            except ProcessLookupError:
-                self._log_info("Snort process already exited.")
-            except Exception as e:
-                self._log_error("Error stopping Snort: %s", str(e))
-            finally:
-                self._snort_process = None
+                subprocess.run(
+                    ['pkill', '-f', f'snort.*-i.*{re.escape(iface)}'],
+                    timeout=5, capture_output=True
+                )
+            except Exception:
+                pass
 
-        # Also try to kill any lingering snort processes on the interface
-        try:
-            subprocess.run(
-                ['pkill', '-f', f'snort.*-i.*{self.interface}'],
-                timeout=5, capture_output=True
-            )
-        except Exception:
-            pass
-
-        if self._monitor_thread and self._monitor_thread.is_alive():
-            self._monitor_thread.join(timeout=5)
+        for t in self._monitor_threads:
+            if t and t.is_alive():
+                t.join(timeout=5)
+        self._monitor_threads = []
         self._log_info("Snort IDS monitor stopped. Total alerts processed: %d", self._alert_count)
 
     # ---- Alert Monitoring ----
 
     def start_monitoring(self):
         """
-        Start a background daemon thread that tails the Snort alert file
-        and processes new alerts in real-time.
+        Start background daemon threads that tail Snort alert files
+        and process new alerts in real-time (one thread per interface).
         """
         if self._running:
             self._log_warning("Alert monitor is already running.")
             return
 
         self._running = True
-        self._monitor_thread = threading.Thread(
-            target=self._tail_alert_file,
-            name='SnortAlertMonitor',
-            daemon=True
-        )
-        self._monitor_thread.start()
+        self._monitor_threads = []
+        for iface in self.interfaces:
+            log_subdir = os.path.join(self.log_dir, 'ids_' + iface.replace('/', '_'))
+            alert_path = os.path.join(log_subdir, 'alert_fast.txt')
+            t = threading.Thread(
+                target=self._tail_alert_file,
+                args=(alert_path,),
+                name='SnortAlertMonitor-%s' % iface,
+                daemon=True
+            )
+            t.start()
+            self._monitor_threads.append(t)
         self._log_info(
-            "Snort alert monitor started — watching %s", self.alert_file
+            "Snort alert monitor started — watching %d interface(s): %s",
+            len(self.interfaces), ', '.join(self.interfaces)
         )
 
-    def _tail_alert_file(self):
+    def _tail_alert_file(self, alert_file=None):
         """
         Tail the alert_fast.txt file, processing new lines as they appear.
         Similar to 'tail -f' behavior.
         """
+        if alert_file is None:
+            alert_file = self.alert_file
         while self._running:
             try:
                 # Wait for file to exist
-                while self._running and not os.path.exists(self.alert_file):
+                while self._running and not os.path.exists(alert_file):
                     time.sleep(1)
 
                 if not self._running:
                     break
 
-                with open(self.alert_file, 'r') as f:
+                with open(alert_file, 'r') as f:
                     # Seek to end of file (only process new alerts)
                     f.seek(0, 2)
 
@@ -475,7 +460,7 @@ class SnortManager:
 
                             # Check if file was rotated (size < current position)
                             try:
-                                current_size = os.path.getsize(self.alert_file)
+                                current_size = os.path.getsize(alert_file)
                                 if current_size < f.tell():
                                     self._log_info("Alert file rotated, reopening...")
                                     break  # Break to reopen file
@@ -561,10 +546,10 @@ class SnortManager:
             return summary
 
     def is_snort_running(self):
-        """Check if the Snort process is still alive."""
-        if self._snort_process is None:
+        """Check if any Snort process is still alive."""
+        if not self._snort_processes:
             return False
-        return self._snort_process.poll() is None
+        return any(p and p.poll() is None for p in self._snort_processes)
 
 
 # =============================================================================

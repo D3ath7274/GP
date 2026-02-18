@@ -111,7 +111,7 @@ def topology():
     h2 = net.addHost('h2', ip='10.0.0.4/24')
     s1 = net.addSwitch('s1')
     c0 = net.addController('c0', controller=RemoteController, 
-                           ip='192.168.1.101', port=6633)
+                           ip='192.168.1.11', port=6633)  # Controller machine
     
     print("*** Configuring WiFi nodes")
     net.configureWifiNodes()

@@ -7,13 +7,22 @@
 #
 # Usage:  sudo bash snort_setup.sh [INTERFACE] [HOME_NET]
 # Example: sudo bash snort_setup.sh ens33 10.0.0.0/24
+# Example (multi-network): sudo bash snort_setup.sh eth0 "10.0.0.0/24,192.168.1.0/24"
 # =============================================================================
 
 set -e
 
 # ---- Configuration ----
 INTERFACE="${1:-ens33}"
-HOME_NET="${2:-10.0.0.0/24}"
+# Default: Mininet (10.0.0.x) + management (192.168.1.x) for controller+Mininet-wifi setup
+HOME_NET_RAW="${2:-10.0.0.0/24,192.168.1.0/24}"
+
+# Format HOME_NET for Snort 3: multiple networks need brackets [a,b,c]
+if echo "${HOME_NET_RAW}" | grep -q ','; then
+    HOME_NET="[${HOME_NET_RAW}]"
+else
+    HOME_NET="${HOME_NET_RAW}"
+fi
 RULES_URL="https://www.snort.org/downloads/community/snort3-community-rules.tar.gz"
 SNORT_DIR="/etc/snort"
 RULES_DIR="${SNORT_DIR}/rules"

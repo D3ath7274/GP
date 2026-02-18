@@ -2,31 +2,28 @@
 
 Integrates Snort 3 with community rules into the Ryu SDN controller to monitor all network traffic on the controller machine and report detected attacks in real-time.
 
-## Architecture
+## Architecture (Traffic Mirroring)
+
+All data-plane traffic (10.0.0.x Mininet + 192.168.1.x management) is mirrored to the controller:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                Ubuntu Controller Machine                 │
-│                                                          │
-│   ┌──────────────┐     ┌──────────────────────────┐     │
-│   │ Ryu SDN      │     │ Snort 3 IDS              │     │
-│   │ Controller   │────>│  - Community Rules        │     │
-│   │              │     │  - Listening on ens33     │     │
-│   │ SnortManager │<────│  - alert_fast output      │     │
-│   │ (monitors    │     └──────────────────────────┘     │
-│   │  alerts)     │                                       │
-│   └──────────────┘                                       │
-│          │                                               │
-│          ▼                                               │
-│   Logs: "SQL injection attack detected from 10.0.0.5"   │
-│   Logs: "SYN flood attack detected from 10.0.0.2"       │
-└─────────────────────────────────────────────────────────┘
-          ▲
-          │ All traffic (physical + Mininet-wifi virtual)
-          │
-    ┌─────┴──────┐
-    │   ens33    │
-    └────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Ubuntu Controller Machine                         │
+│                                                                      │
+│   OpenFlow switch ──> Packet-In (every packet) ──> TrafficMirror     │
+│        │                                    │           │            │
+│        │                                    │           v            │
+│        v                                    │    ┌──────────────┐    │
+│   Flow rules with Output(CONTROLLER)        │    │ TAP snort_tap│    │
+│   so ALL packets are copied to controller   │    └──────┬───────┘    │
+│                                              │           │            │
+│   ┌──────────────┐     ┌────────────────────┴───────────┴───────┐   │
+│   │ Ryu SDN      │     │ Snort 3 IDS (multi-interface)          │   │
+│   │ Controller   │     │  - ens33 (192.168.1.x physical)        │   │
+│   │ SnortManager │<────│  - snort_tap (mirrored 10.0.0.x)       │   │
+│   └──────────────┘     │  - alert_fast output → ML-ready        │   │
+│                        └────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Prerequisites
@@ -43,14 +40,23 @@ Integrates Snort 3 with community rules into the Ryu SDN controller to monitor a
    ```bash
    pip install ryu
    ```
-4. **Root/sudo access** (Snort needs raw packet capture)
+4. **Root/sudo access** (Snort + TAP need raw packet capture)
+5. **TUN/TAP kernel module** (for traffic mirroring): `sudo modprobe tun`
 
 ## Quick Start
 
 ### Step 1: Download Rules & Configure Snort
 
+**Controller (192.168.1.11) + Mininet-wifi (192.168.1.13):** Monitor both the management network and Mininet topology:
+
 ```bash
 cd Controller/
+# Replace eth0/ens33 with your controller's interface (ip link show)
+sudo bash snort_setup.sh eth0 "10.0.0.0/24,192.168.1.0/24"
+```
+
+Or single network only:
+```bash
 sudo bash snort_setup.sh ens33 10.0.0.0/24
 ```
 
@@ -77,7 +83,10 @@ The controller will automatically:
 sudo python3 "SDN Topology/topology .py"
 ```
 
-All Mininet-wifi traffic flows through the controller's `ens33` interface and is monitored by Snort.
+**Traffic visibility (forced mirroring):** All traffic is now mirrored to the controller:
+- **10.0.0.x** (Mininet data-plane): Every packet is sent to the controller via OpenFlow `Output(OFPP_CONTROLLER)`, injected into a TAP interface, and analyzed by Snort.
+- **192.168.1.x** (management): Snort captures directly on the physical interface.
+- The controller creates a TAP device (`snort_tap`) at startup. Snort monitors both the physical NIC and the TAP.
 
 ## Testing with Simulated Attacks
 
@@ -135,9 +144,13 @@ self.snort_manager = SnortManager(
 
 ### Changing HOME_NET
 
-Re-run setup with your subnet:
+Re-run setup with your subnet(s):
 ```bash
+# Single network
 sudo bash snort_setup.sh ens33 192.168.1.0/24
+
+# Multiple networks (controller + Mininet)
+sudo bash snort_setup.sh eth0 "10.0.0.0/24,192.168.1.0/24"
 ```
 
 ### Standalone Snort Monitor Test
