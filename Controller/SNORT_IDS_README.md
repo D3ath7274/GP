@@ -26,9 +26,18 @@ All data-plane traffic (10.0.0.x Mininet + 192.168.1.x management) is mirrored t
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+## Machine Setup
+
+| Machine | IP | Role |
+|---------|-----|------|
+| **Controller** | 192.168.1.11 | Ryu + Snort IDS + traffic mirror |
+| **Mininet-wifi** | 192.168.1.13 | Topology, hosts, APs, switches |
+
 ## Prerequisites
 
-1. **Ubuntu** (controller machine)
+**On Controller (192.168.1.11):**
+
+1. **Ubuntu**
 2. **Snort 3** installed:
    ```bash
    # Option A: From package manager
@@ -41,13 +50,16 @@ All data-plane traffic (10.0.0.x Mininet + 192.168.1.x management) is mirrored t
    pip install ryu
    ```
 4. **Root/sudo access** (Snort + TAP need raw packet capture)
-5. **TUN/TAP kernel module** (for traffic mirroring): `sudo modprobe tun`
+5. **TUN/TAP kernel module** (for traffic mirroring):
+   ```bash
+   sudo modprobe tun
+   ```
 
 ## Quick Start
 
 ### Step 1: Download Rules & Configure Snort
 
-**Controller (192.168.1.11) + Mininet-wifi (192.168.1.13):** Monitor both the management network and Mininet topology:
+**Machine: Controller (192.168.1.11)**
 
 ```bash
 cd Controller/
@@ -67,6 +79,8 @@ This will:
 
 ### Step 2: Start the Controller (with Snort)
 
+**Machine: Controller (192.168.1.11)**
+
 ```bash
 sudo ryu-manager "Controller network only .py"
 ```
@@ -76,7 +90,9 @@ The controller will automatically:
 2. Begin monitoring `/var/log/snort/alert_fast.txt`
 3. Log any detected attacks to the controller output
 
-### Step 3: Start Mininet-wifi Topology (on another machine or terminal)
+### Step 3: Start Mininet-wifi Topology
+
+**Machine: Mininet-wifi (192.168.1.13)**
 
 ```bash
 sudo python3 "SDN Topology/topology .py"
@@ -89,20 +105,20 @@ sudo python3 "SDN Topology/topology .py"
 
 ## Testing with Simulated Attacks
 
-From another terminal or a Mininet host, try:
+**Machine: Mininet-wifi (192.168.1.13)** — from a Mininet host (e.g. `mininet> sta1`) or from the host:
 
 ```bash
-# SYN Flood
-sudo hping3 -S --flood -p 80 <controller-ip>
+# SYN Flood (replace 192.168.1.11 with controller IP if different)
+sudo hping3 -S --flood -p 80 192.168.1.11
 
 # Port Scan
-nmap -sS <controller-ip>
+nmap -sS 192.168.1.11
 
 # SQL Injection payload via HTTP
-curl "http://<controller-ip>/?id=1' OR '1'='1"
+curl "http://192.168.1.11/?id=1' OR '1'='1"
 
 # Ping Flood
-sudo hping3 --icmp --flood <controller-ip>
+sudo hping3 --icmp --flood 192.168.1.11
 ```
 
 ### Expected Output in Controller Logs
@@ -133,12 +149,14 @@ Controller/
 
 ### Changing the Network Interface
 
-Edit `Controller network only .py`, line with `_physical_interface`:
+**Machine: Controller (192.168.1.11)** — Edit `Controller network only .py`, line with `_physical_interface`:
 ```python
 self._physical_interface = 'ens33'
 ```
 
 ### Changing HOME_NET
+
+**Machine: Controller (192.168.1.11)**
 
 Re-run setup with your subnet(s):
 ```bash
@@ -150,6 +168,8 @@ sudo bash snort_setup.sh ens33 "10.0.0.0/24,192.168.1.0/24"
 ```
 
 ### Standalone Snort Monitor Test
+
+**Machine: Controller (192.168.1.11)**
 
 Test the alert parser without the Ryu controller:
 ```bash
