@@ -62,13 +62,15 @@ class TrafficMirror:
             return False
 
         try:
-            ifr = struct.pack('16sH', self.tap_name.encode()[:15].ljust(16),
-                              IFF_TAP | IFF_NO_PI)
+            # ifreq: 16 bytes name + 2 bytes flags + padding to 40 bytes (64-bit Linux)
+            name_bytes = self.tap_name.encode()[:15].ljust(16, b'\x00')[:16]
+            ifr = struct.pack('16sH22x', name_bytes, IFF_TAP | IFF_NO_PI)
             fcntl.ioctl(self._tap_fd, TUNSETIFF, ifr)
         except OSError as e:
             os.close(self._tap_fd)
             self._tap_fd = None
-            self._log('error', "Cannot create TAP: %s", str(e))
+            # Non-fatal: controller falls back to physical interface only
+            self._log('warning', "TAP mirror unavailable: %s. Snort will use physical interface only.", str(e))
             return False
 
         # Bring interface up

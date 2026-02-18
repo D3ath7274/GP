@@ -188,6 +188,13 @@ ALERT_PATTERN_SIMPLE = re.compile(
     r'\[\*\*\]'
 )
 
+# Snort 2 fast format: {...} IP -> IP (IPs may appear without Classification/Priority)
+ALERT_PATTERN_SNORT2 = re.compile(
+    r'\{(?P<proto>\w+)\}\s+'
+    r'(?P<src_ip>[\d.]+)(?::(?P<src_port>\d+))?\s*->\s*'
+    r'(?P<dst_ip>[\d.]+)(?::(?P<dst_port>\d+))?'
+)
+
 
 def parse_alert_line(line):
     """
@@ -229,15 +236,24 @@ def parse_alert_line(line):
         d['classification'] = ''
         d['raw'] = line
 
-        # Try to extract IPs from the line
-        ip_match = re.findall(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?', line)
-        if len(ip_match) >= 2:
-            d['src_ip'] = ip_match[-2][0]
-            d['src_port'] = ip_match[-2][1] or '?'
-            d['dst_ip'] = ip_match[-1][0]
-            d['dst_port'] = ip_match[-1][1] or '?'
-        elif len(ip_match) == 1:
-            d['src_ip'] = ip_match[0][0]
+        # Try to extract IPs: Snort 2 fast has {PROTO} src -> dst
+        snort2_match = ALERT_PATTERN_SNORT2.search(line)
+        if snort2_match:
+            g = snort2_match.groupdict()
+            d['proto'] = g.get('proto', '?')
+            d['src_ip'] = g.get('src_ip', '?')
+            d['src_port'] = g.get('src_port') or '?'
+            d['dst_ip'] = g.get('dst_ip', '?')
+            d['dst_port'] = g.get('dst_port') or '?'
+        else:
+            ip_match = re.findall(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?', line)
+            if len(ip_match) >= 2:
+                d['src_ip'] = ip_match[-2][0]
+                d['src_port'] = ip_match[-2][1] or '?'
+                d['dst_ip'] = ip_match[-1][0]
+                d['dst_port'] = ip_match[-1][1] or '?'
+            elif len(ip_match) == 1:
+                d['src_ip'] = ip_match[0][0]
 
         return d
 
@@ -291,6 +307,10 @@ class SnortManager:
         self._alerts = deque(maxlen=max_alerts)
         self._alert_count = 0
         self._lock = threading.Lock()
+        # Rate-limit noisy rules (e.g. false positives from TAP/mirrored traffic)
+        self._noisy_sids = {527}  # BAD-TRAFFIC same SRC/DST
+        self._last_alert_per_sid = {}  # sid -> timestamp
+        self._rate_limit_seconds = 120
 
     # ---- Logging helpers ----
 
@@ -312,7 +332,22 @@ class SnortManager:
         else:
             print(f"[SNORT-ERROR] {msg % args if args else msg}")
 
-    # ---- Snort Process Management ----
+    # ---- Snort Version Detection ----
+
+    def _detect_snort_version(self):
+        """Detect Snort 2 vs 3. Returns 2 or 3 or None."""
+        try:
+            result = subprocess.run(
+                ['snort', '-V'], capture_output=True, text=True, timeout=5
+            )
+            out = (result.stdout or '') + (result.stderr or '')
+            if 'Version 3' in out:
+                return 3
+            if 'Version 2' in out:
+                return 2
+        except Exception:
+            pass
+        return None
 
     def start_snort(self):
         """
@@ -324,9 +359,24 @@ class SnortManager:
             self._log_warning("Snort already running on %d interface(s).", len(running))
             return True
 
-        if not os.path.exists(self.config_path):
+        snort_ver = self._detect_snort_version()
+        if snort_ver == 2:
+            self._log_warning("Snort 2.x detected. For full features (Lua config), install Snort 3.")
+            config_path = '/etc/snort/snort.conf'
+            if not os.path.exists(config_path):
+                config_path = self.config_path.replace('.lua', '.conf')
+            self._alert_filename = 'alert'
+            snort_args = ['-A', 'fast', '-q', '-D']
+        else:
+            config_path = self.config_path
+            self._alert_filename = 'alert_fast.txt'
+            snort_args = ['-A', 'alert_fast', '-q', '-D']
+            if snort_ver == 3:
+                snort_args.insert(-1, '--warn-all')  # Snort 3 only
+
+        if not os.path.exists(config_path):
             self._log_error(
-                "Snort config not found at %s. Run snort_setup.sh first!", self.config_path
+                "Snort config not found at %s. Run snort_setup.sh first!", config_path
             )
             return False
 
@@ -334,13 +384,12 @@ class SnortManager:
         any_ok = False
         for iface in self.interfaces:
             log_subdir = os.path.join(self.log_dir, 'ids_' + iface.replace('/', '_'))
-            alert_path = os.path.join(log_subdir, 'alert_fast.txt')
             os.makedirs(log_subdir, exist_ok=True)
+            alert_path = os.path.join(log_subdir, self._alert_filename)
             if not os.path.exists(alert_path):
                 open(alert_path, 'w').close()
 
-            cmd = ['snort', '-c', self.config_path, '-i', iface, '-l', log_subdir,
-                   '-A', 'alert_fast', '--warn-all', '-q', '-D']
+            cmd = ['snort', '-c', config_path, '-i', iface, '-l', log_subdir] + snort_args
             self._log_info("Starting Snort IDS on interface %s...", iface)
             try:
                 proc = subprocess.Popen(
@@ -414,9 +463,10 @@ class SnortManager:
 
         self._running = True
         self._monitor_threads = []
+        alert_fname = getattr(self, '_alert_filename', 'alert_fast.txt')
         for iface in self.interfaces:
             log_subdir = os.path.join(self.log_dir, 'ids_' + iface.replace('/', '_'))
-            alert_path = os.path.join(log_subdir, 'alert_fast.txt')
+            alert_path = os.path.join(log_subdir, alert_fname)
             t = threading.Thread(
                 target=self._tail_alert_file,
                 args=(alert_path,),
@@ -479,11 +529,25 @@ class SnortManager:
         if not alert:
             return
 
+        sid = alert.get('sid', '?')
+        try:
+            sid_int = int(sid)
+        except (ValueError, TypeError):
+            sid_int = -1
+
         with self._lock:
             self._alert_count += 1
             alert['alert_number'] = self._alert_count
             alert['detected_at'] = datetime.now().isoformat()
             self._alerts.append(alert)
+
+        # Rate-limit noisy rules (false positives from TAP/mirrored traffic)
+        now = time.time()
+        if sid_int in self._noisy_sids:
+            last = self._last_alert_per_sid.get(sid_int, 0)
+            if now - last < self._rate_limit_seconds:
+                return  # Skip log and callback for this repeat
+            self._last_alert_per_sid[sid_int] = now
 
         # Log the alert
         self._log_warning(

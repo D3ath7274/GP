@@ -196,8 +196,11 @@ The system classifies ~50 attack categories including:
 
 | Issue | Solution |
 |-------|----------|
-| "Snort binary not found" | Install Snort 3: `sudo apt install snort` |
+| "Snort binary not found" | Install Snort: `sudo apt install snort` |
+| "unrecognized option '--warn-all'" | Snort 2.x detected — controller auto-adapts. For full features, install Snort 3. |
 | "Permission denied" | Run with `sudo`: `sudo ryu-manager ...` |
-| "Config not found" | Run `sudo bash snort_setup.sh` first |
-| No alerts appearing | Check `/var/log/snort/alert_fast.txt` has content |
-| Snort crashes on start | Validate config: `snort -c /etc/snort/snort.lua --warn-all` |
+| "Config not found" | Run `sudo bash snort_setup.sh` first (Snort 3). Snort 2 uses `/etc/snort/snort.conf`. |
+| "TAP mirror unavailable" | Non-fatal. Snort uses physical interface only. Ensure `sudo modprobe tun`. |
+| No alerts appearing | Check `/var/log/snort/ids_*/alert_fast.txt` (Snort 3) or `.../alert` (Snort 2) |
+| Snort crashes on start | Validate: `snort -c /etc/snort/snort.lua -T` (Snort 3) or `snort -c /etc/snort/snort.conf -T` (Snort 2) |
+| Flood of "BAD-TRAFFIC same SRC/DST" | False positives from TAP mirroring. Alerts are rate-limited (1 per 2 min). To disable: edit `/etc/snort/rules/bad-traffic.rules` and comment out rule sid 527 |
