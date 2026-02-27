@@ -7,8 +7,9 @@ import threading
 def register_iot_device(net, name, ip, mac, switch_name, device_type):
     """
     Dynamically adds an IoT device and registers it with the controller.
-    Usage in CLI: py register_iot_device(net, 'iot1', '10.0.0.5/24', '00:00:00:00:01:01', 's1', 'IOT:TempSensor')
+    Usage in CLI: py net.register_iot_device(net, 'iot1', '10.0.0.5/24', '00:00:00:00:01:01', 's1', 'IOT:TempSensor')
     """
+    from mininet.link import Link
     print(f"*** Dynamically adding IoT device: {name}")
     try:
         # Check if device already exists to avoid error
@@ -16,47 +17,56 @@ def register_iot_device(net, name, ip, mac, switch_name, device_type):
             print(f"Device {name} already exists.")
             return
 
-        # Get switch node (by name if string provided)
-        if isinstance(switch_name, str):
-            switch = net.getNodeByName(switch_name)
-        else:
-            switch = switch_name
+        # Get switch node
+        switch = net.getNodeByName(switch_name) if isinstance(switch_name, str) else switch_name
         
         if not switch:
             print(f"Switch {switch_name} not found.")
             return
 
-        # Add host
+        # 1. Add host
         iot = net.addHost(name, ip=ip, mac=mac)
-        # Add link
-        link = net.addLink(iot, switch)
-        # Configure interface
-        iot.configDefault()
-        # Attach to switch port
-        switch.attach(link.intf2)
+        if not iot:
+            print(f"Error: Failed to create host {name}")
+            return
+            
+        print(f"*** Host {name} created. Adding link to {switch.name} manually...")
         
-        # Allow some time for link to come up and efficient ARP/Controller discovery
-        # We spawn a thread for the registration packet so we don't block the CLI if called from there?
-        # No, better to block slightly or just wait.
-        # But if called from CLI 'py ...', sleep might block CLI.
-        # Let's use a small delay or a thread.
+        # 2. Add link manually (more reliable at runtime)
+        # Using Link class directly avoids some net.addLink topology-build-time checks
+        link = Link(iot, switch)
+        if not link:
+            print(f"Error: Manual Link creation returned None")
+            return
+            
+        # 3. Add link to net's records for cleanup later
+        net.links.append(link)
+            
+        # 4. Configure interface
+        iot.configDefault()
+        
+        # 5. Attach to switch port
+        if hasattr(switch, 'attach'):
+            switch.attach(link.intf2)
+        
+        print(f"*** Link added and connected to switch. Starting registration thread...")
+
         def _send_reg():
             time.sleep(2)
             print(f"*** Sending registration packet from {name}...")
-            # specific UDP packet to port 9999
-            # Payload: REGISTER:IOT:<Type> or REGISTER:GATEWAY:<Info>
             msg = f"REGISTER:{device_type}"
-            # Using python to send packet as 'nc' might not be available
-            # Sending to a broadcast-like IP or the gateway IP to ensure it reaches the switch
             cmd = f"python3 -c \"import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.sendto(b'{msg}', ('10.0.0.254', 9999))\""
             iot.cmd(cmd)
             print(f"*** Registration packet sent for {name}")
 
         t = threading.Thread(target=_send_reg)
+        t.daemon = True
         t.start()
         
     except Exception as e:
         print(f"Error adding/registering device {name}: {e}")
+        import traceback
+        traceback.print_exc()
 
 def connect_iot_device(net, name, ip, mac, switch_name):
     """
@@ -127,9 +137,13 @@ def topology():
     s1.start([c0])
     ap1.start([c0])
 
-    print(f"*** Registration function available: py register_iot_device(net, 'biot1', '10.0.0.5/24', '00:00...', s1, 'IOT:Type')")
-    print(f"*** Connection function available (Passive): py connect_iot_device(net, 'new1', '10.0.0.99/24', '00:00...99', 's1')")
+    print(f"*** Registration function available: py net.register_iot_device(net, 'biot1', '10.0.0.5/24', '00:00...', 's1', 'IOT:Type')")
+    print(f"*** Connection function available (Passive): py net.connect_iot_device(net, 'new1', '10.0.0.99/24', '00:00...99', 's1')")
     
+    # Inject functions into net object so they are available to 'py' command
+    net.register_iot_device = register_iot_device
+    net.connect_iot_device = connect_iot_device
+
     print("*** Running CLI")
     CLI(net)
     net.stop()

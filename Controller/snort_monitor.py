@@ -307,15 +307,19 @@ class SnortManager:
         self._alerts = deque(maxlen=max_alerts)
         self._alert_count = 0
         self._lock = threading.Lock()
-        # Rate-limit noisy rules (e.g. false positives from TAP/mirrored traffic)
         # Rate-limit rules that fire on normal traffic (ping, TAP mirror, UPnP discovery, etc.)
         self._noisy_sids = {
-            527,   # BAD-TRAFFIC same SRC/DST
-            366, 384, 408,  # ICMP PING, ICMP Echo Reply (normal pingall)
-            1917,  # SCAN UPnP service discover (legitimate UPnP discovery at startup)
+            527,             # BAD-TRAFFIC same SRC/DST (loops in mirrored traffic)
+            366, 384, 408,   # ICMP PING, ICMP Echo Reply (normal pingall)
+            1917, 1923,      # SCAN UPnP/SSDP service discover (legitimate discovery)
+            11963,           # GPL ICMP info
+            2100366,         # GPL PING
+            2101390,         # GPL ICMP Echo Reply
+            2101424,         # GPL DNS request
+            1000001,         # Often used for custom probe/test rules
         }
         self._last_alert_per_sid = {}  # sid -> timestamp
-        self._rate_limit_seconds = 120
+        self._rate_limit_seconds = 300  # Increased to 5 minutes for noise suppression
 
     # ---- Logging helpers ----
 
@@ -346,9 +350,9 @@ class SnortManager:
                 ['snort', '-V'], capture_output=True, text=True, timeout=5
             )
             out = (result.stdout or '') + (result.stderr or '')
-            if 'Version 3' in out:
+            if 'Version 3' in out or 'snort3' in out.lower():
                 return 3
-            if 'Version 2' in out:
+            if 'Version 2' in out or 'Snort 2' in out:
                 return 2
         except Exception:
             pass
@@ -366,18 +370,31 @@ class SnortManager:
 
         snort_ver = self._detect_snort_version()
         if snort_ver == 2:
-            self._log_warning("Snort 2.x detected. For full features (Lua config), install Snort 3.")
-            config_path = '/etc/snort/snort.conf'
-            if not os.path.exists(config_path):
-                config_path = self.config_path.replace('.lua', '.conf')
+            self._log_warning("Snort 2.x detected. Note: This monitor is optimized for Snort 3 (Lua).")
+            # Try standard Snort 2 config locations
+            config_paths = [
+                '/etc/snort/snort.conf',
+                '/etc/snort/snort.lua'.replace('.lua', '.conf'),
+                'snort.conf'
+            ]
+            config_path = next((p for p in config_paths if os.path.exists(p)), None)
+            
+            if not config_path:
+                self._log_error(
+                    "Snort 2.x config not found! Expected /etc/snort/snort.conf. "
+                    "Run: sudo apt install snort-rules-default"
+                )
+                return False
             self._alert_filename = 'alert'
-            snort_args = ['-A', 'fast', '-q', '-D']
+            # No -D for Snort 2 to catch startup errors
+            snort_args = ['-A', 'fast', '-q']
         else:
             config_path = self.config_path
             self._alert_filename = 'alert_fast.txt'
-            snort_args = ['-A', 'alert_fast', '-q', '-D']
+            # No -D for Snort 3 to catch startup errors
+            snort_args = ['-A', 'alert_fast', '-q']
             if snort_ver == 3:
-                snort_args.insert(-1, '--warn-all')  # Snort 3 only
+                snort_args.append('--warn-all')
 
         if not os.path.exists(config_path):
             self._log_error(
@@ -393,27 +410,33 @@ class SnortManager:
             alert_path = os.path.join(log_subdir, self._alert_filename)
             if not os.path.exists(alert_path):
                 open(alert_path, 'w').close()
+            
+            # Use files for output to avoid blocking on PIPE buffers if Snort is noisy
+            out_file = open(os.path.join(log_subdir, 'snort_stdout.log'), 'w')
+            err_file = open(os.path.join(log_subdir, 'snort_stderr.log'), 'w')
 
             cmd = ['snort', '-c', config_path, '-i', iface, '-l', log_subdir] + snort_args
-            self._log_info("Starting Snort IDS on interface %s...", iface)
+            self._log_info("Starting Snort IDS on interface %s (using %s)...", iface, config_path)
             try:
+                # Use DEVNULL for stdin, and files for others
                 proc = subprocess.Popen(
-                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    cmd, stdout=out_file, stderr=err_file, stdin=subprocess.DEVNULL,
                     preexec_fn=os.setsid if hasattr(os, 'setsid') else None
                 )
-                time.sleep(1.5)
+                time.sleep(2.0)
                 if proc.poll() is not None:
-                    err = proc.stderr.read().decode('utf-8', errors='ignore')[:500]
-                    self._log_error("Snort on %s failed: %s", iface, err or "(no stderr)")
+                    # Snort failed immediately. Read the error from the file.
+                    err_file.close() # Close to flush
+                    with open(os.path.join(log_subdir, 'snort_stderr.log'), 'r') as f:
+                        err = f.read()[:500]
+                    self._log_error("Snort on %s failed: %s", iface, err or "(check log for details)")
                     continue
+                
                 self._snort_processes.append(proc)
                 any_ok = True
                 self._log_info("Snort on %s started (PID: %s)", iface, proc.pid)
             except FileNotFoundError:
                 self._log_error("Snort binary not found! sudo apt install snort")
-                break
-            except PermissionError:
-                self._log_error("Permission denied. Run with sudo.")
                 break
             except Exception as e:
                 self._log_error("Snort on %s: %s", iface, str(e))
@@ -576,7 +599,6 @@ class SnortManager:
             alert.get('msg', ''),
             alert.get('priority', '?')
         )
-
         # Invoke callback (for Ryu controller integration)
         if self.on_alert:
             try:

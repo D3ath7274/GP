@@ -192,7 +192,49 @@ The system classifies ~50 attack categories including:
 | Brute Force | `Brute force login attempt from X` |
 | Protocol Attacks | `ARP spoofing from X`, `DNS amplification from X` |
 
-## Troubleshooting
+## 7. Machine Learning Dataset Generation
+
+The controller now automatically captures network traffic and generates a labeled dataset for ML/DL training.
+
+**File:** `dataset.csv` (created in the controller directory)
+
+### Features Extracted
+
+The dataset includes **45+ features** across three categories to detect zero-day attacks and post-compromise behavior:
+
+1.  **Flow-Level Features** (Communication mechanics)
+    - Packet rates, byte rates, TCP flags (SYN/ACK/FIN/RST/PSH), port diversity.
+2.  **Device Behavioral Profiles** (Anomaly detection)
+    - Tracking historical behavior per device (IP).
+    - **Z-Score Deviations:** `device_pkt_rate_deviation`, `device_byte_rate_deviation`, `device_payload_size_deviation`.
+    - **Protocol Distribution:** % TCP/UDP/ICMP usage.
+    - **New Destination Ratio:** Detects lateral movement (hacking attempts).
+3.  **Network Context** (Global state)
+    - Traffic entropy (Shannon entropy of source IPs/destination ports).
+    - Total active flows, global throughput.
+
+### Labeling
+
+The dataset is automatically labeled using Snort IDS alerts:
+- **`label` = 0**: Normal traffic.
+- **`label` = 1**: Known attack (Matched a Snort rule).
+- **`label` = 2**: Behavioral Anomaly (Deviates significantly from device profile, potential Zero-Day).
+
+### Usage for ML Training
+
+Load the CSV into Python/Pandas:
+```python
+import pandas as pd
+df = pd.read_csv('dataset.csv')
+
+# Features (X)
+X = df.drop(['label', 'attack_type', 'snort_sid', 'timestamp', 'src_ip', 'dst_ip'], axis=1)
+
+# Labels (y)
+y = df['label']
+```
+
+## 8. Troubleshooting
 
 | Issue | Solution |
 |-------|----------|

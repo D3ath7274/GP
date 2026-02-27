@@ -29,6 +29,8 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import ipv4
 from ryu.lib.packet import udp
 from ryu.lib.packet import ether_types
+from ryu.lib.packet import tcp  # Added
+from ryu.lib.packet import icmp # Added
 
 # Snort 3 IDS Integration + Traffic Mirroring
 import os
@@ -36,6 +38,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snort_monitor import SnortManager
 from traffic_mirror import TrafficMirror
+from traffic_capture import TrafficCapture  # Added
 
 
 class SimpleSwitch(app_manager.RyuApp):
@@ -77,11 +80,28 @@ class SimpleSwitch(app_manager.RyuApp):
                 "Controller will continue without IDS."
             )
 
+        # Traffic Capture Module for ML Dataset Generation
+        self.traffic_capture = TrafficCapture(
+            output_path='dataset.csv',
+            window_seconds=5.0,
+            snort_manager=self.snort_manager,
+            controller=self,  # Pass controller for IoT/Gateway context
+            logger=self.logger
+        )
+        self.traffic_capture.start()
+
         # IoT configuration
         # Vendor/OUI prefixes (lowercase) commonly used by IoT devices.
         self.iot_mac_prefixes = ['00:11:22', 'aa:bb:cc']
         # Excluded prefixes: Mininet-wifi, virtual interfaces, known non-IoT.
-        self.iot_exclude_prefixes = ['42:00:00', '0a:f7:8a', '16:ca:de', '3a:10:75', '92:01:13', 'ba:e2:67', 'aa:45:c7']
+        self.iot_exclude_prefixes = [
+            '42:00:00', '0a:f7:8a', '16:ca:de', '3a:10:75', '92:01:13', 'ba:e2:67', 'aa:45:c7',
+            '00:00:00', # Standard Mininet stations
+            '32:46:1b', '2e:d7:13'  # Generic virtual interfaces
+        ]
+        
+        # Tracking set to prevent log flooding (discovery only logged once per session)
+        self.discovery_logged_macs = set()
         # Explicit IoT device MAC -> type mapping (example):
         # {'00:11:22:33:44:55': 'home_sensor'}
         self.iot_devices = {}
@@ -131,11 +151,16 @@ class SimpleSwitch(app_manager.RyuApp):
             alert.get('proto', '?'),
             alert.get('sid', '?'),
         )
+        # Forward alert to traffic capture for labeling anomalous flows
+        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+            self.traffic_capture.record_alert(alert)
 
     def close(self):
         """Clean up: stop Snort and traffic mirror when the controller shuts down."""
         self.logger.info("Controller shutting down — stopping Snort IDS...")
         self.snort_manager.stop_snort()
+        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+            self.traffic_capture.stop()
         if hasattr(self, 'traffic_mirror') and self.traffic_mirror:
             self.traffic_mirror.stop()
         super(SimpleSwitch, self).close()
@@ -193,10 +218,13 @@ class SimpleSwitch(app_manager.RyuApp):
             self.discovered_gateways[mac_lower] = {}
         self.discovered_gateways[mac_lower]['dpid'] = dpid
         self.discovered_gateways[mac_lower]['port'] = port
+        
         # Also update the primary gateway mapping for this switch (use the first discovered gateway per switch)
         if dpid not in self.iot_gateways:
             self.iot_gateways[dpid] = {'port': port, 'mac': mac}
-            self.logger.info("Gateway discovered and registered: %s on dpid %s port %s", mac, dpid, port)
+            # Display long DPIDs in hex for readability (like in Mininet ap1)
+            dpid_str = hex(dpid) if dpid > 0xffff else str(dpid)
+            self.logger.info("Gateway discovered and registered: %s on dpid %s port %d", mac, dpid_str, port)
         else:
             self.logger.debug("Gateway already registered for dpid %s, skipping %s", dpid, mac)
 
@@ -211,7 +239,65 @@ class SimpleSwitch(app_manager.RyuApp):
 
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             # ignore lldp packet
+            # ignore lldp packet
             return
+
+        # --- Feature Extraction for ML ---
+        packet_info = {
+            'packet_size': len(msg.data),
+            'dpid': datapath.id,
+            'in_port': msg.in_port,
+            'eth_src': eth.src,
+            'eth_dst': eth.dst,
+            'src_ip': '',
+            'dst_ip': '',
+            'src_port': 0,
+            'dst_port': 0,
+            'protocol': 'OTHER',
+            'tcp_flags': {}
+        }
+        
+        # Parse L3/L4 headers if present
+        if eth.ethertype == ether_types.ETH_TYPE_IP:
+            ip_pkt = pkt.get_protocol(ipv4.ipv4)
+            if ip_pkt:
+                packet_info['src_ip'] = ip_pkt.src
+                packet_info['dst_ip'] = ip_pkt.dst
+                
+                if ip_pkt.proto == 6: # TCP
+                    packet_info['protocol'] = 'TCP'
+                    tcp_pkt = pkt.get_protocol(tcp.tcp)
+                    if tcp_pkt:
+                        packet_info['src_port'] = tcp_pkt.src_port
+                        packet_info['dst_port'] = tcp_pkt.dst_port
+                        # Extract flags
+                        packet_info['tcp_flags'] = {
+                            'SYN': (tcp_pkt.bits & tcp.TCP_SYN) != 0,
+                            'ACK': (tcp_pkt.bits & tcp.TCP_ACK) != 0,
+                            'FIN': (tcp_pkt.bits & tcp.TCP_FIN) != 0,
+                            'RST': (tcp_pkt.bits & tcp.TCP_RST) != 0,
+                            'PSH': (tcp_pkt.bits & tcp.TCP_PSH) != 0,
+                        }
+                elif ip_pkt.proto == 17: # UDP
+                    packet_info['protocol'] = 'UDP'
+                    udp_pkt = pkt.get_protocol(udp.udp)
+                    if udp_pkt:
+                        packet_info['src_port'] = udp_pkt.src_port
+                        packet_info['dst_port'] = udp_pkt.dst_port
+                elif ip_pkt.proto == 1: # ICMP
+                    packet_info['protocol'] = 'ICMP'
+                    icmp_pkt = pkt.get_protocol(icmp.icmp)
+        elif eth.ethertype == ether_types.ETH_TYPE_ARP:
+             packet_info['protocol'] = 'ARP'
+             # Could extract ARP details if needed, but src/dst MAC is already there
+
+        # Record packet for ML dataset
+        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+            # Filter out non-IP/ARP traffic if desired, or keep all
+            if packet_info['protocol'] != 'OTHER':
+                self.traffic_capture.record_packet(packet_info)
+
+
 
         # Inject packet into TAP for Snort (mirrors all data-plane traffic)
         if hasattr(self, 'traffic_mirror') and self.traffic_mirror:
@@ -242,9 +328,17 @@ class SimpleSwitch(app_manager.RyuApp):
                         message = payload_data.decode('utf-8', errors='ignore').strip()
                         if message.startswith("REGISTER:"):
                             _, type_str, info = message.split(':', 2)
-                            self.logger.info("Registration request received from %s", src)
+                            self.logger.info("Explicit registration received from %s", src)
                             if type_str == "IOT":
                                 self.iot_devices[src] = info
+                                # Ensure it's not marked as gateway if it's explicitly IoT
+                                mac_lower = src.lower()
+                                if mac_lower in self.discovered_gateways:
+                                    del self.discovered_gateways[mac_lower]
+                                # Also remove from switch-port mapping for all DPIDs
+                                for dpid_id in list(self.iot_gateways.keys()):
+                                    if self.iot_gateways[dpid_id].get('mac', '').lower() == mac_lower:
+                                        del self.iot_gateways[dpid_id]
                                 self.logger.info("Registered IoT Device: %s (Type: %s)", src, info)
                             elif type_str == "GATEWAY":
                                 self.register_gateway_dynamic(src, dpid, msg.in_port)
@@ -264,34 +358,54 @@ class SimpleSwitch(app_manager.RyuApp):
                         
                         if is_gw_oui:
                             self.register_gateway_dynamic(src, dpid, msg.in_port)
-                            self.logger.info("Passive Discovery: Gateway detected via DHCP %s", src)
+                            if src not in self.discovery_logged_macs:
+                                self.logger.info("Passive Discovery: Gateway detected via DHCP %s", src)
+                                self.discovery_logged_macs.add(src)
                         elif is_iot_oui:
                              self.iot_devices[src] = "IOT:known_OUI"
-                             self.logger.info("Passive Discovery: IoT Device detected via DHCP %s", src)
+                             if src not in self.discovery_logged_macs:
+                                 self.logger.info("Passive Discovery: IoT Device detected via DHCP %s", src)
+                                 self.discovery_logged_macs.add(src)
                         elif self.is_iot(src):
                              self.iot_devices[src] = "IOT:Detected_DHCP"
-                             self.logger.info("Passive Discovery: IoT Device detected via DHCP %s", src)
+                             if src not in self.discovery_logged_macs:
+                                 self.logger.info("Passive Discovery: IoT Device detected via DHCP %s", src)
+                                 self.discovery_logged_macs.add(src)
+                        else:
+                             # Not IoT, still record to prevent re-checking
+                             self.discovery_logged_macs.add(src)
 
         # 3. Passive Discovery via ARP
         if eth.ethertype == ether_types.ETH_TYPE_ARP:
              if src not in self.iot_devices and src not in self.discovered_gateways:
                  if self.is_gateway(src):
                      self.register_gateway_dynamic(src, dpid, msg.in_port)
-                     self.logger.info("Passive Discovery: Gateway detected via ARP %s", src)
+                     if src not in self.discovery_logged_macs:
+                         self.logger.info("Passive Discovery: Gateway detected via ARP %s", src)
+                         self.discovery_logged_macs.add(src)
                  elif self.is_iot(src): # strict check?
                      self.iot_devices[src] = "IOT:Unknown_OUI"
-                     self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
+                     if src not in self.discovery_logged_macs:
+                         self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
+                         self.discovery_logged_macs.add(src)
                  elif self.is_iot(src):
                      # Only register if OUI matches IoT prefix (no auto-register of unknowns)
                      self.iot_devices[src] = "IOT:Detected_ARP"
-                     self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
+                     if src not in self.discovery_logged_macs:
+                         self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
+                         self.discovery_logged_macs.add(src)
+                 else:
+                     # Not IoT, still record to prevent re-checking
+                     self.discovery_logged_macs.add(src)
 
         # ----------------------------------
 
         # Dynamic gateway discovery (Legacy Check)
-        is_gateway_src = self.is_gateway(src)
-        if is_gateway_src:
-            self.register_gateway_dynamic(src, dpid, msg.in_port)
+        # ONLY if not already known as an IoT device
+        if src not in self.iot_devices:
+            is_gateway_src = self.is_gateway(src)
+            if is_gateway_src:
+                self.register_gateway_dynamic(src, dpid, msg.in_port)
 
         is_iot_src = self.is_iot(src)
         is_iot_dst = self.is_iot(dst)
