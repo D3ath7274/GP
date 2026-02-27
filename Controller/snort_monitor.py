@@ -261,7 +261,11 @@ class SnortManager:
         self._blocked_sids = {
             527,             # BAD-TRAFFIC same SRC/DST (TAP mirror artifact)
             366, 384, 408,   # ICMP PING, ICMP Echo Reply (normal pingall)
-            402,             # ICMP Destination Unreachable (normal routing)
+            399,             # ICMP Destination Unreachable Host Unreachable
+            401,             # ICMP Destination Unreachable Network Unreachable
+            402,             # ICMP Destination Unreachable Port Unreachable
+            449,             # ICMP Time-To-Live Exceeded in Transit (traceroute)
+            485,             # ICMP Dest Unreachable Comm Administratively Prohibited
             1917, 1923,      # SCAN UPnP/SSDP service discover (legitimate multicast)
             2657,            # SSLv2 Client_Hello (TLS negotiation, not an attack)
             11963,           # GPL ICMP info
