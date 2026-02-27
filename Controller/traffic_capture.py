@@ -470,8 +470,9 @@ class TrafficCapture:
                 profile = self._devices.get(src_ip)
             
             # Compute flow's intrinsic label
+            protocol = flow_key[3]  # (src_ip, dst_ip, dst_port, protocol)
             label, attack_type, sid = self._compute_label(
-                src_ip, flow_key[1], alerts, profile, pps, bps, avg_size
+                src_ip, flow_key[1], alerts, profile, pps, bps, avg_size, protocol
             )
             
             if label > 0:
@@ -646,7 +647,7 @@ class TrafficCapture:
         }
 
     def _compute_label(self, src_ip, dst_ip, alerts, device_profile, 
-                       curr_pps=0, curr_bps=0, curr_avg_size=0):
+                       curr_pps=0, curr_bps=0, curr_avg_size=0, protocol='OTHER'):
         """
         Determine the label for a flow. Goal: 0% False Positives.
           0 = normal
@@ -677,14 +678,8 @@ class TrafficCapture:
         # Don't label behaviorally if:
         # - Not enough flows for a stable baseline
         # - Device is still in stabilization period
-        # - Protocol is a noisy maintenance protocol (ARP/DHCP/ICMP)
         if device_profile.total_flows < MIN_FLOWS or age < STABILIZATION_SEC:
             return 0, 'normal', ''
-        
-        # Whitelist core protocols for behavioral anomaly (too noisy/jittery)
-        # We rely on Snort for attacks in these protocols.
-        # Check against flows snapshot protocol if passed, or use OTHER
-        # (Assuming the caller passes the key from current flow)
         
         features = device_profile.get_features(curr_pps, curr_bps, curr_avg_size)
         pkt_dev = abs(features.get('device_pkt_rate_deviation', 0))
@@ -694,18 +689,34 @@ class TrafficCapture:
         ports_count = features.get('device_unique_dst_ports', 0)
         ips_count = features.get('device_unique_dst_ips', 0)
 
-        # Granular Categorization
+        # --- Protocol-Aware Attack Categorization ---
+        # Determine the flow's protocol from the flow key (dst_ip is the second element)
+        # We use the protocol string passed indirectly via the flow key.
+
+        # Volumetric flood detection (PPS or BPS spike)
         if pkt_dev > Z_THRESHOLD or byte_dev > Z_THRESHOLD:
-            return 2, 'Flood: Volumetric', ''
+            # Protocol-aware flood type selection
+            proto_upper = protocol.upper() if protocol else 'OTHER'
+            if proto_upper == 'ICMP':
+                return 2, 'ICMP Flood', ''
+            elif proto_upper == 'UDP':
+                return 2, 'UDP Flood', ''
+            elif proto_upper == 'ARP':
+                return 2, 'ARP Spoofing', ''
+            else:
+                return 2, 'SYN Flood', ''
         
+        # Payload anomaly (could be UDP flood or buffer overflow probe)
         if payload_dev > Z_THRESHOLD:
-            return 2, 'Anomaly: Payload Size', ''
+            return 2, 'UDP Flood', ''
             
+        # Host discovery / network sweep
         if new_dst_ratio > 0.9 and ips_count > 10:
-            return 2, 'Scan: Host Discovery', ''
+            return 2, 'Port Scan', ''
             
+        # Port sweep
         if ports_count > 50:
-            return 2, 'Scan: Port Sweep', ''
+            return 2, 'Port Scan', ''
 
         return 0, 'normal', ''
 

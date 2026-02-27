@@ -33,105 +33,54 @@ from datetime import datetime
 # =============================================================================
 
 ATTACK_CLASSIFICATIONS = {
-    # SQL Injection
-    'sql injection': 'SQL injection attack',
-    'sql inject': 'SQL injection attack',
-    'sql attack': 'SQL injection attack',
-    'sqli': 'SQL injection attack',
-    'sql select': 'SQL injection attack',
-    'sql union': 'SQL injection attack',
-    'sql blind': 'SQL injection attack',
-    '1=1': 'SQL injection attack',
-    'or 1=1': 'SQL injection attack',
+    # --- SYN Flood / DoS (Attack Type 1) ---
+    'syn flood': 'SYN Flood',
+    'synflood': 'SYN Flood',
+    'dos': 'SYN Flood',
+    'ddos': 'SYN Flood',
+    'denial of service': 'SYN Flood',
+    'flood': 'SYN Flood',
+    'resource exhaustion': 'SYN Flood',
 
-    # Cross-Site Scripting (XSS)
-    'xss': 'XSS (Cross-Site Scripting) attack',
-    'cross-site scripting': 'XSS (Cross-Site Scripting) attack',
-    'cross site scripting': 'XSS (Cross-Site Scripting) attack',
-    'script injection': 'XSS (Cross-Site Scripting) attack',
+    # --- Port Scan (Attack Type 2) ---
+    'port scan': 'Port Scan',
+    'portscan': 'Port Scan',
+    'nmap': 'Port Scan',
+    'scan attempt': 'Port Scan',
+    'reconnaissance': 'Port Scan',
+    'fingerprint': 'Port Scan',
 
-    # SYN Flood / DoS
-    'syn flood': 'SYN flood attack',
-    'synflood': 'SYN flood attack',
-    'dos': 'Denial of Service (DoS) attack',
-    'ddos': 'Distributed Denial of Service (DDoS) attack',
-    'denial of service': 'Denial of Service (DoS) attack',
-    'flood': 'Flooding attack',
-    'resource exhaustion': 'Resource exhaustion attack',
+    # --- ICMP Flood (Attack Type 3) ---
+    'icmp flood': 'ICMP Flood',
+    'ping of death': 'ICMP Flood',
+    'smurf': 'ICMP Flood',
 
-    # Port Scanning
-    'port scan': 'Port scan',
-    'portscan': 'Port scan',
-    'nmap': 'Nmap scan',
-    'scan attempt': 'Network scan attempt',
-    'reconnaissance': 'Reconnaissance activity',
-    'fingerprint': 'OS fingerprinting attempt',
+    # --- ARP Spoofing (Attack Type 4) ---
+    'arp spoof': 'ARP Spoofing',
+    'arp poisoning': 'ARP Spoofing',
+    'arp': 'ARP Spoofing',
 
-    # Brute Force
-    'brute force': 'Brute force attack',
-    'brute-force': 'Brute force attack',
-    'login attempt': 'Brute force login attempt',
-    'failed login': 'Brute force login attempt',
-    'password': 'Password attack',
+    # --- UDP Flood (Attack Type 5) ---
+    'udp flood': 'UDP Flood',
+    'dns amplification': 'UDP Flood',
 
-    # Exploits
-    'exploit': 'Exploit attempt',
-    'buffer overflow': 'Buffer overflow exploit',
-    'overflow': 'Buffer overflow exploit',
-    'shellcode': 'Shellcode execution attempt',
-    'code execution': 'Remote code execution attempt',
-    'rce': 'Remote code execution attempt',
-    'command injection': 'Command injection attack',
-    'cmd injection': 'Command injection attack',
-
-    # Malware / Trojan
-    'malware': 'Malware detected',
-    'trojan': 'Trojan activity detected',
-    'backdoor': 'Backdoor activity detected',
-    'ransomware': 'Ransomware activity detected',
-    'worm': 'Worm activity detected',
-    'botnet': 'Botnet activity detected',
-    'c2': 'Command & Control (C2) communication',
-    'c&c': 'Command & Control (C2) communication',
-    'command and control': 'Command & Control (C2) communication',
-
-    # Web Attacks
-    'directory traversal': 'Directory traversal attack',
-    'path traversal': 'Path traversal attack',
-    'file inclusion': 'File inclusion attack',
-    'lfi': 'Local file inclusion attack',
-    'rfi': 'Remote file inclusion attack',
-    'webshell': 'Web shell detected',
-    'web shell': 'Web shell detected',
-    'php injection': 'PHP injection attack',
-
-    # Protocol Attacks
-    'dns': 'DNS attack',
-    'dns amplification': 'DNS amplification attack',
-    'arp': 'ARP spoofing/poisoning',
-    'arp spoof': 'ARP spoofing attack',
-    'icmp': 'ICMP-based attack',
-    'ping of death': 'Ping of Death attack',
-    'smurf': 'Smurf attack',
-
-    # Network Protocol Violations
-    'bad traffic': 'Suspicious/malformed traffic',
-    'suspicious': 'Suspicious activity',
-    'anomaly': 'Traffic anomaly detected',
-    'policy violation': 'Policy violation',
-    'inappropriate': 'Inappropriate content/traffic',
-
-    # SSH / Telnet
-    'ssh': 'SSH attack',
-    'telnet': 'Telnet attack',
-
-    # SNMP
-    'snmp': 'SNMP attack',
-    'community string': 'SNMP community string exposure',
-
-    # FTP
-    'ftp': 'FTP attack',
-    'ftp bounce': 'FTP bounce attack',
+    # --- Other (still useful for Snort signature matching) ---
+    'sql injection': 'SQL Injection',
+    'sql inject': 'SQL Injection',
+    'sqli': 'SQL Injection',
+    'xss': 'XSS Attack',
+    'cross-site scripting': 'XSS Attack',
+    'exploit': 'Exploit Attempt',
+    'buffer overflow': 'Exploit Attempt',
+    'overflow': 'Exploit Attempt',
+    'shellcode': 'Exploit Attempt',
+    'malware': 'Malware',
+    'trojan': 'Malware',
+    'backdoor': 'Malware',
+    'botnet': 'Malware',
+    'brute force': 'Brute Force',
+    'brute-force': 'Brute Force',
+    'login attempt': 'Brute Force',
 }
 
 
@@ -307,19 +256,20 @@ class SnortManager:
         self._alerts = deque(maxlen=max_alerts)
         self._alert_count = 0
         self._lock = threading.Lock()
-        # Rate-limit rules that fire on normal traffic (ping, TAP mirror, UPnP discovery, etc.)
-        self._noisy_sids = {
-            527,             # BAD-TRAFFIC same SRC/DST (loops in mirrored traffic)
+        # Hard blocklist: these SIDs are FULLY DROPPED (no storage, no callback, no CSV label).
+        # They are known false positives in SDN/Mininet environments.
+        self._blocked_sids = {
+            527,             # BAD-TRAFFIC same SRC/DST (TAP mirror artifact)
             366, 384, 408,   # ICMP PING, ICMP Echo Reply (normal pingall)
-            1917, 1923,      # SCAN UPnP/SSDP service discover (legitimate discovery)
+            402,             # ICMP Destination Unreachable (normal routing)
+            1917, 1923,      # SCAN UPnP/SSDP service discover (legitimate multicast)
+            2657,            # SSLv2 Client_Hello (TLS negotiation, not an attack)
             11963,           # GPL ICMP info
             2100366,         # GPL PING
             2101390,         # GPL ICMP Echo Reply
             2101424,         # GPL DNS request
             1000001,         # Often used for custom probe/test rules
         }
-        self._last_alert_per_sid = {}  # sid -> timestamp
-        self._rate_limit_seconds = 300  # Increased to 5 minutes for noise suppression
 
     # ---- Logging helpers ----
 
@@ -563,41 +513,35 @@ class SnortManager:
         except (ValueError, TypeError):
             sid_int = -1
 
+        # Hard blocklist: fully drop known false-positive SIDs.
+        # They never reach storage, callback, or the CSV labeler.
+        if sid_int in self._blocked_sids:
+            return
+
         with self._lock:
             self._alert_count += 1
             alert['alert_number'] = self._alert_count
             alert['detected_at'] = datetime.now().isoformat()
             self._alerts.append(alert)
 
-        # Rate-limit noisy rules (false positives from TAP/mirrored traffic)
-        now = time.time()
-        if sid_int in self._noisy_sids:
-            last = self._last_alert_per_sid.get(sid_int, 0)
-            if now - last < self._rate_limit_seconds:
-                return  # Skip log and callback for this repeat
-            self._last_alert_per_sid[sid_int] = now
-
         # Log the alert
         self._log_warning(
             "\n"
             "========================================\n"
-            "  🚨 IDS ALERT #%d\n"
+            "  \U0001f6a8 IDS ALERT #%d\n"
             "========================================\n"
             "  Attack : %s\n"
             "  From   : %s:%s\n"
             "  To     : %s:%s\n"
             "  Proto  : %s\n"
-            "  Rule   : [%s:%s:%s] %s\n"
-            "  Priority: %s\n"
+            "  Rule   : SID %s\n"
             "========================================",
             self._alert_count,
             alert['attack_type'],
             alert['src_ip'], alert['src_port'],
             alert['dst_ip'], alert['dst_port'],
             alert['proto'],
-            alert.get('gid', '?'), alert['sid'], alert.get('rev', '?'),
-            alert.get('msg', ''),
-            alert.get('priority', '?')
+            alert['sid'],
         )
         # Invoke callback (for Ryu controller integration)
         if self.on_alert:
