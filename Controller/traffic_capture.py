@@ -294,6 +294,12 @@ class TrafficCapture:
         # --- Attacker Identification (one-time log per IP/Type) ---
         self._logged_attackers = set() # Set of (ip, attack_type)
 
+        # --- Two-Stage Rate-Limit Tracking ---
+        # Stage 1: suspected → rate-limited for RATE_LIMIT_SECONDS
+        # Stage 2: if anomaly continues after cooldown → full alert
+        self._suspected_attackers = {}  # ip -> {'first_seen': time, 'attack_type': str, 'target': str}
+        self.RATE_LIMIT_SECONDS = 30
+
     # ---- Logging helpers ----
 
     def _log(self, level, msg, *args):
@@ -594,21 +600,43 @@ class TrafficCapture:
             'snort_sid': snort_sid,
         }
 
-        # --- Attacker Identification Logging ---
+        # --- Two-Stage Attacker Detection ---
         if label in [1, 2]:
-            # Log once per (attacker, attack_type) per session
+            now = time.time()
             log_key = (src_ip, attack_type)
-            if log_key not in self._logged_attackers:
-                self._logged_attackers.add(log_key)
-                # Formatted console log for visibility
-                reason = "IDS/Snort" if label == 1 else "Behavioral Anomaly"
+            reason = "IDS/Snort" if label == 1 else "Behavioral Anomaly"
+            
+            if src_ip not in self._suspected_attackers:
+                # Stage 1: First detection → rate-limit for 30 seconds
+                self._suspected_attackers[src_ip] = {
+                    'first_seen': now,
+                    'attack_type': attack_type,
+                    'target': dst_ip,
+                }
                 self._log('warning',
-                    f"\n[!] ATTACKER IDENTIFIED\n"
-                    f"    IP      : {src_ip}\n"
-                    f"    Target  : {dst_ip}\n"
-                    f"    Type    : {attack_type}\n"
+                    f"\n[⚠] RATE LIMITED {src_ip} for {self.RATE_LIMIT_SECONDS} seconds\n"
+                    f"    Suspected : {attack_type}\n"
+                    f"    Target    : {dst_ip}\n"
                     f"    Detected via: {reason}\n"
+                    f"    Action    : Traffic from {src_ip} is being monitored\n"
                 )
+            else:
+                suspect_info = self._suspected_attackers[src_ip]
+                elapsed = now - suspect_info['first_seen']
+                
+                if elapsed >= self.RATE_LIMIT_SECONDS:
+                    # Stage 2: Attack persists after cooldown → confirmed attacker
+                    if log_key not in self._logged_attackers:
+                        self._logged_attackers.add(log_key)
+                        self._log('warning',
+                            f"\n[!] ATTACKER CONFIRMED\n"
+                            f"    IP      : {src_ip}\n"
+                            f"    Target  : {dst_ip}\n"
+                            f"    Type    : {attack_type}\n"
+                            f"    Detected via: {reason}\n"
+                            f"    Duration: {elapsed:.0f}s (persisted beyond {self.RATE_LIMIT_SECONDS}s rate-limit)\n"
+                        )
+                # else: still in cooldown period, stay silent
 
         # Merge all features
         row = {}
@@ -681,6 +709,13 @@ class TrafficCapture:
         if device_profile.total_flows < MIN_FLOWS or age < STABILIZATION_SEC:
             return 0, 'normal', ''
         
+        # Protocol-aware thresholds: ICMP/ARP are bursty (pingall), need higher bar
+        proto_upper = protocol.upper() if protocol else 'OTHER'
+        if proto_upper in ('ICMP', 'ARP'):
+            z_thresh = 10.0  # Much higher for bursty protocols
+        else:
+            z_thresh = Z_THRESHOLD  # 6.0 for TCP/UDP
+        
         features = device_profile.get_features(curr_pps, curr_bps, curr_avg_size)
         pkt_dev = abs(features.get('device_pkt_rate_deviation', 0))
         byte_dev = abs(features.get('device_byte_rate_deviation', 0))
@@ -690,13 +725,10 @@ class TrafficCapture:
         ips_count = features.get('device_unique_dst_ips', 0)
 
         # --- Protocol-Aware Attack Categorization ---
-        # Determine the flow's protocol from the flow key (dst_ip is the second element)
-        # We use the protocol string passed indirectly via the flow key.
 
         # Volumetric flood detection (PPS or BPS spike)
-        if pkt_dev > Z_THRESHOLD or byte_dev > Z_THRESHOLD:
+        if pkt_dev > z_thresh or byte_dev > z_thresh:
             # Protocol-aware flood type selection
-            proto_upper = protocol.upper() if protocol else 'OTHER'
             if proto_upper == 'ICMP':
                 return 2, 'ICMP Flood', ''
             elif proto_upper == 'UDP':
@@ -707,7 +739,7 @@ class TrafficCapture:
                 return 2, 'SYN Flood', ''
         
         # Payload anomaly (could be UDP flood or buffer overflow probe)
-        if payload_dev > Z_THRESHOLD:
+        if payload_dev > z_thresh:
             return 2, 'UDP Flood', ''
             
         # Host discovery / network sweep
