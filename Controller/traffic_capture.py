@@ -300,6 +300,12 @@ class TrafficCapture:
         self._suspected_attackers = {}  # ip -> {'first_seen': time, 'attack_type': str, 'target': str}
         self.RATE_LIMIT_SECONDS = 30
 
+        # --- Per-Host, Per-Window Rate Counters (for precise attack detection) ---
+        self._host_icmp_count = defaultdict(int)    # src_ip -> ICMP packets this window
+        self._host_syn_count = defaultdict(int)     # src_ip -> SYN-only packets (no ACK)
+        self._host_udp_count = defaultdict(int)     # src_ip -> UDP packets this window
+        self._host_dst_ports = defaultdict(set)     # src_ip -> set of unique dst_ports
+
     # ---- Logging helpers ----
 
     def _log(self, level, msg, *args):
@@ -376,6 +382,18 @@ class TrafficCapture:
             self._net_total_packets += 1
             self._net_total_bytes += packet_size
 
+            # --- Per-host rate counters (for attack detection) ---
+            if protocol == 'ICMP':
+                self._host_icmp_count[src_ip] += 1
+            elif protocol == 'UDP':
+                self._host_udp_count[src_ip] += 1
+            elif protocol == 'TCP':
+                # Count SYN-only packets (SYN set, ACK not set) — hallmark of SYN flood
+                if tcp_flags.get('SYN') and not tcp_flags.get('ACK'):
+                    self._host_syn_count[src_ip] += 1
+            if dst_port and src_ip:
+                self._host_dst_ports[src_ip].add(dst_port)
+
         # Ensure device profile exists
         with self._device_lock:
             if src_ip and src_ip not in self._devices:
@@ -442,6 +460,16 @@ class TrafficCapture:
             self._net_total_packets = 0
             self._net_total_bytes = 0
 
+            # Snapshot and reset per-host rate counters
+            host_icmp = dict(self._host_icmp_count)
+            host_syn = dict(self._host_syn_count)
+            host_udp = dict(self._host_udp_count)
+            host_ports = {ip: set(ports) for ip, ports in self._host_dst_ports.items()}
+            self._host_icmp_count = defaultdict(int)
+            self._host_syn_count = defaultdict(int)
+            self._host_udp_count = defaultdict(int)
+            self._host_dst_ports = defaultdict(set)
+
         # Snapshot alerts
         with self._alert_lock:
             cutoff = time.time() - self.window_seconds * 2
@@ -477,8 +505,15 @@ class TrafficCapture:
             
             # Compute flow's intrinsic label
             protocol = flow_key[3]  # (src_ip, dst_ip, dst_port, protocol)
+            host_counters = {
+                'icmp': host_icmp.get(src_ip, 0),
+                'syn': host_syn.get(src_ip, 0),
+                'udp': host_udp.get(src_ip, 0),
+                'unique_ports': len(host_ports.get(src_ip, set())),
+            }
             label, attack_type, sid = self._compute_label(
-                src_ip, flow_key[1], alerts, profile, pps, bps, avg_size, protocol
+                src_ip, flow_key[1], alerts, profile, pps, bps, avg_size, protocol,
+                host_counters
             )
             
             if label > 0:
@@ -675,14 +710,15 @@ class TrafficCapture:
         }
 
     def _compute_label(self, src_ip, dst_ip, alerts, device_profile, 
-                       curr_pps=0, curr_bps=0, curr_avg_size=0, protocol='OTHER'):
+                       curr_pps=0, curr_bps=0, curr_avg_size=0, protocol='OTHER',
+                       host_counters=None):
         """
         Determine the label for a flow. Goal: 0% False Positives.
           0 = normal
-          1 = known attack (Snort alert matches this flow's IPs)
-          2 = suspicious behavioral deviation (no Snort alert but profile anomaly)
+          1 = known attack (Snort/DAI alert matches this flow's IPs)
+          2 = suspicious behavioral deviation (rate counter or profile anomaly)
         """
-        # --- 1. Known Attacks (Snort) ---
+        # --- 1. Known Attacks (Snort + DAI) ---
         matching_alerts = [
             a for a in alerts
             if a['src_ip'] == src_ip or a['dst_ip'] == dst_ip
@@ -692,62 +728,64 @@ class TrafficCapture:
             alert = matching_alerts[-1]
             return 1, alert['attack_type'], str(alert.get('sid', ''))
 
-        # --- 2. Behavioral Anomaly Detection (Stricter for 0% False Positives) ---
+        # --- 2. Per-Host Rate Counter Detection (Primary) ---
+        # These use absolute thresholds per 5-second window. More reliable than
+        # Z-score because they don't depend on baseline and aren't confused by pingall.
+        if host_counters:
+            # ICMP Flood: >100 ICMP packets from one host in 5 seconds
+            # (normal pingall sends ~1 per target, so 4-5 per window max)
+            if host_counters.get('icmp', 0) > 100:
+                return 2, 'ICMP Flood', ''
+            
+            # SYN Flood: >50 SYN-only (no ACK) packets from one host in 5 seconds
+            # (normal TCP connections send 1 SYN followed by ACK)
+            if host_counters.get('syn', 0) > 50:
+                return 2, 'SYN Flood', ''
+            
+            # UDP Flood: >200 UDP packets from one host in 5 seconds
+            if host_counters.get('udp', 0) > 200:
+                return 2, 'UDP Flood', ''
+            
+            # Port Scan: >25 unique destination ports from one host in 5 seconds
+            # (normal traffic targets 1-3 ports per host)
+            if host_counters.get('unique_ports', 0) > 25:
+                return 2, 'Port Scan', ''
+
+        # --- 3. Z-Score Behavioral Analysis (Secondary / Fallback) ---
         if not device_profile:
             return 0, 'normal', ''
 
-        # Hardened Thresholds & Stabilization Logic
-        MIN_FLOWS = 20          # Wait for more samples
-        STABILIZATION_SEC = 180 # Ignore for first 3 minutes of device life
-        Z_THRESHOLD = 6.0       # Very high (extreme deviation only)
+        MIN_FLOWS = 20
+        STABILIZATION_SEC = 180
+        Z_THRESHOLD = 8.0  # Raised from 6.0 — rate counters handle most floods now
         
         age = time.time() - device_profile.first_seen
-        
-        # Don't label behaviorally if:
-        # - Not enough flows for a stable baseline
-        # - Device is still in stabilization period
         if device_profile.total_flows < MIN_FLOWS or age < STABILIZATION_SEC:
             return 0, 'normal', ''
-        
-        # Protocol-aware thresholds: ICMP/ARP are bursty (pingall), need higher bar
-        proto_upper = protocol.upper() if protocol else 'OTHER'
-        if proto_upper in ('ICMP', 'ARP'):
-            z_thresh = 10.0  # Much higher for bursty protocols
-        else:
-            z_thresh = Z_THRESHOLD  # 6.0 for TCP/UDP
         
         features = device_profile.get_features(curr_pps, curr_bps, curr_avg_size)
         pkt_dev = abs(features.get('device_pkt_rate_deviation', 0))
         byte_dev = abs(features.get('device_byte_rate_deviation', 0))
         payload_dev = abs(features.get('device_payload_size_deviation', 0))
         new_dst_ratio = features.get('device_new_dst_ratio', 0)
-        ports_count = features.get('device_unique_dst_ports', 0)
         ips_count = features.get('device_unique_dst_ips', 0)
 
-        # --- Protocol-Aware Attack Categorization ---
-
-        # Volumetric flood detection (PPS or BPS spike)
-        if pkt_dev > z_thresh or byte_dev > z_thresh:
-            # Protocol-aware flood type selection
+        # Volumetric spike (catches attacks that stay just under rate counter thresholds)
+        proto_upper = protocol.upper() if protocol else 'OTHER'
+        if pkt_dev > Z_THRESHOLD or byte_dev > Z_THRESHOLD:
             if proto_upper == 'ICMP':
                 return 2, 'ICMP Flood', ''
             elif proto_upper == 'UDP':
                 return 2, 'UDP Flood', ''
-            elif proto_upper == 'ARP':
-                return 2, 'ARP Spoofing', ''
-            else:
+            elif proto_upper == 'TCP':
                 return 2, 'SYN Flood', ''
         
-        # Payload anomaly (could be UDP flood or buffer overflow probe)
-        if payload_dev > z_thresh:
+        # Payload anomaly
+        if payload_dev > Z_THRESHOLD:
             return 2, 'UDP Flood', ''
             
-        # Host discovery / network sweep
+        # Host sweep
         if new_dst_ratio > 0.9 and ips_count > 10:
-            return 2, 'Port Scan', ''
-            
-        # Port sweep
-        if ports_count > 50:
             return 2, 'Port Scan', ''
 
         return 0, 'normal', ''

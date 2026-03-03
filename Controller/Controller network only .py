@@ -31,6 +31,7 @@ from ryu.lib.packet import udp
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import tcp  # Added
 from ryu.lib.packet import icmp # Added
+from ryu.lib.packet import arp as arp_lib  # ARP Spoofing Detection
 
 # Snort 3 IDS Integration + Traffic Mirroring
 import os
@@ -120,6 +121,13 @@ class SimpleSwitch(app_manager.RyuApp):
         ]
         # Discovered gateways: { 'mac': {'dpid': <id>, 'port': <port>, 'first_seen': <timestamp>} }
         self.discovered_gateways = {}
+
+        # ===================================================================
+        # ARP Spoofing Detection (SDN equivalent of Dynamic ARP Inspection)
+        # ===================================================================
+        # Binding table: IP -> {'mac': <first_seen_mac>, 'dpid': <dpid>, 'port': <port>}
+        self._arp_bindings = {}
+        self._arp_spoof_logged = set()  # (attacker_mac, victim_ip) — log once per pair
 
     # ===================================================================
     # Snort IDS Alert Handler
@@ -375,27 +383,66 @@ class SimpleSwitch(app_manager.RyuApp):
                              # Not IoT, still record to prevent re-checking
                              self.discovery_logged_macs.add(src)
 
-        # 3. Passive Discovery via ARP
+        # 3. Passive Discovery via ARP + ARP Spoofing Detection
         if eth.ethertype == ether_types.ETH_TYPE_ARP:
+             arp_pkt = pkt.get_protocol(arp_lib.arp)
+             if arp_pkt:
+                 arp_src_ip = arp_pkt.src_ip
+                 arp_src_mac = arp_pkt.src_mac
+                 
+                 # --- ARP Spoofing Detection (DAI equivalent) ---
+                 if arp_src_ip and arp_src_mac:
+                     if arp_src_ip in self._arp_bindings:
+                         bound = self._arp_bindings[arp_src_ip]
+                         if bound['mac'].lower() != arp_src_mac.lower():
+                             # SPOOF DETECTED: different MAC claiming same IP
+                             spoof_key = (arp_src_mac, arp_src_ip)
+                             if spoof_key not in self._arp_spoof_logged:
+                                 self._arp_spoof_logged.add(spoof_key)
+                                 self.logger.warning(
+                                     "\n"
+                                     "╔══════════════════════════════════════════════════════════╗\n"
+                                     "║  ⚠ ARP SPOOFING DETECTED (DAI)                          ║\n"
+                                     "╠══════════════════════════════════════════════════════════╣\n"
+                                     "║  Attacker MAC : %-40s ║\n"
+                                     "║  Claims IP    : %-40s ║\n"
+                                     "║  Real Owner   : %-40s ║\n"
+                                     "║  Switch/Port  : dpid %s port %-26s ║\n"
+                                     "╚══════════════════════════════════════════════════════════╝",
+                                     arp_src_mac,
+                                     arp_src_ip,
+                                     bound['mac'],
+                                     str(dpid), str(msg.in_port)
+                                 )
+                                 # Forward as alert to traffic capture for CSV labeling
+                                 if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                                     self.traffic_capture.record_alert({
+                                         'src_ip': arp_src_ip,
+                                         'dst_ip': arp_src_ip,
+                                         'attack_type': 'ARP Spoofing',
+                                         'sid': 'DAI',
+                                     })
+                     else:
+                         # First time seeing this IP — bind it
+                         self._arp_bindings[arp_src_ip] = {
+                             'mac': arp_src_mac,
+                             'dpid': dpid,
+                             'port': msg.in_port,
+                         }
+
+             # Passive device discovery (existing logic)
              if src not in self.iot_devices and src not in self.discovered_gateways:
                  if self.is_gateway(src):
                      self.register_gateway_dynamic(src, dpid, msg.in_port)
                      if src not in self.discovery_logged_macs:
                          self.logger.info("Passive Discovery: Gateway detected via ARP %s", src)
                          self.discovery_logged_macs.add(src)
-                 elif self.is_iot(src): # strict check?
+                 elif self.is_iot(src):
                      self.iot_devices[src] = "IOT:Unknown_OUI"
                      if src not in self.discovery_logged_macs:
                          self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
                          self.discovery_logged_macs.add(src)
-                 elif self.is_iot(src):
-                     # Only register if OUI matches IoT prefix (no auto-register of unknowns)
-                     self.iot_devices[src] = "IOT:Detected_ARP"
-                     if src not in self.discovery_logged_macs:
-                         self.logger.info("Passive Discovery: IoT Device detected via ARP %s", src)
-                         self.discovery_logged_macs.add(src)
                  else:
-                     # Not IoT, still record to prevent re-checking
                      self.discovery_logged_macs.add(src)
 
         # ----------------------------------
