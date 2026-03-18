@@ -474,7 +474,7 @@ class SimpleSwitch(app_manager.RyuApp):
         # Forward to destination AND send copy to controller (for IDS/ML monitoring)
         actions = [datapath.ofproto_parser.OFPActionOutput(out_port)]
         actions.append(datapath.ofproto_parser.OFPActionOutput(
-            ofproto.OFPP_CONTROLLER, 0  # 0 = send full packet
+            ofproto.OFPP_CONTROLLER, 0xffff  # Send full packet data to controller for IDS/ML
         ))
 
         # install a flow to avoid packet_in next time
