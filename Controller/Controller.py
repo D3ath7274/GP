@@ -36,6 +36,7 @@ from ryu.lib.packet import arp as arp_lib  # ARP Spoofing Detection
 # Snort 3 IDS Integration + Traffic Mirroring
 import os
 import sys
+import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snort_monitor import SnortManager
 from traffic_mirror import TrafficMirror
@@ -48,6 +49,8 @@ class SimpleSwitch(app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
+        self._datapaths = {}   # dpid -> datapath (for sending flow mods outside packet_in)
+        self._blocked_ips = {} # ip -> {'mac':, 'until':, 'attack_type':}
 
         # ===================================================================
         # Traffic Mirroring: All data-plane traffic (10.0.0.x + 192.168.1.x)
@@ -129,6 +132,11 @@ class SimpleSwitch(app_manager.RyuApp):
         self._arp_bindings = {}
         self._arp_spoof_logged = set()  # (attacker_mac, victim_ip) — log once per pair
 
+        # ===================================================================
+        # Dynamic Device Names — learned from traffic (registration, DHCP, etc.)
+        # ===================================================================
+        self._discovered_names = {}  # IP -> device name (populated dynamically)
+
     # ===================================================================
     # Snort IDS Alert Handler
     # ===================================================================
@@ -172,6 +180,103 @@ class SimpleSwitch(app_manager.RyuApp):
         if hasattr(self, 'traffic_mirror') and self.traffic_mirror:
             self.traffic_mirror.stop()
         super(SimpleSwitch, self).close()
+
+    # ===================================================================
+    # Attacker Blocking (OpenFlow DROP Rule)
+    # ===================================================================
+    def block_attacker(self, src_ip, src_mac, attack_type, timeout,
+                       detection_time=None, target_ip='', reason=''):
+        """
+        Install a high-priority OpenFlow DROP rule for an attacker.
+        
+        Args:
+            src_ip: Attacker's IP address
+            src_mac: Attacker's MAC address
+            attack_type: Type of attack detected
+            timeout: hard_timeout in seconds for the DROP rule
+            detection_time: timestamp when attack was first detected
+            target_ip: Target of the attack
+            reason: 'rate-limit' or 'block'
+        """
+        import datetime
+        now = time.time()
+        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        latency = (now - detection_time) if detection_time else 0.0
+
+        # Resolve device name: discovered names → IoT registry → gateways → Host IP
+        device_name = self._discovered_names.get(src_ip, None)
+        mac_lower = src_mac.lower() if src_mac else ''
+        if not device_name:
+            for mac_key, info in self.iot_devices.items():
+                if mac_key.lower() == mac_lower:
+                    device_name = str(info)
+                    break
+        if not device_name and mac_lower in self.discovered_gateways:
+            device_name = 'Gateway'
+        if not device_name:
+            device_name = f'Host {src_ip}'
+
+        # Install DROP rule on all known switches
+        rules_installed = 0
+        for dpid, datapath in self._datapaths.items():
+            ofproto = datapath.ofproto
+            parser = datapath.ofproto_parser
+
+            # Match on source MAC (works for all traffic types including ARP)
+            match = parser.OFPMatch(
+                dl_src=haddr_to_bin(src_mac)
+            )
+            # No actions = DROP
+            mod = parser.OFPFlowMod(
+                datapath=datapath,
+                match=match,
+                cookie=0,
+                command=ofproto.OFPFC_ADD,
+                idle_timeout=0,
+                hard_timeout=timeout,
+                priority=65000,  # Higher than any learning rule
+                flags=ofproto.OFPFF_SEND_FLOW_REM,
+                actions=[]  # Empty = DROP
+            )
+            datapath.send_msg(mod)
+            rules_installed += 1
+
+        self._blocked_ips[src_ip] = {
+            'mac': src_mac,
+            'until': now + timeout,
+            'attack_type': attack_type,
+        }
+
+        # --- Formatted Attack Log ---
+        action_label = 'RATE-LIMITED' if reason == 'rate-limit' else 'BLOCKED'
+        self.logger.warning(
+            "\n"
+            "╔══════════════════════════════════════════════════════════╗\n"
+            "║  🚫 ATTACKER %s%s║\n"
+            "╠══════════════════════════════════════════════════════════╣\n"
+            "║  Time      : %-42s ║\n"
+            "║  Latency   : %-42s ║\n"
+            "║  Device    : %-42s ║\n"
+            "║  IP        : %-42s ║\n"
+            "║  MAC       : %-42s ║\n"
+            "║  Target    : %-42s ║\n"
+            "║  Attack    : %-42s ║\n"
+            "║  Detection : %-42s ║\n"
+            "║  Action    : DROP rule for %-30s ║\n"
+            "║  Switches  : %-42s ║\n"
+            "╚══════════════════════════════════════════════════════════╝",
+            action_label, ' ' * (46 - len(action_label)),
+            now_str,
+            f"{latency:.3f}s (detection → response)",
+            device_name,
+            src_ip,
+            src_mac,
+            target_ip,
+            attack_type,
+            reason,
+            f"{timeout}s",
+            f"{rules_installed} switch(es)",
+        )
 
     def add_flow(self, datapath, in_port, dst, src, actions, idle_timeout=0, hard_timeout=0, priority=None):
         ofproto = datapath.ofproto
@@ -299,6 +404,15 @@ class SimpleSwitch(app_manager.RyuApp):
              packet_info['protocol'] = 'ARP'
              # Could extract ARP details if needed, but src/dst MAC is already there
 
+        # --- Dynamic Device Name Learning ---
+        # Learn device name from ANY packet with a source IP.
+        # Cross-references IP ↔ MAC from the traffic itself.
+        pkt_src_ip = packet_info.get('src_ip', '')
+        pkt_src_mac = eth.src
+        if pkt_src_ip and pkt_src_ip not in self._discovered_names:
+            self._discovered_names[pkt_src_ip] = f'{pkt_src_mac} ({pkt_src_ip})'
+            self.logger.debug("Learned device: %s → %s", pkt_src_ip, pkt_src_mac)
+
         # Record packet for ML dataset
         if hasattr(self, 'traffic_capture') and self.traffic_capture:
             # Filter out non-IP/ARP traffic if desired, or keep all
@@ -316,6 +430,7 @@ class SimpleSwitch(app_manager.RyuApp):
 
         dpid = datapath.id
         self.mac_to_port.setdefault(dpid, {})
+        self._datapaths[dpid] = datapath  # Store for block_attacker()
 
         self.logger.debug("packet in %s %s %s %s", dpid, src, dst, msg.in_port)
 
@@ -348,6 +463,14 @@ class SimpleSwitch(app_manager.RyuApp):
                                     if self.iot_gateways[dpid_id].get('mac', '').lower() == mac_lower:
                                         del self.iot_gateways[dpid_id]
                                 self.logger.info("Registered IoT Device: %s (Type: %s)", src, info)
+                                # Learn device name from registration
+                                if ip_pkt:
+                                    self._discovered_names[ip_pkt.src] = f'IoT:{info}'
+                            elif type_str == "NAME":
+                                # Hostname registration: REGISTER:NAME:sta1
+                                if ip_pkt:
+                                    self._discovered_names[ip_pkt.src] = f'{info} ({ip_pkt.src})'
+                                    self.logger.info("Registered hostname: %s → %s", ip_pkt.src, info)
                             elif type_str == "GATEWAY":
                                 self.register_gateway_dynamic(src, dpid, msg.in_port)
                                 self.logger.info("Registered Gateway: %s (Info: %s)", src, info)
@@ -429,6 +552,9 @@ class SimpleSwitch(app_manager.RyuApp):
                              'dpid': dpid,
                              'port': msg.in_port,
                          }
+                         # Auto-learn device name from first ARP
+                         if arp_src_ip not in self._discovered_names:
+                             self._discovered_names[arp_src_ip] = f'Host {arp_src_ip}'
 
              # Passive device discovery (existing logic)
              if src not in self.iot_devices and src not in self.discovered_gateways:

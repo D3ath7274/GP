@@ -144,6 +144,24 @@ def topology():
     net.register_iot_device = register_iot_device
     net.connect_iot_device = connect_iot_device
 
+    # --- Send hostname registrations to the controller ---
+    # Each host sends REGISTER:NAME:<hostname> so the controller can
+    # map IP → device name for attack logs.
+    def _register_hostnames():
+        time.sleep(3)  # Wait for switch to connect to controller
+        all_hosts = [sta1, sta2, h1, h2]
+        for host in all_hosts:
+            name = host.name
+            msg = f"REGISTER:NAME:{name}"
+            cmd = f"python3 -c \"import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.sendto(b'{msg}', ('10.0.0.254', 9999))\""
+            host.cmd(cmd)
+            print(f"*** Hostname registered: {name}")
+        print("*** All hostnames registered with controller")
+
+    reg_thread = threading.Thread(target=_register_hostnames)
+    reg_thread.daemon = True
+    reg_thread.start()
+
     print("*** Running CLI")
     CLI(net)
     net.stop()

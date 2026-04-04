@@ -306,6 +306,9 @@ class TrafficCapture:
         self._host_udp_count = defaultdict(int)     # src_ip -> UDP packets this window
         self._host_dst_ports = defaultdict(set)     # src_ip -> set of unique dst_ports
 
+        # --- IP to MAC mapping (for block_attacker calls) ---
+        self._ip_to_mac = {}  # src_ip -> eth_src MAC address
+
     # ---- Logging helpers ----
 
     def _log(self, level, msg, *args):
@@ -393,6 +396,11 @@ class TrafficCapture:
                     self._host_syn_count[src_ip] += 1
             if dst_port and src_ip:
                 self._host_dst_ports[src_ip].add(dst_port)
+
+        # Track IP → MAC mapping
+        eth_src = pkt_info.get('eth_src', '')
+        if src_ip and eth_src:
+            self._ip_to_mac[src_ip] = eth_src
 
         # Ensure device profile exists
         with self._device_lock:
@@ -640,37 +648,64 @@ class TrafficCapture:
             now = time.time()
             log_key = (src_ip, attack_type)
             reason = "IDS/Snort" if label == 1 else "Behavioral Anomaly"
+            attacker_mac = self._ip_to_mac.get(src_ip, 'unknown')
             
             if src_ip not in self._suspected_attackers:
-                # Stage 1: First detection → rate-limit for 30 seconds
+                # Stage 1: First detection → rate-limit DROP rule for 30 seconds
                 self._suspected_attackers[src_ip] = {
                     'first_seen': now,
                     'attack_type': attack_type,
                     'target': dst_ip,
                 }
                 self._log('warning',
-                    f"\n[⚠] RATE LIMITED {src_ip} for {self.RATE_LIMIT_SECONDS} seconds\n"
+                    f"\n[⚠] SUSPECTED ATTACK from {src_ip} — monitoring for {self.RATE_LIMIT_SECONDS}s\n"
                     f"    Suspected : {attack_type}\n"
                     f"    Target    : {dst_ip}\n"
                     f"    Detected via: {reason}\n"
-                    f"    Action    : Traffic from {src_ip} is being monitored\n"
                 )
+                # Install 30s DROP rule via controller
+                if self.controller and hasattr(self.controller, 'block_attacker'):
+                    try:
+                        self.controller.block_attacker(
+                            src_ip=src_ip,
+                            src_mac=attacker_mac,
+                            attack_type=attack_type,
+                            timeout=self.RATE_LIMIT_SECONDS,
+                            detection_time=now,
+                            target_ip=dst_ip,
+                            reason='rate-limit',
+                        )
+                    except Exception as e:
+                        self._log('error', f"Failed to install rate-limit rule: {e}")
             else:
                 suspect_info = self._suspected_attackers[src_ip]
                 elapsed = now - suspect_info['first_seen']
                 
                 if elapsed >= self.RATE_LIMIT_SECONDS:
-                    # Stage 2: Attack persists after cooldown → confirmed attacker
+                    # Stage 2: Attack persists after cooldown → confirmed, full block
                     if log_key not in self._logged_attackers:
                         self._logged_attackers.add(log_key)
+                        block_duration = 120  # 2-minute block for confirmed attackers
                         self._log('warning',
-                            f"\n[!] ATTACKER CONFIRMED\n"
-                            f"    IP      : {src_ip}\n"
-                            f"    Target  : {dst_ip}\n"
+                            f"\n[!] ATTACKER CONFIRMED — {src_ip} persisted beyond {self.RATE_LIMIT_SECONDS}s\n"
                             f"    Type    : {attack_type}\n"
-                            f"    Detected via: {reason}\n"
-                            f"    Duration: {elapsed:.0f}s (persisted beyond {self.RATE_LIMIT_SECONDS}s rate-limit)\n"
+                            f"    Target  : {dst_ip}\n"
+                            f"    Duration: {elapsed:.0f}s\n"
                         )
+                        # Install 120s DROP rule via controller
+                        if self.controller and hasattr(self.controller, 'block_attacker'):
+                            try:
+                                self.controller.block_attacker(
+                                    src_ip=src_ip,
+                                    src_mac=attacker_mac,
+                                    attack_type=attack_type,
+                                    timeout=block_duration,
+                                    detection_time=suspect_info['first_seen'],
+                                    target_ip=dst_ip,
+                                    reason='block',
+                                )
+                            except Exception as e:
+                                self._log('error', f"Failed to install block rule: {e}")
                 # else: still in cooldown period, stay silent
 
         # Merge all features
