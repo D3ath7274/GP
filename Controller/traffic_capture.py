@@ -309,6 +309,11 @@ class TrafficCapture:
         # --- IP to MAC mapping (for block_attacker calls) ---
         self._ip_to_mac = {}  # src_ip -> eth_src MAC address
 
+        # --- Detection Mode ---
+        # OFF = capture only (all labels = normal, clean dataset)
+        # ON  = full anomaly detection + blocking
+        self._detection_enabled = False
+
     # ---- Logging helpers ----
 
     def _log(self, level, msg, *args):
@@ -318,6 +323,17 @@ class TrafficCapture:
             print(f"[TrafficCapture-{level.upper()}] {msg % args if args else msg}")
 
     # ---- Public API ----
+
+    def set_detection_mode(self, enabled):
+        """Toggle anomaly detection on/off. When off, all traffic is labeled 'normal'."""
+        self._detection_enabled = enabled
+        if enabled:
+            # Reset tracking state for fresh detection
+            self._suspected_attackers = {}
+            self._logged_attackers = set()
+            self._log('info', 'Detection mode ENABLED — anomaly detection active')
+        else:
+            self._log('info', 'Detection mode DISABLED — capture only, all labels = normal')
 
     def start(self):
         """Start the background flush thread."""
@@ -643,7 +659,13 @@ class TrafficCapture:
             'snort_sid': snort_sid,
         }
 
-        # --- Two-Stage Attacker Detection ---
+        # --- Three-Stage Attacker Detection ---
+        # Stage 1: Monitor (log only, NO drop rule)  — gives time to distinguish real attacks from pingall
+        # Stage 2: Rate-limit DROP rule               — after MONITOR_SECONDS with ≥3 detections
+        # Stage 3: Full block DROP rule               — attack persists beyond rate-limit
+        MONITOR_SECONDS = 15   # Observation window before any action
+        MIN_HITS = 3           # Must be detected at least 3 times before escalating
+
         if label in [1, 2]:
             now = time.time()
             log_key = (src_ip, attack_type)
@@ -651,62 +673,78 @@ class TrafficCapture:
             attacker_mac = self._ip_to_mac.get(src_ip, 'unknown')
             
             if src_ip not in self._suspected_attackers:
-                # Stage 1: First detection → rate-limit DROP rule for 30 seconds
+                # Stage 1: First detection → LOG ONLY, start monitoring
                 self._suspected_attackers[src_ip] = {
                     'first_seen': now,
                     'attack_type': attack_type,
                     'target': dst_ip,
+                    'hit_count': 1,
+                    'rate_limited': False,
                 }
                 self._log('warning',
-                    f"\n[⚠] SUSPECTED ATTACK from {src_ip} — monitoring for {self.RATE_LIMIT_SECONDS}s\n"
+                    f"\n[⚠] SUSPECTED ATTACK from {src_ip} — monitoring for {MONITOR_SECONDS}s\n"
                     f"    Suspected : {attack_type}\n"
                     f"    Target    : {dst_ip}\n"
                     f"    Detected via: {reason}\n"
+                    f"    Action    : Monitoring only (no block yet)\n"
                 )
-                # Install 30s DROP rule via controller
-                if self.controller and hasattr(self.controller, 'block_attacker'):
-                    try:
-                        self.controller.block_attacker(
-                            src_ip=src_ip,
-                            src_mac=attacker_mac,
-                            attack_type=attack_type,
-                            timeout=self.RATE_LIMIT_SECONDS,
-                            detection_time=now,
-                            target_ip=dst_ip,
-                            reason='rate-limit',
-                        )
-                    except Exception as e:
-                        self._log('error', f"Failed to install rate-limit rule: {e}")
             else:
                 suspect_info = self._suspected_attackers[src_ip]
+                suspect_info['hit_count'] = suspect_info.get('hit_count', 1) + 1
                 elapsed = now - suspect_info['first_seen']
+                hits = suspect_info['hit_count']
                 
-                if elapsed >= self.RATE_LIMIT_SECONDS:
-                    # Stage 2: Attack persists after cooldown → confirmed, full block
-                    if log_key not in self._logged_attackers:
-                        self._logged_attackers.add(log_key)
-                        block_duration = 120  # 2-minute block for confirmed attackers
-                        self._log('warning',
-                            f"\n[!] ATTACKER CONFIRMED — {src_ip} persisted beyond {self.RATE_LIMIT_SECONDS}s\n"
-                            f"    Type    : {attack_type}\n"
-                            f"    Target  : {dst_ip}\n"
-                            f"    Duration: {elapsed:.0f}s\n"
-                        )
-                        # Install 120s DROP rule via controller
-                        if self.controller and hasattr(self.controller, 'block_attacker'):
-                            try:
-                                self.controller.block_attacker(
-                                    src_ip=src_ip,
-                                    src_mac=attacker_mac,
-                                    attack_type=attack_type,
-                                    timeout=block_duration,
-                                    detection_time=suspect_info['first_seen'],
-                                    target_ip=dst_ip,
-                                    reason='block',
-                                )
-                            except Exception as e:
-                                self._log('error', f"Failed to install block rule: {e}")
-                # else: still in cooldown period, stay silent
+                if not suspect_info.get('rate_limited') and elapsed >= MONITOR_SECONDS and hits >= MIN_HITS:
+                    # Stage 2: Persistent anomaly confirmed → rate-limit DROP rule
+                    suspect_info['rate_limited'] = True
+                    suspect_info['rate_limit_time'] = now
+                    self._log('warning',
+                        f"\n[⛔] RATE-LIMITED {src_ip} for {self.RATE_LIMIT_SECONDS}s\n"
+                        f"    Attack  : {attack_type}\n"
+                        f"    Target  : {dst_ip}\n"
+                        f"    Hits    : {hits} detections in {elapsed:.0f}s\n"
+                    )
+                    if self.controller and hasattr(self.controller, 'block_attacker'):
+                        try:
+                            self.controller.block_attacker(
+                                src_ip=src_ip,
+                                src_mac=attacker_mac,
+                                attack_type=attack_type,
+                                timeout=self.RATE_LIMIT_SECONDS,
+                                detection_time=suspect_info['first_seen'],
+                                target_ip=dst_ip,
+                                reason='rate-limit',
+                            )
+                        except Exception as e:
+                            self._log('error', f"Failed to install rate-limit rule: {e}")
+
+                elif suspect_info.get('rate_limited'):
+                    rate_limit_elapsed = now - suspect_info.get('rate_limit_time', now)
+                    if rate_limit_elapsed >= self.RATE_LIMIT_SECONDS:
+                        # Stage 3: Attack persists beyond rate-limit → full block
+                        if log_key not in self._logged_attackers:
+                            self._logged_attackers.add(log_key)
+                            block_duration = 120
+                            self._log('warning',
+                                f"\n[!] ATTACKER CONFIRMED — {src_ip} persisted beyond rate-limit\n"
+                                f"    Type    : {attack_type}\n"
+                                f"    Target  : {dst_ip}\n"
+                                f"    Hits    : {hits} detections in {elapsed:.0f}s\n"
+                            )
+                            if self.controller and hasattr(self.controller, 'block_attacker'):
+                                try:
+                                    self.controller.block_attacker(
+                                        src_ip=src_ip,
+                                        src_mac=attacker_mac,
+                                        attack_type=attack_type,
+                                        timeout=block_duration,
+                                        detection_time=suspect_info['first_seen'],
+                                        target_ip=dst_ip,
+                                        reason='block',
+                                    )
+                                except Exception as e:
+                                    self._log('error', f"Failed to install block rule: {e}")
+                # else: still in monitoring window or under MIN_HITS, stay silent
 
         # Merge all features
         row = {}
@@ -753,7 +791,12 @@ class TrafficCapture:
           1 = known attack (Snort/DAI alert matches this flow's IPs)
           2 = suspicious behavioral deviation (rate counter or profile anomaly)
         """
-        # --- 1. Known Attacks (Snort + DAI) ---
+        # --- 1. Detection Mode Gate ---
+        # When detection is OFF, force everything to normal for clean dataset capture
+        if not self._detection_enabled:
+            return 0, 'normal', ''
+
+        # --- 2. Known Attacks (Snort + DAI) ---
         matching_alerts = [
             a for a in alerts
             if a['src_ip'] == src_ip or a['dst_ip'] == dst_ip
@@ -787,12 +830,14 @@ class TrafficCapture:
                 return 2, 'Port Scan', ''
 
         # --- 3. Z-Score Behavioral Analysis (Secondary / Fallback) ---
+        # ONLY used when rate counters are not available, or for patterns
+        # that rate counters don't cover (payload anomaly, host sweep).
         if not device_profile:
             return 0, 'normal', ''
 
         MIN_FLOWS = 20
         STABILIZATION_SEC = 180
-        Z_THRESHOLD = 8.0  # Raised from 6.0 — rate counters handle most floods now
+        Z_THRESHOLD = 8.0
         
         age = time.time() - device_profile.first_seen
         if device_profile.total_flows < MIN_FLOWS or age < STABILIZATION_SEC:
@@ -805,21 +850,27 @@ class TrafficCapture:
         new_dst_ratio = features.get('device_new_dst_ratio', 0)
         ips_count = features.get('device_unique_dst_ips', 0)
 
-        # Volumetric spike (catches attacks that stay just under rate counter thresholds)
         proto_upper = protocol.upper() if protocol else 'OTHER'
+
+        # Volumetric spike — but ONLY if rate counters didn't already clear this protocol.
+        # If rate counters are available and said "under threshold," trust them.
+        # Z-score spikes from pingall are false positives; rate counters are authoritative.
         if pkt_dev > Z_THRESHOLD or byte_dev > Z_THRESHOLD:
-            if proto_upper == 'ICMP':
-                return 2, 'ICMP Flood', ''
-            elif proto_upper == 'UDP':
-                return 2, 'UDP Flood', ''
-            elif proto_upper == 'TCP':
-                return 2, 'SYN Flood', ''
+            if not host_counters:
+                # No rate counters available — fall back to Z-score for all protocols
+                if proto_upper == 'ICMP':
+                    return 2, 'ICMP Flood', ''
+                elif proto_upper == 'UDP':
+                    return 2, 'UDP Flood', ''
+                elif proto_upper == 'TCP':
+                    return 2, 'SYN Flood', ''
+            # else: rate counters already checked and cleared — do NOT override
         
-        # Payload anomaly
+        # Payload anomaly (not covered by rate counters)
         if payload_dev > Z_THRESHOLD:
             return 2, 'UDP Flood', ''
             
-        # Host sweep
+        # Host sweep (not covered by rate counters)
         if new_dst_ratio > 0.9 and ips_count > 10:
             return 2, 'Port Scan', ''
 

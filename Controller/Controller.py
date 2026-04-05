@@ -137,6 +137,21 @@ class SimpleSwitch(app_manager.RyuApp):
         # ===================================================================
         self._discovered_names = {}  # IP -> device name (populated dynamically)
 
+        # ===================================================================
+        # Detection Mode Toggle
+        # ===================================================================
+        # OFF = capture traffic normally, label everything as 'normal' (clean dataset)
+        # ON  = full anomaly detection + blocking active
+        self._detection_enabled = False
+        self.logger.info(
+            "\n"
+            "╔══════════════════════════════════════════════════════════╗\n"
+            "║  🛡 DETECTION MODE: OFF (Capture Only)                    ║\n"
+            "║  Traffic is being recorded. All labels = normal.        ║\n"
+            "║  Send CONTROL:DETECT:ON to enable attack detection.     ║\n"
+            "╚══════════════════════════════════════════════════════════╝"
+        )
+
     # ===================================================================
     # Snort IDS Alert Handler
     # ===================================================================
@@ -449,6 +464,36 @@ class SimpleSwitch(app_manager.RyuApp):
                     try:
                         payload_data = msg.data[14+20+8:] # Approximate offset
                         message = payload_data.decode('utf-8', errors='ignore').strip()
+                        if message.startswith("CONTROL:"):
+                            # Control commands: CONTROL:DETECT:ON / CONTROL:DETECT:OFF
+                            parts = message.split(':')
+                            if len(parts) >= 3 and parts[1] == 'DETECT':
+                                mode = parts[2].strip().upper()
+                                if mode == 'ON':
+                                    self._detection_enabled = True
+                                    if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                                        self.traffic_capture.set_detection_mode(True)
+                                    self.logger.warning(
+                                        "\n"
+                                        "╔══════════════════════════════════════════════════════════╗\n"
+                                        "║  🚨 DETECTION MODE: ON                                    ║\n"
+                                        "║  Anomaly detection + blocking ACTIVE.                   ║\n"
+                                        "║  Attacks will be detected and blocked.                  ║\n"
+                                        "╚══════════════════════════════════════════════════════════╝"
+                                    )
+                                elif mode == 'OFF':
+                                    self._detection_enabled = False
+                                    if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                                        self.traffic_capture.set_detection_mode(False)
+                                    self.logger.warning(
+                                        "\n"
+                                        "╔══════════════════════════════════════════════════════════╗\n"
+                                        "║  🛡 DETECTION MODE: OFF (Capture Only)                    ║\n"
+                                        "║  Traffic is being recorded. All labels = normal.        ║\n"
+                                        "╚══════════════════════════════════════════════════════════╝"
+                                    )
+                            return  # Don't process control packets further
+
                         if message.startswith("REGISTER:"):
                             _, type_str, info = message.split(':', 2)
                             self.logger.info("Explicit registration received from %s", src)

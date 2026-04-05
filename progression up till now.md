@@ -1,71 +1,106 @@
 # Progression Report: SDN IoT Intrusion Detection System
 
-This document summarizes the major technical enhancements and bug fixes implemented across the SDN Controller, Traffic Capture Module, and Mininet-wifi Topology.
-
 ---
 
 ## 1. Traffic Capture & Dataset Generation (`traffic_capture.py`)
 
-**Objective:** To generate high-fidelity datasets for Machine Learning that accurately label both known attacks (Snort) and suspicious behavioral deviations.
+### Window-Wide Label Inheritance
+- Two-pass processing per 5-second flush window
+- Pass 1: identifies attacker IPs via Snort alerts or behavioral anomalies
+- Pass 2: all flows from that IP inherit the attack label — no "normal" rows mid-attack
 
-### Key Changes:
-*   **Window-Wide Label Inheritance:**
-    *   **Function:** Implemented a "two-pass" processing engine during the 5-second flow flush.
-    *   **How it works:** In Pass 1, the system identifies any source IP that triggered a Snort alert or a behavioral anomaly. In Pass 2, **all flows** from that IP within the same window inherit that attack label. This ensures that a single malicious IP doesn't have "normal" looking rows in the middle of an attack.
-*   **Baseline Integrity (0% False Poisoning):**
-    *   **Function:** Protects the behavioral "Normal" profile from being corrupted by attack data.
-    *   **How it works:** The `DeviceProfile.update` method now checks the computed label. If a flow is labeled as an attack, its volume (PPS, BPS, Payload size) is **excluded** from the historical average and variance calculations. This prevents attackers from slowly increasing their rate to "blend in."
-*   **Granular Behavioral Labeling:**
-    *   **Function:** Replaced generic "Anomaly" labels with specific attack types.
-    *   **How it works:** Based on which feature triggered the Z-score threshold, the `attack_type` is dynamically set to `Scan: Port Sweep`, `Scan: Host Discovery`, `Flood: Volumetric`, or `Flood: Throughput`.
-*   **False Positive Hardening:**
-    *   **Function:** Minimized noise for cleaner ML training.
-    *   **How it works:** Increased Z-score thresholds to **6.0** and added a **180-second stabilization period** for new devices. Behavioral analysis only begins once a device has a stable historical baseline.
+### Baseline Integrity
+- Attack flows are excluded from `DeviceProfile` volume averages (PPS, BPS, payload size)
+- Prevents attackers from slowly shifting the baseline to evade detection
+
+### Per-Host Rate Counters (Primary Detection)
+- 4 counters accumulated per source IP per window:
+  - `_host_icmp_count` — ICMP Flood if >100/window
+  - `_host_syn_count` — SYN Flood if >50 SYN-only (no ACK)/window
+  - `_host_udp_count` — UDP Flood if >200/window
+  - `_host_dst_ports` — Port Scan if >25 unique dst ports/window
+- Checked before Z-score analysis — more reliable, no baseline dependency
+
+### Z-Score Behavioral Analysis (Fallback)
+- Threshold raised to 8.0 (from 6.0) — rate counters handle most floods
+- 180-second stabilization period for new devices
+- Minimum 20 flows before behavioral labeling begins
+
+### Two-Stage Attack Detection
+- **Stage 1** — first anomaly detected → logs `[⚠] SUSPECTED ATTACK`, installs 30-second OpenFlow DROP rule on the attacker's MAC
+- **Stage 2** — anomaly persists past 30 seconds → logs `[!] ATTACKER CONFIRMED`, installs 120-second OpenFlow DROP rule
+- Both stages call `controller.block_attacker()` with full metadata
+
+### IP → MAC Tracking
+- `_ip_to_mac` dict populated from every `record_packet` call
+- Passed to `block_attacker()` for OpenFlow rule installation
 
 ---
 
-## 2. Controller Logic (`Controller network only .py`)
+## 2. Controller (`Controller.py`)
 
-**Objective:** To improve device identification and system stability.
+### ARP Spoofing Detection (DAI Equivalent)
+- `_arp_bindings` dict stores first-seen IP → MAC from ARP packets
+- If a different MAC claims an already-bound IP → `⚠ ARP SPOOFING DETECTED (DAI)` warning logged
+- Alert forwarded to `traffic_capture.record_alert()` for CSV labeling as `attack_type='ARP Spoofing'`
 
-### Key Changes:
-*   **Registration Priority Fix:**
-    *   **Function:** Prevents misidentification of IoT devices as Gateways.
-    *   **How it works:** The controller now prioritizes "Explicit Registration" (UDP port 9999). If a device sends a registration packet, it is immediately marked as an IoT device, and any previous "Passive Discovery" flags (like being a Gateway based on OUI) are deleted.
-*   **Log Flood Mitigation:**
-    *   **Function:** Keeps the Ryu console readable.
-    *   **How it works:** Added a `discovery_logged_macs` set. Passive discovery messages for a specific MAC address are now logged only **once per session** instead of for every packet.
-*   **DPID Readability:**
-    *   **Function:** Improved console debugging.
-    *   **How it works:** Dynamic Gateway discovery now displays large Datapath IDs (DPIDs) in **Hexadecimal** (e.g., `0x1000...`) instead of long decimal strings, matching Mininet's output.
+### OpenFlow Attacker Blocking (`block_attacker()`)
+- Installs high-priority (65000) OpenFlow DROP rule matching `dl_src=attacker_mac` with `hard_timeout`
+- Installed on **all known switches** via `_datapaths` dict
+- Empty action list = DROP at switch level (hardware speed)
+
+### Attack Logging
+- Formatted box log with:
+  - Timestamp of the attack
+  - Detection → response latency (in seconds)
+  - Device name (dynamically learned), IP address, MAC address
+  - Target IP, attack type, detection method
+  - DROP rule duration and number of switches affected
+
+### Dynamic Device Name Learning
+- `_discovered_names` dict populated from 3 sources:
+  1. `REGISTER:NAME:<hostname>` packets from topology (e.g., `sta1 (10.0.0.1)`)
+  2. `REGISTER:IOT:<type>` packets (e.g., `IoT:TempSensor`)
+  3. First IP packet from any device (fallback: `MAC (IP)`)
+- Names used in attack logs — no hardcoded values
+
+### Traffic Mirroring Fix
+- Changed `OFPP_CONTROLLER` max_len from `0` to `0xffff`
+- `max_len=0` was sending 0 bytes of packet data for flow-rule matches → flood packets couldn't be parsed
+- Now sends full packet data to controller for all matched flows
+
+### Registration Priority & Passive Discovery
+- Explicit UDP registration (port 9999) overrides passive OUI-based discovery
+- `discovery_logged_macs` set prevents log flooding
+- Large DPIDs displayed in hexadecimal
 
 ---
 
 ## 3. Snort IDS Integration (`snort_monitor.py`)
 
-**Objective:** To ensure the IDS bridge across VMs is robust and doesn't crash the controller.
+### Pipe Buffer Fix
+- Snort stdout/stderr redirected to log files instead of Python pipes
+- Prevents controller freeze from full pipe buffers
 
-### Key Changes:
-*   **Pipe Buffer/System Freeze Fix:**
-    *   **Function:** Prevents the Ryu controller from hanging/freezing.
-    *   **How it works:** Reassigned Snort's `stdout` and `stderr` to physical log files (`snort_stdout.log` and `snort_stderr.log`) instead of using Python subprocess pipes. This prevents Snort from "blocking" the entire controller script when the internal buffers got full.
-*   **Enhanced Version Compatibility:**
-    *   **Function:** Support for both Snort 2.x and Snort 3.
-    *   **How it works:** The monitor now auto-detects the Snort version. If it finds Snort 2.x (installed by default on many Ubuntu versions), it automatically searches for legacy `/etc/snort/snort.conf` rather than failing on the newer Snort 3 `lua` files.
+### Version Compatibility
+- Auto-detects Snort 2.x vs Snort 3
+- Falls back to `/etc/snort/snort.conf` for Snort 2
+
+### Blocked SIDs
+- SIDs 399, 401, 449, 485 added to `_blocked_sids` — ICMP informational messages that caused false positives
 
 ---
 
-## 4. Mininet-wifi Topology Script (`topology .py`)
+## 4. Topology Script (`topology .py`)
 
-**Objective:** To allow seamless runtime addition of IoT devices.
+### Automatic Hostname Registration
+- Background thread sends `REGISTER:NAME:<hostname>` from every host (sta1, sta2, h1, h2) at startup
+- Controller maps IP → device name for attack logs
 
-### Key Changes:
-*   **CLI Function Exposure:**
-    *   **Function:** Allows the user to call registration functions directly from the Mininet CLI.
-    *   **How it works:** Injected `register_iot_device` and `connect_iot_device` into the `net` object. Users can now run `py net.register_iot_device(...)`.
-*   **Manual Linking Fix:**
-    *   **Function:** Solves the "NoneType" error during dynamic addition.
-    *   **How it works:** Switched from `net.addLink` (which can fail after network start) to manual `Link(host, switch)` creation. This forces the link to be created at the Linux kernel level even while the simulation is running.
-*   **Non-Blocking Registration:**
-    *   **Function:** Prevents terminal lockups.
-    *   **How it works:** Used a **daemon thread** for the 2-second registration wait time. This allows the Mininet CLI to stay interactive while the host prepares to send its registration packet.
+### Dynamic Device Addition
+- `register_iot_device()` — adds host, links to switch, sends `REGISTER:IOT:type` packet
+- `connect_iot_device()` — passive mode, waits for ARP/DHCP to trigger discovery
+- Both available via Mininet CLI: `py net.register_iot_device(...)`
+
+### Non-Blocking Registration
+- Daemon threads for registration to keep CLI responsive

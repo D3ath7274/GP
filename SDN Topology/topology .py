@@ -121,7 +121,7 @@ def topology():
     h2 = net.addHost('h2', ip='10.0.0.4/24')
     s1 = net.addSwitch('s1')
     c0 = net.addController('c0', controller=RemoteController, 
-                           ip='192.168.1.11', port=6633)  # Controller machine
+                           ip='192.168.1.19', port=6633)  # Controller machine
     
     print("*** Configuring WiFi nodes")
     net.configureWifiNodes()
@@ -144,6 +144,24 @@ def topology():
     net.register_iot_device = register_iot_device
     net.connect_iot_device = connect_iot_device
 
+    # --- Detection Mode Toggle ---
+    def detect_on(net):
+        """Enable anomaly detection on the controller."""
+        host = net.hosts[0]  # Use first available host to send control packet
+        cmd = "python3 -c \"import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.sendto(b'CONTROL:DETECT:ON', ('10.0.0.254', 9999))\""
+        host.cmd(cmd)
+        print("*** Detection mode: ON — attacks will be detected and blocked")
+
+    def detect_off(net):
+        """Disable anomaly detection on the controller."""
+        host = net.hosts[0]
+        cmd = "python3 -c \"import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.sendto(b'CONTROL:DETECT:OFF', ('10.0.0.254', 9999))\""
+        host.cmd(cmd)
+        print("*** Detection mode: OFF — capture only, all labels = normal")
+
+    net.detect_on = detect_on
+    net.detect_off = detect_off
+
     # --- Send hostname registrations to the controller ---
     # Each host sends REGISTER:NAME:<hostname> so the controller can
     # map IP → device name for attack logs.
@@ -162,6 +180,7 @@ def topology():
     reg_thread.daemon = True
     reg_thread.start()
 
+    print("*** Detection commands: py net.detect_on(net)  /  py net.detect_off(net)")
     print("*** Running CLI")
     CLI(net)
     net.stop()
