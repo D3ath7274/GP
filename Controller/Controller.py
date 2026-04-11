@@ -37,6 +37,7 @@ from ryu.lib.packet import arp as arp_lib  # ARP Spoofing Detection
 import os
 import sys
 import time
+import threading
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snort_monitor import SnortManager
 from traffic_mirror import TrafficMirror
@@ -152,6 +153,28 @@ class SimpleSwitch(app_manager.RyuApp):
             "╚══════════════════════════════════════════════════════════╝"
         )
 
+        # ===================================================================
+        # UDP Command Listener (receives commands over the physical network)
+        # ===================================================================
+        # Mininet hosts (10.0.0.x) cannot route to the controller (192.168.1.x),
+        # so the topology VM sends CONTROL/REGISTER commands directly to the
+        # controller's physical IP on UDP port 9999.
+        import socket as _socket
+        self._udp_sock = None
+        try:
+            self._udp_sock = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+            self._udp_sock.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+            self._udp_sock.bind(('0.0.0.0', 9999))
+            self._udp_listener = threading.Thread(
+                target=self._udp_command_listener,
+                name='UDPCommandListener',
+                daemon=True,
+            )
+            self._udp_listener.start()
+            self.logger.info("UDP command listener started on port 9999")
+        except Exception as e:
+            self.logger.warning("UDP listener failed to start: %s (commands via OpenFlow only)", e)
+
     # ===================================================================
     # Snort IDS Alert Handler
     # ===================================================================
@@ -187,14 +210,90 @@ class SimpleSwitch(app_manager.RyuApp):
             self.traffic_capture.record_alert(alert)
 
     def close(self):
-        """Clean up: stop Snort and traffic mirror when the controller shuts down."""
+        """Clean up: stop Snort, traffic mirror, and UDP listener when the controller shuts down."""
         self.logger.info("Controller shutting down — stopping Snort IDS...")
         self.snort_manager.stop_snort()
         if hasattr(self, 'traffic_capture') and self.traffic_capture:
             self.traffic_capture.stop()
         if hasattr(self, 'traffic_mirror') and self.traffic_mirror:
             self.traffic_mirror.stop()
+        if hasattr(self, '_udp_sock') and self._udp_sock:
+            try:
+                self._udp_sock.close()
+            except Exception:
+                pass
         super(SimpleSwitch, self).close()
+
+    # ===================================================================
+    # UDP Command Listener (direct physical network commands)
+    # ===================================================================
+    def _udp_command_listener(self):
+        """
+        Listen on UDP port 9999 for CONTROL and REGISTER commands sent
+        directly over the physical network from the topology VM.
+        """
+        self.logger.info("UDP command listener running on 0.0.0.0:9999")
+        while True:
+            try:
+                data, addr = self._udp_sock.recvfrom(4096)
+                message = data.decode('utf-8', errors='ignore').strip()
+                sender_ip = addr[0]
+                self.logger.info("UDP command received from %s: %s", sender_ip, message)
+
+                if message.startswith("CONTROL:"):
+                    parts = message.split(':')
+                    if len(parts) >= 3 and parts[1] == 'DETECT':
+                        mode = parts[2].strip().upper()
+                        if mode == 'ON':
+                            self._detection_enabled = True
+                            if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                                self.traffic_capture.set_detection_mode(True)
+                            self.logger.warning(
+                                "\n"
+                                "╔══════════════════════════════════════════════════════════╗\n"
+                                "║  🚨 DETECTION MODE: ON                                    ║\n"
+                                "║  Anomaly detection + blocking ACTIVE.                   ║\n"
+                                "║  Attacks will be detected and blocked.                  ║\n"
+                                "╚══════════════════════════════════════════════════════════╝"
+                            )
+                        elif mode == 'OFF':
+                            self._detection_enabled = False
+                            if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                                self.traffic_capture.set_detection_mode(False)
+                    elif len(parts) >= 3 and parts[1] == 'UNBLOCK':
+                        target_ip = parts[2].strip()
+                        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                            self.traffic_capture.manual_unblock(target_ip)
+                            self.logger.info("ADMIN: Unblocked attacker %s", target_ip)
+                            self.logger.warning(
+                                "\n"
+                                "╔══════════════════════════════════════════════════════════╗\n"
+                                "║  🛡 DETECTION MODE: OFF (Capture Only)                    ║\n"
+                                "║  Traffic is being recorded. All labels = normal.        ║\n"
+                                "╚══════════════════════════════════════════════════════════╝"
+                            )
+
+                elif message.startswith("REGISTER:"):
+                    try:
+                        _, type_str, info = message.split(':', 2)
+                        if type_str == 'NAME':
+                            # Format: REGISTER:NAME:hostname:ip
+                            # e.g. REGISTER:NAME:h1:10.0.0.3
+                            if ':' in info:
+                                hostname, host_ip = info.rsplit(':', 1)
+                                self._discovered_names[host_ip] = hostname.strip()
+                                self.logger.info("Registered hostname (UDP): %s → %s", host_ip, hostname.strip())
+                            else:
+                                self.logger.info("REGISTER:NAME received but no IP: %s", info)
+                        elif type_str == 'IOT':
+                            self.logger.info("IoT registration via UDP from %s: %s", sender_ip, info)
+                    except ValueError:
+                        pass
+
+            except OSError:
+                break  # Socket closed
+            except Exception as e:
+                self.logger.error("UDP listener error: %s", e)
 
     # ===================================================================
     # Attacker Blocking (OpenFlow DROP Rule)
@@ -425,7 +524,8 @@ class SimpleSwitch(app_manager.RyuApp):
         pkt_src_ip = packet_info.get('src_ip', '')
         pkt_src_mac = eth.src
         if pkt_src_ip and pkt_src_ip not in self._discovered_names:
-            self._discovered_names[pkt_src_ip] = f'{pkt_src_mac} ({pkt_src_ip})'
+            # Auto-learned placeholder — will be replaced by REGISTER:NAME
+            self._discovered_names[pkt_src_ip] = f'Host ({pkt_src_ip})'
             self.logger.debug("Learned device: %s → %s", pkt_src_ip, pkt_src_mac)
 
         # Record packet for ML dataset
@@ -514,8 +614,8 @@ class SimpleSwitch(app_manager.RyuApp):
                             elif type_str == "NAME":
                                 # Hostname registration: REGISTER:NAME:sta1
                                 if ip_pkt:
-                                    self._discovered_names[ip_pkt.src] = f'{info} ({ip_pkt.src})'
-                                    self.logger.info("Registered hostname: %s → %s", ip_pkt.src, info)
+                                    self._discovered_names[ip_pkt.src] = info.strip()
+                                    self.logger.info("Registered hostname: %s → %s", ip_pkt.src, info.strip())
                             elif type_str == "GATEWAY":
                                 self.register_gateway_dynamic(src, dpid, msg.in_port)
                                 self.logger.info("Registered Gateway: %s (Info: %s)", src, info)
@@ -599,7 +699,7 @@ class SimpleSwitch(app_manager.RyuApp):
                          }
                          # Auto-learn device name from first ARP
                          if arp_src_ip not in self._discovered_names:
-                             self._discovered_names[arp_src_ip] = f'Host {arp_src_ip}'
+                             self._discovered_names[arp_src_ip] = f'Host ({arp_src_ip})'
 
              # Passive device discovery (existing logic)
              if src not in self.iot_devices and src not in self.discovered_gateways:

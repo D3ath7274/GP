@@ -298,8 +298,6 @@ class TrafficCapture:
         # Key: (src_ip, attack_type)  Value: dict with consecutive window count
         # An attack is only confirmed after N consecutive windows exceed threshold.
         self._attack_confirmations = {}  # (ip, type) -> {consecutive, first_seen, escalated, ...}
-        self._confirmed_attackers = {}   # src_ip -> attack_type (Permanent until manually unblocked)
-        self._active_blocks = {}         # ip -> block_expiration_time
         self.RATE_LIMIT_SECONDS = 30
         self.REQUIRED_CONSECUTIVE = {
             'ICMP Flood': 3,   # 15 seconds sustained
@@ -337,18 +335,10 @@ class TrafficCapture:
         """Toggle anomaly detection on/off. When off, all traffic is labeled 'normal'."""
         self._detection_enabled = enabled
         if enabled:
-            # Reset ALL tracking state for fresh detection — prevents stale
-            # traffic accumulated during detection-OFF from triggering alerts.
+            # Reset tracking state for fresh detection
             self._attack_confirmations = {}
-            self._active_blocks = {}
             self._logged_attackers = set()
-            with self._flow_lock:
-                self._host_icmp_count = defaultdict(int)
-                self._host_syn_count = defaultdict(int)
-                self._host_ack_count = defaultdict(int)
-                self._host_udp_count = defaultdict(int)
-                self._host_dst_ports = defaultdict(set)
-            self._log('info', 'Detection mode ENABLED — anomaly detection active (counters reset)')
+            self._log('info', 'Detection mode ENABLED — anomaly detection active')
         else:
             self._log('info', 'Detection mode DISABLED — capture only, all labels = normal')
 
@@ -388,24 +378,11 @@ class TrafficCapture:
         """
         if not self._running:
             return
-            
-        src_ip = pkt_info.get('src_ip', '')
-        
-        # --- Backlog Ignore / Blacklist Cache ---
-        # If the switch is physically dropping this IP because we blocked it,
-        # we must ignore packets from this IP in our controller's backlog queue,
-        # otherwise old stale packets will continuously re-trigger false alarms.
-        if src_ip in self._active_blocks:
-            if time.time() < self._active_blocks[src_ip]:
-                return  # Drop packet from ML / tracking pipeline
-            else:
-                del self._active_blocks[src_ip]
 
-        with self._flow_lock:
-            # We use an identical 5-tuple + protocol flow mapping
-            protocol = pkt_info.get('protocol', 'OTHER')
+        src_ip = pkt_info.get('src_ip', '')
         dst_ip = pkt_info.get('dst_ip', '')
         dst_port = pkt_info.get('dst_port', 0)
+        protocol = pkt_info.get('protocol', 'OTHER')
         packet_size = pkt_info.get('packet_size', 0)
         src_port = pkt_info.get('src_port', 0)
         tcp_flags = pkt_info.get('tcp_flags', {})
@@ -583,100 +560,26 @@ class TrafficCapture:
             
             flow_metadata.append((flow_key, flow_data, pps, bps, avg_size))
 
-        # --- Consecutive-window tracking & Escalation ---
-        # This runs ONCE per window, not per flow.
-        # 1. Collect which (src_ip, attack_type) were detected this window
-        # 2. Increment consecutive counter for those (once per window)
-        # 3. Reset counter for those NOT detected (attack stopped)
-        # 4. Run escalation if consecutive threshold is met
-        detected_this_window = {}  # (src_ip, type) -> dst_ip
+        # --- Consecutive-window reset ---
+        # If an (src_ip, attack_type) was being tracked but did NOT exceed its
+        # threshold this window, reset the consecutive counter (attack stopped).
+        detected_this_window = set()
         for src_ip, (label, attack_type, _) in window_attackers.items():
             if label == 2:
-                detected_this_window[(src_ip, attack_type)] = None  # dst_ip filled below
-
-        # Fill dst_ip from flow metadata
-        for flow_key, flow_data, _, _, _ in flow_metadata:
-            key = (flow_key[0], window_attackers.get(flow_key[0], (0, '', ''))[1])
-            if key in detected_this_window and detected_this_window[key] is None:
-                detected_this_window[key] = flow_key[1]  # dst_ip
-
-        # Update consecutive counters (once per window per key)
+                detected_this_window.add((src_ip, attack_type))
         for key in list(self._attack_confirmations.keys()):
             if key not in detected_this_window:
-                # Source was clean this window → reset tracking
                 del self._attack_confirmations[key]
-
-        for key, dst_ip in detected_this_window.items():
-            src_ip, attack_type = key
-            
-            # If already permanently confirmed, skip new escalation logs. It will write to dataset silently forever.
-            if src_ip in self._confirmed_attackers:
-                continue
-
-            required = self.REQUIRED_CONSECUTIVE.get(attack_type, 3)
-            attacker_mac = self._ip_to_mac.get(src_ip, 'unknown')
-            
-            # Fetch the actual count from host_counters to show in log
-            trigger_val = 'N/A'
-            if 'ICMP' in attack_type: trigger_val = host_icmp.get(src_ip, 0)
-            elif 'UDP' in attack_type: trigger_val = host_udp.get(src_ip, 0)
-            elif 'SYN' in attack_type: trigger_val = host_syn.get(src_ip, 0)
-            elif 'Port' in attack_type: trigger_val = len(host_ports.get(src_ip, set()))
-
-            if key not in self._attack_confirmations:
-                # First window → start tracking
-                self._attack_confirmations[key] = {
-                    'consecutive': 1,
-                    'first_seen': time.time(),
-                    'target': dst_ip,
-                    'escalated': False,
-                    'escalated_time': 0,
-                }
-                self._log('warning',
-                    f"\n[\u26a0] SUSPECTED ATTACK from {src_ip}\n"
-                    f"    Suspected : {attack_type} (Spike: {trigger_val} detected)\n"
-                    f"    Target    : {dst_ip}\n"
-                    f"    Window    : 1/{required} consecutive required\n"
-                    f"    Action    : Monitoring only (no block yet)\n"
-                )
-            else:
-                conf = self._attack_confirmations[key]
-                conf['consecutive'] += 1
-                windows = conf['consecutive']
-                elapsed = time.time() - conf['first_seen']
-                now = time.time()
-
-                if not conf.get('escalated') and windows >= required:
-                    # Consecutive threshold met → Classify completely
-                    conf['escalated'] = True
-                    conf['escalated_time'] = now
-                    self._confirmed_attackers[src_ip] = attack_type
-                    
-                    device_name = "Unknown"
-                    if self.controller and hasattr(self.controller, '_discovered_names'):
-                        device_name = self.controller._discovered_names.get(src_ip, "Unknown")
-                    name_str = f" ({device_name})" if device_name != "Unknown" else ""
-                    
-                    self._log('warning',
-                        f"\n[\u26d4] ATTACK CONFIRMED — Classified {src_ip}{name_str} as attacker\n"
-                        f"    Attack  : {attack_type} (Sustained ~{trigger_val}/window)\n"
-                        f"    Target  : {dst_ip}\n"
-                        f"    Evidence: {windows} consecutive windows in {elapsed:.0f}s\n"
-                        f"    Action  : Host represents a persistent threat. Label locked-in indefinitely.\n"
-                    )
-
-                else:
-                    # Below consecutive threshold, log progress
-                    self._log('info',
-                        f"[\u26a0] {src_ip}: {attack_type} window {windows}/{required} (Spike: {trigger_val})"
-                    )
 
         # Pass 2: Build Rows with Inheritance
         # All flows from an identified attacker in this window will inherit the attack label.
         rows = []
         for flow_key, flow_data, pps, bps, avg_size in flow_metadata:
             src_ip = flow_key[0]
+            
+            # Use inherited label if IP was identified as attacker in Pass 1
             inherited = window_attackers.get(src_ip)
+            
             row = self._build_flow_row(
                 flow_key, flow_data, network_ctx, alerts,
                 pps, bps, avg_size,
@@ -780,19 +683,94 @@ class TrafficCapture:
             'snort_sid': snort_sid,
         }
 
-        label_features = {
-            'label': label,
-            'attack_type': attack_type,
-            'snort_sid': snort_sid,
-        }
+        # --- Per-Attack-Type Escalation ---
+        # Uses _attack_confirmations which tracks consecutive windows per (src_ip, type).
+        # Stage 1: Consecutive windows building up → log "SUSPECTED"
+        # Stage 2: Consecutive threshold met → rate-limit DROP (30s)
+        # Stage 3: Attack persists beyond rate-limit → full block DROP (120s)
 
-        # Merge all features
-        row = {}
-        row.update(flow_features)
-        row.update(device_features)
-        row.update(network_ctx)
-        row.update(label_features)
-        return row
+        if label in [1, 2]:
+            now = time.time()
+            conf_key = (src_ip, attack_type)
+            reason = "IDS/Snort" if label == 1 else "Behavioral Anomaly"
+            attacker_mac = self._ip_to_mac.get(src_ip, 'unknown')
+            required = self.REQUIRED_CONSECUTIVE.get(attack_type, 3)
+
+            if conf_key not in self._attack_confirmations:
+                # First window detecting this (src_ip, attack_type) → start tracking
+                self._attack_confirmations[conf_key] = {
+                    'consecutive': 1,
+                    'first_seen': now,
+                    'target': dst_ip,
+                    'escalated': False,
+                    'escalated_time': 0,
+                }
+                self._log('warning',
+                    f"\n[\u26a0] SUSPECTED ATTACK from {src_ip}\n"
+                    f"    Suspected : {attack_type}\n"
+                    f"    Target    : {dst_ip}\n"
+                    f"    Detected via: {reason}\n"
+                    f"    Window    : 1/{required} consecutive required\n"
+                    f"    Action    : Monitoring only (no block yet)\n"
+                )
+            else:
+                conf = self._attack_confirmations[conf_key]
+                # consecutive is incremented in _flush_flows via detected_this_window;
+                # here we just handle escalation decisions
+                windows = conf['consecutive']
+                elapsed = now - conf['first_seen']
+
+                if not conf.get('escalated') and windows >= required:
+                    # Consecutive threshold met → Stage 2: rate-limit DROP
+                    conf['escalated'] = True
+                    conf['escalated_time'] = now
+                    self._log('warning',
+                        f"\n[\u26d4] ATTACK CONFIRMED — Rate-limiting {src_ip} for {self.RATE_LIMIT_SECONDS}s\n"
+                        f"    Attack  : {attack_type}\n"
+                        f"    Target  : {dst_ip}\n"
+                        f"    Evidence: {windows} consecutive windows in {elapsed:.0f}s\n"
+                    )
+                    if self.controller and hasattr(self.controller, 'block_attacker'):
+                        try:
+                            self.controller.block_attacker(
+                                src_ip=src_ip,
+                                src_mac=attacker_mac,
+                                attack_type=attack_type,
+                                timeout=self.RATE_LIMIT_SECONDS,
+                                detection_time=conf['first_seen'],
+                                target_ip=dst_ip,
+                                reason='rate-limit',
+                            )
+                        except Exception as e:
+                            self._log('error', f"Failed to install rate-limit rule: {e}")
+
+                elif conf.get('escalated'):
+                    rate_limit_elapsed = now - conf.get('escalated_time', now)
+                    if rate_limit_elapsed >= self.RATE_LIMIT_SECONDS:
+                        # Stage 3: Attack persists beyond rate-limit → full block
+                        if conf_key not in self._logged_attackers:
+                            self._logged_attackers.add(conf_key)
+                            block_duration = 120
+                            self._log('warning',
+                                f"\n[!] ATTACKER CONFIRMED — {src_ip} persisted beyond rate-limit\n"
+                                f"    Type    : {attack_type}\n"
+                                f"    Target  : {dst_ip}\n"
+                                f"    Evidence: {windows} consecutive windows in {elapsed:.0f}s\n"
+                            )
+                            if self.controller and hasattr(self.controller, 'block_attacker'):
+                                try:
+                                    self.controller.block_attacker(
+                                        src_ip=src_ip,
+                                        src_mac=attacker_mac,
+                                        attack_type=attack_type,
+                                        timeout=block_duration,
+                                        detection_time=conf['first_seen'],
+                                        target_ip=dst_ip,
+                                        reason='block',
+                                    )
+                                except Exception as e:
+                                    self._log('error', f"Failed to install block rule: {e}")
+                # else: below consecutive threshold, still monitoring
 
         # Merge all features
         row = {}
@@ -830,46 +808,24 @@ class TrafficCapture:
             'distinct_alert_types': len(alert_types),
         }
 
-    def set_detection_mode(self, enabled):
-        """Toggle true anomaly detection vs baseline capture."""
-        self._detection_enabled = enabled
-
-    def manual_unblock(self, src_ip):
-        """Manually clear an IP from confirmed attacker blocks."""
-        device_name = "Unknown"
-        if self.controller and hasattr(self.controller, '_discovered_names'):
-            device_name = self.controller._discovered_names.get(src_ip, "Unknown")
-            
-        self._log('info', f"[\u2705] ADMIN MANUAL UNBLOCK: {src_ip} ({device_name}) has been cleared of attacker status.")
-        
-        if src_ip in self._confirmed_attackers:
-            del self._confirmed_attackers[src_ip]
-            
-        keys_to_del = [k for k in self._attack_confirmations.keys() if k[0] == src_ip]
-        for k in keys_to_del:
-            del self._attack_confirmations[k]
-            
-        keys_to_del2 = [k for k in self._logged_attackers if k[0] == src_ip]
-        self._logged_attackers.difference_update(keys_to_del2)
-
     def _compute_label(self, src_ip, dst_ip, alerts, device_profile, 
                        curr_pps=0, curr_bps=0, curr_avg_size=0, protocol='OTHER',
                        host_counters=None):
         """
-        Determine the label for a flow. Goal: 0% False Positives.
+        Determine the label for a flow.
           0 = normal
           1 = known attack (Snort/DAI alert matches this flow's IPs)
-          2 = suspicious behavioral deviation (rate counter or profile anomaly)
+          2 = suspicious behavioral deviation (confirmed by consecutive windows)
+
+        When detection is OFF: all labels = 0 (clean dataset capture).
+        When detection is ON: the system decides the label based on
+          rate counters, context guards, and consecutive-window confirmation.
         """
         # --- 1. Detection Mode Gate ---
-        # When detection is OFF, force everything to normal for clean dataset capture
         if not self._detection_enabled:
             return 0, 'normal', ''
 
-        if src_ip in self._confirmed_attackers:
-            return 2, self._confirmed_attackers[src_ip], ""
-
-        # --- 2. Known Attacks (Snort + DAI) ---
+        # --- 2. Known Attacks (Snort + DAI) — always authoritative ---
         matching_alerts = [
             a for a in alerts
             if a['src_ip'] == src_ip or a['dst_ip'] == dst_ip
@@ -888,38 +844,56 @@ class TrafficCapture:
             udp  = host_counters.get('udp', 0)
             ports = host_counters.get('unique_ports', 0)
 
-            # ICMP Flood: >1000 ICMP packets from one host in 5 seconds
-            # Raised significantly: a real flood generates 10,000+ pkts.
-            # Mininet pingall could somehow trigger 150 due to broadcast storms.
-            # ICMP Flood: >15000 ICMP packets from one host in 5 seconds
-            # Raised over 10k to comfortably ignore intense Mininet broadcast loops
-            # like pingall (which can hit ~6k in some topologies).
-            if icmp > 15000:
+            # ICMP Flood: >150 ICMP packets from one host in 5 seconds
+            # (pingall with 20 hosts ≈ 20/window; genuine flood = thousands)
+            if icmp > 150:
                 detected_type = 'ICMP Flood'
 
-            # SYN Flood: >5000 SYN-only packets AND low ACK count
-            elif syn > 5000 and ack < 50:
+            # SYN Flood: >80 SYN-only packets AND low ACK count
+            # Context guard: if host also sends many ACKs, it's completing
+            # TCP handshakes (e.g., iperf, web crawl) → NOT a flood
+            elif syn > 80 and ack < 20:
                 detected_type = 'SYN Flood'
 
-            # UDP Flood: >15000 UDP packets from one host in 5 seconds
-            elif udp > 15000:
+            # UDP Flood: >300 UDP packets from one host in 5 seconds
+            # (IoT telemetry bursts ≈ 50–100; DNS queries ≈ 10–20)
+            elif udp > 300:
                 detected_type = 'UDP Flood'
 
-            # Port Scan: >100 unique destination ports from one host in 5 seconds
-            elif ports > 100:
+            # Port Scan: >30 unique destination ports from one host in 5 seconds
+            # (service discovery ≈ 3–5 ports; nmap = 100+)
+            elif ports > 30:
                 detected_type = 'Port Scan'
 
+        # --- 4. Consecutive-Window Confirmation ---
+        # A single window exceeding the threshold is NOT enough to label as attack.
+        # The anomaly must persist for N consecutive windows to be confirmed.
         if detected_type:
-            return 2, detected_type, ''
+            conf_key = (src_ip, detected_type)
+            required = self.REQUIRED_CONSECUTIVE.get(detected_type, 3)
 
-        # --- 4. Z-Score Behavioral Analysis (Secondary / Fallback) ---
+            if conf_key not in self._attack_confirmations:
+                # First window — start counting but label as suspicious
+                self._attack_confirmations[conf_key] = {
+                    'consecutive': 1,
+                    'first_seen': time.time(),
+                    'target': dst_ip,
+                    'escalated': False,
+                    'escalated_time': 0,
+                }
+                # Detection ON: label=2 so dataset captures the anomaly,
+                # but escalation won't fire until consecutive threshold is met
+                return 2, detected_type, ''
+            else:
+                conf = self._attack_confirmations[conf_key]
+                conf['consecutive'] += 1
+                # Always label=2 when detection is ON and counter exceeded
+                return 2, detected_type, ''
+
+        # --- 5. Z-Score Behavioral Analysis (Secondary / Fallback) ---
+        # ONLY used when rate counters didn't detect anything, for patterns
+        # that rate counters don't cover (payload anomaly, host sweep).
         if not device_profile:
-            return 0, 'normal', ''
-
-        # Guard: If traffic drops to 0 or is extremely low, it cannot mathematically
-        # be a flood. This prevents the Z-score deviation from treating a sudden
-        # drop in traffic as a massive "anomaly".
-        if curr_pps < 10:
             return 0, 'normal', ''
 
         MIN_FLOWS = 20
@@ -939,20 +913,23 @@ class TrafficCapture:
 
         proto_upper = protocol.upper() if protocol else 'OTHER'
 
-        # Volumetric spike
+        # Volumetric spike — but ONLY if rate counters didn't already clear this protocol.
         if pkt_dev > Z_THRESHOLD or byte_dev > Z_THRESHOLD:
-            if proto_upper == 'ICMP':
-                return 2, 'ICMP Flood', ''
-            elif proto_upper == 'UDP':
-                return 2, 'UDP Flood', ''
-            elif proto_upper == 'TCP':
-                return 2, 'SYN Flood', ''
+            if not host_counters:
+                # No rate counters available — fall back to Z-score
+                if proto_upper == 'ICMP':
+                    return 2, 'ICMP Flood', ''
+                elif proto_upper == 'UDP':
+                    return 2, 'UDP Flood', ''
+                elif proto_upper == 'TCP':
+                    return 2, 'SYN Flood', ''
+            # else: rate counters checked and cleared — trust them
 
-        # Payload anomaly
+        # Payload anomaly (not covered by rate counters)
         if payload_dev > Z_THRESHOLD:
             return 2, 'UDP Flood', ''
 
-        # Host sweep
+        # Host sweep (not covered by rate counters)
         if new_dst_ratio > 0.9 and ips_count > 10:
             return 2, 'Port Scan', ''
 

@@ -181,15 +181,9 @@ def topology():
         """Disable anomaly detection on the controller."""
         _send_to_controller('CONTROL:DETECT:OFF')
         print("*** Detection mode: OFF — capture only, all labels = normal")
-        
-    def unblock_attacker(net, ip_address):
-        """Manually clear an IP from confirmed attacker blocks."""
-        _send_to_controller(f'CONTROL:UNBLOCK:{ip_address}')
-        print(f"*** Unblocked {ip_address}")
 
     net.detect_on = detect_on
     net.detect_off = detect_off
-    net.unblock_attacker = unblock_attacker
 
     # --- Send hostname registrations to the controller ---
     # Sends REGISTER:NAME:hostname:ip directly to controller over physical network

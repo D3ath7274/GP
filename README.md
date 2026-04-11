@@ -184,23 +184,29 @@ mininet-wifi> h1 arpspoof -i h1-eth0 -t 10.0.0.2 10.0.0.1 &
 
 ### Expected Detection Flow
 
-1. **Within 5 seconds** — controller logs `[⚠] SUSPECTED ATTACK` and installs a 30-second DROP rule
-2. **If attack persists past 30 seconds** — controller logs `[!] ATTACKER CONFIRMED` and installs a 120-second DROP rule
+To ensure high-fidelity dataset generation, the system currently operates as a **Passive Monitoring Engine**. Attacks are detected, logged, and labeled in the dataset, but OpenFlow DROP rules are bypassed to avoid disrupting the network simulation layer.
+
+1. **Within 5 seconds** — controller logs `[⚠] SUSPECTED ATTACK window 1/3`.
+2. **Consecutive Confirmation** — If the attack persists for 3 consecutive windows, it logs `[⛔] ATTACK CONFIRMED` and is rate-limited purely at the Python controller level (Backlog Ignore Cache) to preserve system stability.
 
 Example controller output:
 ```
 ╔══════════════════════════════════════════════════════════╗
-║  🚫 ATTACKER RATE-LIMITED                                ║
-╠══════════════════════════════════════════════════════════╣
-║  Time      : 2026-03-23 17:45:12                         ║
-║  Latency   : 0.003s (detection → response)               ║
-║  Device    : h1 (10.0.0.3)                               ║
-║  IP        : 10.0.0.3                                    ║
-║  MAC       : 9e:8e:c6:8d:10:57                           ║
-║  Target    : 10.0.0.2                                    ║
-║  Attack    : UDP Flood                                   ║
-║  Action    : DROP rule for 30s                           ║
+║  🚨 DETECTION MODE: ON                                    ║
+║  Anomaly detection + blocking ACTIVE.                   ║
+║  Attacks will be detected and blocked.                  ║
 ╚══════════════════════════════════════════════════════════╝
+
+[⚠] SUSPECTED ATTACK from 10.0.0.3
+    Suspected : UDP Flood (Spike: 24500 detected)
+    Target    : 10.0.0.2
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+[⛔] ATTACK CONFIRMED — Rate-limiting 10.0.0.3 for 30s
+    Attack  : UDP Flood
+    Target  : 10.0.0.2
+    Evidence: 3 consecutive windows strictly exceeded thresholds.
 ```
 
 ---
@@ -209,10 +215,10 @@ Example controller output:
 
 | Attack Type | Primary Detection | Threshold |
 |---|---|---|
-| ICMP Flood | Per-host ICMP counter | >100 packets |
-| SYN Flood | Per-host SYN-only counter | >50 packets |
-| UDP Flood | Per-host UDP counter | >200 packets |
-| Port Scan | Unique dst ports per host | >25 ports |
+| ICMP Flood | Per-host ICMP counter | >15,000 packets |
+| SYN Flood | Per-host SYN-only counter | >5,000 packets |
+| UDP Flood | Per-host UDP counter | >15,000 packets |
+| Port Scan | Unique dst ports per host | >100 ports |
 | ARP Spoofing | IP→MAC binding mismatch | 1 mismatch |
 
 A secondary Z-score behavioral analysis (threshold 8.0) catches attacks that stay just below these counters.
