@@ -191,6 +191,33 @@ def topology():
     net.detect_off = detect_off
     net.unblock_attacker = unblock_attacker
 
+    # --- Attack Metadata Helpers (for dataset labeling) ---
+    def attack_start(net, tool, src_ip, pps=0):
+        """Label the dataset with the attack tool and intensity.
+        Usage: py net.attack_start(net, 'hping3', '10.0.0.1', 10000)
+        """
+        _send_to_controller(f'ATTACK_START:{tool}:{pps}')
+        print(f"*** META: Attack started — tool={tool}, src={src_ip}, pps={pps}")
+
+    def attack_stop(net, src_ip=''):
+        """Clear the attack metadata label from the dataset.
+        Usage: py net.attack_stop(net)
+        """
+        _send_to_controller('ATTACK_STOP')
+        print(f"*** META: Attack stopped")
+
+    def mininet_event(net, event_name):
+        """Label the dataset with a Mininet operational event.
+        Usage: py net.mininet_event(net, 'pingall')
+        Values: 'pingall', 'normal', 'topology_change'
+        """
+        _send_to_controller(f'MININET_EVENT:{event_name}')
+        print(f"*** META: Mininet event → {event_name}")
+
+    net.attack_start = attack_start
+    net.attack_stop = attack_stop
+    net.mininet_event = mininet_event
+
     # --- Send hostname registrations to the controller ---
     # Sends REGISTER:NAME:hostname:ip directly to controller over physical network
     def _register_hostnames():
@@ -208,7 +235,11 @@ def topology():
     reg_thread.start()
 
     print("*** Registration: py net.register_iot_device(net, 'iot1', '10.0.0.5/24', '00:00...', 's1', 'IOT:Type')")
-    print("*** Detection commands: py net.detect_on(net)  /  py net.detect_off(net)")
+    print("*** Detection:    py net.detect_on(net)  /  py net.detect_off(net)")
+    print("*** Unblock:      py net.unblock_attacker(net, '10.0.0.x')")
+    print("*** Attack Meta:  py net.attack_start(net, 'hping3', '10.0.0.1', 10000)")
+    print("***               py net.attack_stop(net)")
+    print("*** Mininet Meta: py net.mininet_event(net, 'pingall')")
     print("*** Running CLI")
     CLI(net)
     net.stop()
