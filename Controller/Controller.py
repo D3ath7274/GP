@@ -265,13 +265,32 @@ class SimpleSwitch(app_manager.RyuApp):
                         if hasattr(self, 'traffic_capture') and self.traffic_capture:
                             self.traffic_capture.manual_unblock(target_ip)
                             self.logger.info("ADMIN: Unblocked attacker %s", target_ip)
-                            self.logger.warning(
-                                "\n"
-                                "╔══════════════════════════════════════════════════════════╗\n"
-                                "║  🛡 DETECTION MODE: OFF (Capture Only)                    ║\n"
-                                "║  Traffic is being recorded. All labels = normal.        ║\n"
-                                "╚══════════════════════════════════════════════════════════╝"
-                            )
+
+                elif message.startswith("ATTACK_START:"):
+                    # Format: ATTACK_START:tool_name:pps  (e.g. ATTACK_START:hping3:10000)
+                    try:
+                        _, tool, pps_str = message.split(':', 2)
+                        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                            self.traffic_capture.set_attack_metadata(tool.strip(), pps_str.strip())
+                            self.logger.info("META: Attack started — tool=%s, pps=%s", tool, pps_str)
+                    except ValueError:
+                        self.logger.warning("Invalid ATTACK_START format: %s", message)
+
+                elif message.startswith("ATTACK_STOP"):
+                    # Format: ATTACK_STOP
+                    if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                        self.traffic_capture.clear_attack_metadata()
+                        self.logger.info("META: Attack stopped")
+
+                elif message.startswith("MININET_EVENT:"):
+                    # Format: MININET_EVENT:event_name  (e.g. MININET_EVENT:pingall)
+                    try:
+                        _, event_name = message.split(':', 1)
+                        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                            self.traffic_capture.set_mininet_event(event_name.strip())
+                            self.logger.info("META: Mininet event → %s", event_name.strip())
+                    except ValueError:
+                        pass
 
                 elif message.startswith("REGISTER:"):
                     try:
@@ -516,7 +535,13 @@ class SimpleSwitch(app_manager.RyuApp):
                     icmp_pkt = pkt.get_protocol(icmp.icmp)
         elif eth.ethertype == ether_types.ETH_TYPE_ARP:
              packet_info['protocol'] = 'ARP'
-             # Could extract ARP details if needed, but src/dst MAC is already there
+             arp_pkt = pkt.get_protocol(arp_lib.arp)
+             if arp_pkt:
+                 packet_info['src_ip'] = arp_pkt.src_ip
+                 packet_info['dst_ip'] = arp_pkt.dst_ip
+                 packet_info['arp_op'] = arp_pkt.opcode   # 1=request, 2=reply
+                 packet_info['arp_spa'] = arp_pkt.src_ip   # sender protocol address
+                 packet_info['arp_tpa'] = arp_pkt.dst_ip   # target protocol address
 
         # --- Dynamic Device Name Learning ---
         # Learn device name from ANY packet with a source IP.
