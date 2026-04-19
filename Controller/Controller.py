@@ -44,6 +44,17 @@ from traffic_mirror import TrafficMirror
 from traffic_capture import TrafficCapture  # Added
 
 
+# =============================================================================
+# COLLECTION_MODE: Set to True during dataset collection.
+# When True, rate limiting / active blocking is bypassed so that ground-truth
+# attack features are recorded at full intensity. A clipped flood produces
+# corrupted feature values — the model would learn the threshold, not the attack.
+# Set to False ONLY after dataset_training.csv is finalized and the system
+# moves into live detection / deployment.
+# =============================================================================
+COLLECTION_MODE = True
+
+
 class SimpleSwitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_0.OFP_VERSION]
 
@@ -272,6 +283,44 @@ class SimpleSwitch(app_manager.RyuApp):
                                 "║  Traffic is being recorded. All labels = normal.        ║\n"
                                 "╚══════════════════════════════════════════════════════════╝"
                             )
+
+                elif message.startswith("LABEL_OVERRIDE:"):
+                    # Format: LABEL_OVERRIDE:ip:attack_type
+                    # e.g. LABEL_OVERRIDE:10.0.0.3:Port Scan
+                    # Clear: LABEL_OVERRIDE:10.0.0.3:clear
+                    parts = message.split(':', 2)
+                    if len(parts) >= 3:
+                        target_ip = parts[1].strip()
+                        attack_type = parts[2].strip()
+                        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                            self.traffic_capture.set_label_override(target_ip, attack_type)
+                            self.logger.warning(
+                                "LABEL_OVERRIDE: %s → %s", target_ip, attack_type
+                            )
+
+                elif message.startswith("ATTACK_START:"):
+                    # Format: ATTACK_START:tool_name:intensity
+                    # e.g. ATTACK_START:hping3:flood
+                    parts = message.split(':', 2)
+                    tool = parts[1].strip() if len(parts) >= 2 else 'unknown'
+                    intensity = parts[2].strip() if len(parts) >= 3 else '0'
+                    if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                        self.traffic_capture.set_attack_metadata(tool, intensity)
+                    self.logger.warning("META: Attack started — tool=%s, intensity=%s", tool, intensity)
+
+                elif message == "ATTACK_STOP" or message.startswith("ATTACK_STOP"):
+                    if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                        self.traffic_capture.clear_attack_metadata()
+                    self.logger.warning("META: Attack stopped")
+
+                elif message.startswith("MININET_EVENT:"):
+                    # Format: MININET_EVENT:event_name
+                    # e.g. MININET_EVENT:pingall or MININET_EVENT:normal
+                    parts = message.split(':', 1)
+                    event = parts[1].strip() if len(parts) >= 2 else 'normal'
+                    if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                        self.traffic_capture.set_mininet_event(event)
+                    self.logger.info("META: Mininet event set to '%s'", event)
 
                 elif message.startswith("REGISTER:"):
                     try:
@@ -514,9 +563,18 @@ class SimpleSwitch(app_manager.RyuApp):
                 elif ip_pkt.proto == 1: # ICMP
                     packet_info['protocol'] = 'ICMP'
                     icmp_pkt = pkt.get_protocol(icmp.icmp)
+                    if icmp_pkt:
+                        packet_info['icmp_type'] = icmp_pkt.type
+                        packet_info['icmp_code'] = icmp_pkt.code
         elif eth.ethertype == ether_types.ETH_TYPE_ARP:
              packet_info['protocol'] = 'ARP'
-             # Could extract ARP details if needed, but src/dst MAC is already there
+             arp_pkt_for_info = pkt.get_protocol(arp_lib.arp)
+             if arp_pkt_for_info:
+                 packet_info['arp_op'] = arp_pkt_for_info.opcode
+                 packet_info['arp_spa'] = arp_pkt_for_info.src_ip
+                 packet_info['arp_tpa'] = arp_pkt_for_info.dst_ip
+                 packet_info['src_ip'] = arp_pkt_for_info.src_ip
+                 packet_info['dst_ip'] = arp_pkt_for_info.dst_ip
 
         # --- Dynamic Device Name Learning ---
         # Learn device name from ANY packet with a source IP.

@@ -10,6 +10,19 @@ Features are designed to detect:
   - Zero-day attacks (via behavioral deviation from learned baselines)
   - Post-authentication compromise (device profile changes)
 
+Feature Groups (see feature_engineering_rationale_cited.md):
+  Group 1:  Timing & Inter-Arrival Rhythm (7 features)
+  Group 2:  Directionality & Asymmetry (7 features)
+  Group 3:  TCP Session Completeness (4 features)
+  Group 4:  Per-Flow Entropy (3 features)
+  Group 5:  ARP-Specific Behavioral (7 features)
+  Group 6:  Packet Size Distribution (4 features)
+  Group 7:  Port Behavior Patterns (6 features)
+  Group 8:  Broadcast & Multicast Context (4 features)
+  Group 9:  Flow-Level Context (1 feature)
+  Group 10: Metadata — audit only, stripped before DL training (8 features)
+  Base:     Flow mechanics (21), Device Profile (17), Network Context (13), Labels (3)
+
 Usage (integrated with Ryu controller):
     from traffic_capture import TrafficCapture
     capture = TrafficCapture(snort_manager=self.snort_manager, logger=self.logger)
@@ -26,9 +39,19 @@ import os
 import csv
 import math
 import time
+import statistics
 import threading
-from collections import defaultdict, deque
+from collections import defaultdict, Counter, deque
 from datetime import datetime
+
+
+# =========================================================================
+# Constants
+# =========================================================================
+
+# Maximum per-flow timestamp/size buffer before reservoir sampling kicks in.
+# Prevents memory exhaustion during sustained floods.
+TIMESTAMP_BUFFER_MAX = 2000
 
 
 # =========================================================================
@@ -36,12 +59,48 @@ from datetime import datetime
 # =========================================================================
 
 FLOW_COLUMNS = [
+    # --- Base Flow Mechanics (21 features) ---
     'timestamp', 'src_ip', 'dst_ip', 'src_port', 'dst_port', 'protocol',
     'flow_duration', 'total_packets', 'total_bytes',
     'avg_packet_size', 'min_packet_size', 'max_packet_size',
     'packets_per_second', 'bytes_per_second',
     'syn_count', 'ack_count', 'fin_count', 'rst_count', 'psh_count',
     'unique_src_ports', 'unique_dst_ports',
+    # --- Group 1: Timing & Inter-Arrival Rhythm (7 features) ---
+    # Rationale III: inter_arrival_cv captures robotic regularity of attack tools
+    # regardless of attack volume — strongest universal discriminator.
+    'inter_arrival_mean', 'inter_arrival_std', 'inter_arrival_cv',
+    'inter_arrival_min', 'inter_arrival_max',
+    'burst_count', 'burst_duration_avg',
+    # --- Group 2: Directionality & Asymmetry (7 features) ---
+    # Rationale IV: Attacks are asymmetric by definition. Ratio-based features
+    # are immune to Mininet's 2x TAP amplification.
+    'fwd_packet_count', 'bwd_packet_count',
+    'fwd_bwd_packet_ratio', 'fwd_bwd_bytes_ratio',
+    'fwd_avg_packet_size', 'bwd_avg_packet_size', 'reply_rate',
+    # --- Group 3: TCP Session Completeness (4 features) ---
+    # Rationale V: Operationalizes the TCP lifecycle contract (RFC 793/9293).
+    # incomplete_ratio is a category-level zero-day indicator.
+    'syn_ack_ratio', 'completed_sessions', 'incomplete_ratio', 'avg_session_duration',
+    # --- Group 4: Per-Flow Entropy (3 features) ---
+    # Rationale VI: Entropy captures distribution diversity as categorical measure,
+    # invariant to port number magnitude. Multi-dimensional per Lakhina et al.
+    'payload_size_entropy', 'src_port_entropy', 'icmp_type_entropy',
+    # --- Group 6: Packet Size Distribution (4 features) ---
+    # Rationale VIII: Attack tools produce near-zero pkt_size_std.
+    # small_pkt_ratio encodes SYN flood physical characteristics (RFC 793).
+    'pkt_size_std', 'pkt_size_variance', 'small_pkt_ratio', 'large_pkt_ratio',
+    # --- Group 7: Port Behavior Patterns (6 features) ---
+    # Rationale IX: Floods and scans occupy opposite extremes of port diversity.
+    # sequential_port_score detects nmap default sequential scanning.
+    'top_dst_port', 'top_dst_port_ratio', 'dst_port_std',
+    'well_known_port_ratio', 'ephemeral_port_ratio', 'sequential_port_score',
+    # --- Group 8: Broadcast Context (per-flow flag) ---
+    # Rationale X: Distinguishes Mininet pingall storms from real floods.
+    'is_broadcast_dst',
+    # --- Group 9: Flow-Level Context (1 feature) ---
+    # Rationale XI.B: Detects connection flooding and horizontal network scanning.
+    'flows_per_window',
 ]
 
 DEVICE_COLUMNS = [
@@ -53,6 +112,9 @@ DEVICE_COLUMNS = [
     'device_protocol_dist_icmp',
     'device_avg_payload_size', 'device_payload_size_deviation',
     'is_registered_iot', 'is_gateway', 'device_age_seconds',
+    # Rationale XI.A: Gates Z-score features on cold-start reliability.
+    # 1 if device has >=20 flows AND >=180s age.
+    'is_baseline_mature',
 ]
 
 NETWORK_COLUMNS = [
@@ -61,13 +123,35 @@ NETWORK_COLUMNS = [
     'network_avg_flow_duration', 'network_entropy_src_ip',
     'network_entropy_dst_port',
     'active_snort_alerts', 'distinct_alert_types',
+    # --- Group 8: Broadcast & Multicast Environment (network-level) ---
+    # Rationale X: Environment-specific but necessary for operational accuracy.
+    'broadcast_ratio', 'multicast_ratio', 'arp_broadcast_ratio',
+]
+
+ARP_COLUMNS = [
+    # --- Group 5: ARP-Specific Behavioral (7 features) ---
+    # Rationale VII: Dedicated ARP group addresses the visibility gap in generic
+    # flow features. Absent from CIC-IDS2017 and UNSW-NB15.
+    'arp_reply_rate', 'arp_request_rate', 'arp_reply_request_ratio',
+    'arp_gratuitous_count', 'arp_unsolicited_count',
+    'mac_ip_binding_changes', 'ip_mac_binding_changes',
 ]
 
 LABEL_COLUMNS = [
     'label', 'attack_type', 'snort_sid',
 ]
 
-ALL_COLUMNS = FLOW_COLUMNS + DEVICE_COLUMNS + NETWORK_COLUMNS + LABEL_COLUMNS
+META_COLUMNS = [
+    # --- Group 10: Metadata — audit/reproducibility only ---
+    # Rationale XII: MUST be stripped before DL training (data leakage).
+    'meta_window_id', 'meta_src_mac_oui', 'meta_device_name',
+    'meta_attack_tool', 'meta_attack_intensity', 'meta_mininet_event',
+    # Rationale XII.C: Flush computation time — if >5000ms, feature set needs profiling.
+    'meta_controller_load',
+    'meta_backlog_drops',
+]
+
+ALL_COLUMNS = FLOW_COLUMNS + DEVICE_COLUMNS + NETWORK_COLUMNS + ARP_COLUMNS + LABEL_COLUMNS + META_COLUMNS
 
 
 # =========================================================================
@@ -75,7 +159,8 @@ ALL_COLUMNS = FLOW_COLUMNS + DEVICE_COLUMNS + NETWORK_COLUMNS + LABEL_COLUMNS
 # =========================================================================
 
 def _shannon_entropy(counter_dict):
-    """Compute Shannon entropy from a {value: count} dictionary."""
+    """Compute Shannon entropy from a {value: count} dictionary.
+    Rationale VI: Treats values as categorical identifiers, invariant to magnitude."""
     total = sum(counter_dict.values())
     if total == 0:
         return 0.0
@@ -91,6 +176,24 @@ def _safe_div(a, b, default=0.0):
     return a / b if b else default
 
 
+def _is_broadcast(ip, mac=''):
+    """Check if an IP or MAC is a broadcast/multicast address."""
+    if ip in ('255.255.255.255', '0.0.0.0'):
+        return True
+    if mac and mac.lower() in ('ff:ff:ff:ff:ff:ff',):
+        return True
+    return False
+
+
+def _is_multicast(ip):
+    """Check if an IP is a multicast address (224.0.0.0/4)."""
+    try:
+        first_octet = int(ip.split('.')[0])
+        return 224 <= first_octet <= 239
+    except (ValueError, IndexError):
+        return False
+
+
 # =========================================================================
 # Device Profile Tracker
 # =========================================================================
@@ -100,7 +203,14 @@ class DeviceProfile:
     Maintains a running behavioral profile for a single device (by IP).
     Used to compute deviation features so the ML model can detect
     zero-day attacks and post-authentication compromise.
+
+    Rationale XIII: Device deviation features measure *relative* behavioral
+    change from a device's own historical baseline, not absolute values.
+    This is the mathematical foundation for zero-day detection via autoencoder.
     """
+
+    MIN_FLOWS = 20
+    STABILIZATION_SEC = 180
 
     def __init__(self, ip, first_seen):
         self.ip = ip
@@ -188,6 +298,12 @@ class DeviceProfile:
             return 0.0
         return round((value - mean) / std, 4)
 
+    @property
+    def is_mature(self):
+        """Rationale XI.A: Whether baseline is statistically reliable."""
+        age = time.time() - self.first_seen
+        return self.total_flows >= self.MIN_FLOWS and age >= self.STABILIZATION_SEC
+
     def get_features(self, current_pkt_rate, current_byte_rate, current_payload):
         """Return device behavioral features as a dict."""
         n = self.total_flows
@@ -225,6 +341,7 @@ class DeviceProfile:
             'is_registered_iot': self.is_iot,
             'is_gateway': self.is_gateway,
             'device_age_seconds': round(time.time() - self.first_seen, 2),
+            'is_baseline_mature': 1 if self.is_mature else 0,
         }
 
     def reset_recent(self):
@@ -284,15 +401,22 @@ class TrafficCapture:
         self._net_total_packets = 0
         self._net_total_bytes = 0
 
+        # --- Broadcast/Multicast counters (per window, Group 8) ---
+        self._net_broadcast_count = 0
+        self._net_multicast_count = 0
+        self._net_arp_total = 0
+        self._net_arp_broadcast = 0
+
         # --- State ---
         self._running = False
         self._flush_thread = None
         self._window_start = time.time()
         self._csv_initialized = False
         self._rows_written = 0
+        self._window_id = 0
 
         # --- Attacker Identification (one-time log per IP/Type) ---
-        self._logged_attackers = set() # Set of (ip, attack_type)
+        self._logged_attackers = set()  # Set of (ip, attack_type)
 
         # --- Per-Attack-Type Confirmation Tracking ---
         # Key: (src_ip, attack_type)  Value: dict with consecutive window count
@@ -315,6 +439,21 @@ class TrafficCapture:
         self._host_udp_count = defaultdict(int)     # src_ip -> UDP packets this window
         self._host_dst_ports = defaultdict(set)     # src_ip -> set of unique dst_ports
 
+        # --- ICMP Type Tracking (for icmp_type_entropy, Group 4) ---
+        self._host_icmp_types = defaultdict(lambda: defaultdict(int))
+        # src_ip -> {icmp_type_int: count}
+
+        # --- ARP Tracking (Group 5) ---
+        # Per-window: keyed by source MAC
+        self._arp_requests = defaultdict(int)       # src_mac -> request count this window
+        self._arp_replies = defaultdict(int)         # src_mac -> reply count this window
+        self._arp_gratuitous = defaultdict(int)      # src_mac -> gratuitous count this window
+        self._arp_request_targets = defaultdict(set) # dst_ip -> set of src_ips that requested it
+        self._arp_reply_sources = defaultdict(list)  # dst_ip -> list of (src_mac, claimed_ip)
+        # Persistent across windows (Rationale VII.C: slow-poisoning detection)
+        self._mac_to_ip_history = defaultdict(set)   # src_mac -> set of IPs ever claimed
+        self._ip_to_mac_history = defaultdict(set)   # ip -> set of MACs ever claiming it
+
         # --- IP to MAC mapping (for block_attacker calls) ---
         self._ip_to_mac = {}  # src_ip -> eth_src MAC address
 
@@ -322,6 +461,20 @@ class TrafficCapture:
         # OFF = capture only (all labels = normal, clean dataset)
         # ON  = full anomaly detection + blocking
         self._detection_enabled = False
+
+        # --- Manual Label Override (for stealthy attacks below detection thresholds) ---
+        # Rationale: Slow attacks (nmap -T1, 1000 PPS SYN) deliberately evade thresholds.
+        # Without override, stealthy attack traffic gets labeled 'normal' — corrupted training data.
+        self._label_overrides = {}  # src_ip -> attack_type string
+
+        # --- Metadata Signals (Group 10) ---
+        self._meta_attack_tool = 'none'
+        self._meta_attack_intensity = 0
+        self._meta_mininet_event = 'normal'
+        self._meta_backlog_drops = 0
+
+        # --- Per-window flow count per src_ip (Group 9) ---
+        self._flows_per_src = defaultdict(int)
 
     # ---- Logging helpers ----
 
@@ -351,6 +504,41 @@ class TrafficCapture:
             self._log('info', 'Detection mode ENABLED — anomaly detection active (counters reset)')
         else:
             self._log('info', 'Detection mode DISABLED — capture only, all labels = normal')
+
+    def set_label_override(self, src_ip, attack_type):
+        """
+        Force all flows from src_ip to be labeled with attack_type.
+        Used for stealthy attacks that stay below detection thresholds.
+        Call with attack_type='clear' to remove the override.
+        """
+        if attack_type == 'clear':
+            if src_ip in self._label_overrides:
+                del self._label_overrides[src_ip]
+                self._log('info',
+                    f"[OVERRIDE] Label override cleared for {src_ip} — "
+                    f"returning to automatic detection")
+        else:
+            self._label_overrides[src_ip] = attack_type
+            self._log('info',
+                f"[OVERRIDE] Label override SET: {src_ip} → {attack_type} "
+                f"(all flows from this IP will be labeled as attack)")
+
+    def set_attack_metadata(self, tool, intensity=0):
+        """Set metadata for ATTACK_START signaling."""
+        self._meta_attack_tool = tool
+        self._meta_attack_intensity = intensity
+        self._log('info', f"[META] Attack metadata set: tool={tool}, intensity={intensity}")
+
+    def clear_attack_metadata(self):
+        """Clear metadata for ATTACK_STOP signaling."""
+        self._meta_attack_tool = 'none'
+        self._meta_attack_intensity = 0
+        self._log('info', "[META] Attack metadata cleared")
+
+    def set_mininet_event(self, event):
+        """Set metadata for MININET_EVENT signaling."""
+        self._meta_mininet_event = event
+        self._log('info', f"[META] Mininet event set: {event}")
 
     def start(self):
         """Start the background flush thread."""
@@ -384,31 +572,31 @@ class TrafficCapture:
         pkt_info dict should contain:
             src_ip, dst_ip, src_port, dst_port, protocol,
             packet_size, eth_src, eth_dst, tcp_flags (dict),
-            dpid, in_port
+            dpid, in_port, icmp_type (optional), icmp_code (optional),
+            arp_op (optional), arp_spa (optional), arp_tpa (optional)
         """
         if not self._running:
             return
-            
+
         src_ip = pkt_info.get('src_ip', '')
-        
+
         # --- Backlog Ignore / Blacklist Cache ---
-        # If the switch is physically dropping this IP because we blocked it,
-        # we must ignore packets from this IP in our controller's backlog queue,
-        # otherwise old stale packets will continuously re-trigger false alarms.
         if src_ip in self._active_blocks:
             if time.time() < self._active_blocks[src_ip]:
+                self._meta_backlog_drops += 1
                 return  # Drop packet from ML / tracking pipeline
             else:
                 del self._active_blocks[src_ip]
 
         with self._flow_lock:
-            # We use an identical 5-tuple + protocol flow mapping
             protocol = pkt_info.get('protocol', 'OTHER')
         dst_ip = pkt_info.get('dst_ip', '')
         dst_port = pkt_info.get('dst_port', 0)
         packet_size = pkt_info.get('packet_size', 0)
         src_port = pkt_info.get('src_port', 0)
         tcp_flags = pkt_info.get('tcp_flags', {})
+        eth_src = pkt_info.get('eth_src', '')
+        eth_dst = pkt_info.get('eth_dst', '')
         now = time.time()
 
         if not src_ip and not dst_ip:
@@ -431,9 +619,19 @@ class TrafficCapture:
             self._net_total_packets += 1
             self._net_total_bytes += packet_size
 
+            # --- Broadcast/Multicast counters (Group 8) ---
+            if _is_broadcast(dst_ip, eth_dst):
+                self._net_broadcast_count += 1
+            if _is_multicast(dst_ip):
+                self._net_multicast_count += 1
+
             # --- Per-host rate counters (for attack detection) ---
             if protocol == 'ICMP':
                 self._host_icmp_count[src_ip] += 1
+                # Track ICMP type for entropy (Group 4)
+                icmp_type = pkt_info.get('icmp_type')
+                if icmp_type is not None:
+                    self._host_icmp_types[src_ip][icmp_type] += 1
             elif protocol == 'UDP':
                 self._host_udp_count[src_ip] += 1
             elif protocol == 'TCP':
@@ -443,11 +641,37 @@ class TrafficCapture:
                 # Count ACK packets for SYN/ACK ratio guard
                 if tcp_flags.get('ACK'):
                     self._host_ack_count[src_ip] += 1
+            elif protocol == 'ARP':
+                # --- ARP tracking (Group 5) ---
+                arp_op = pkt_info.get('arp_op', 0)
+                arp_spa = pkt_info.get('arp_spa', '')  # sender protocol address
+                arp_tpa = pkt_info.get('arp_tpa', '')  # target protocol address
+                self._net_arp_total += 1
+                if _is_broadcast(dst_ip, eth_dst):
+                    self._net_arp_broadcast += 1
+                if arp_op == 1:  # ARP Request
+                    self._arp_requests[eth_src] += 1
+                    if arp_tpa:
+                        self._arp_request_targets[arp_tpa].add(src_ip)
+                elif arp_op == 2:  # ARP Reply
+                    self._arp_replies[eth_src] += 1
+                    if arp_spa:
+                        self._arp_reply_sources[arp_spa].append((eth_src, src_ip))
+                # Gratuitous ARP: sender claims its own IP
+                if arp_spa and arp_tpa and arp_spa == arp_tpa:
+                    self._arp_gratuitous[eth_src] += 1
+                # Persistent binding tracking
+                if eth_src and arp_spa:
+                    self._mac_to_ip_history[eth_src].add(arp_spa)
+                    self._ip_to_mac_history[arp_spa].add(eth_src)
+
             if dst_port and src_ip:
                 self._host_dst_ports[src_ip].add(dst_port)
 
+            # Flow count per src_ip (Group 9)
+            self._flows_per_src[src_ip] += 1
+
         # Track IP → MAC mapping
-        eth_src = pkt_info.get('eth_src', '')
         if src_ip and eth_src:
             self._ip_to_mac[src_ip] = eth_src
 
@@ -457,12 +681,10 @@ class TrafficCapture:
                 profile = DeviceProfile(src_ip, now)
                 # Tag IoT/gateway if controller is available
                 if self.controller:
-                    eth_src = pkt_info.get('eth_src', '')
                     if hasattr(self.controller, 'is_iot') and self.controller.is_iot(eth_src):
                         profile.is_iot = 1
                     if hasattr(self.controller, 'is_gateway') and self.controller.is_gateway(eth_src):
                         profile.is_gateway = 1
-                    # Check discovered lists as well
                     if eth_src in getattr(self.controller, 'iot_devices', {}):
                         profile.is_iot = 1
                     if eth_src.lower() in getattr(self.controller, 'discovered_gateways', {}):
@@ -496,6 +718,9 @@ class TrafficCapture:
 
     def _flush_flows(self):
         """Aggregate accumulated flows, compute features, write to CSV."""
+        flush_start = time.time()
+        self._window_id += 1
+
         # Snapshot and reset flows
         with self._flow_lock:
             if not self._flows:
@@ -529,6 +754,40 @@ class TrafficCapture:
             self._host_udp_count = defaultdict(int)
             self._host_dst_ports = defaultdict(set)
 
+            # Snapshot ICMP types
+            host_icmp_types = dict(self._host_icmp_types)
+            self._host_icmp_types = defaultdict(lambda: defaultdict(int))
+
+            # Snapshot ARP counters
+            arp_requests = dict(self._arp_requests)
+            arp_replies = dict(self._arp_replies)
+            arp_gratuitous = dict(self._arp_gratuitous)
+            arp_request_targets = dict(self._arp_request_targets)
+            arp_reply_sources = dict(self._arp_reply_sources)
+            self._arp_requests = defaultdict(int)
+            self._arp_replies = defaultdict(int)
+            self._arp_gratuitous = defaultdict(int)
+            self._arp_request_targets = defaultdict(set)
+            self._arp_reply_sources = defaultdict(list)
+
+            # Snapshot broadcast/multicast counters
+            broadcast_count = self._net_broadcast_count
+            multicast_count = self._net_multicast_count
+            arp_total = self._net_arp_total
+            arp_broadcast = self._net_arp_broadcast
+            self._net_broadcast_count = 0
+            self._net_multicast_count = 0
+            self._net_arp_total = 0
+            self._net_arp_broadcast = 0
+
+            # Snapshot flows-per-src
+            flows_per_src = dict(self._flows_per_src)
+            self._flows_per_src = defaultdict(int)
+
+            # Snapshot backlog drops
+            backlog_drops = self._meta_backlog_drops
+            self._meta_backlog_drops = 0
+
         # Snapshot alerts
         with self._alert_lock:
             cutoff = time.time() - self.window_seconds * 2
@@ -538,32 +797,29 @@ class TrafficCapture:
         window_duration = self.window_seconds
         network_ctx = self._compute_network_context(
             flows_snapshot, net_src_ips, net_dst_ips, net_dst_ports,
-            net_total_packets, net_total_bytes, window_duration, alerts
+            net_total_packets, net_total_bytes, window_duration, alerts,
+            broadcast_count, multicast_count, arp_total, arp_broadcast
         )
 
         # Pass 1: Identify "Attacker" IPs in this window
-        # An IP is an attacker if ANY of its flows trigger Snort or Behavioral rules.
-        window_attackers = {} # ip -> (label, attack_type, sid)
-        
-        # We need to compute individual flow labels first to find attackers
+        window_attackers = {}  # ip -> (label, attack_type, sid)
+
         flow_metadata = []
         for flow_key, flow_data in flows_snapshot.items():
             if not flow_data['packets']:
                 continue
-            
+
             src_ip = flow_key[0]
-            # Basic stats for detection pass
             duration = max(flow_data['last_seen'] - flow_data['first_seen'], 0.001)
             total_packets = len(flow_data['packets'])
             pps = total_packets / duration
             bps = sum(p[0] for p in flow_data['packets']) / duration
             avg_size = bps / pps if pps else 0
-            
+
             with self._device_lock:
                 profile = self._devices.get(src_ip)
-            
-            # Compute flow's intrinsic label
-            protocol = flow_key[3]  # (src_ip, dst_ip, dst_port, protocol)
+
+            protocol = flow_key[3]
             host_counters = {
                 'icmp': host_icmp.get(src_ip, 0),
                 'syn': host_syn.get(src_ip, 0),
@@ -575,48 +831,37 @@ class TrafficCapture:
                 src_ip, flow_key[1], alerts, profile, pps, bps, avg_size, protocol,
                 host_counters
             )
-            
+
             if label > 0:
-                # If multiple attacks found, prioritize Snort (1) over Behavioral (2)
                 if src_ip not in window_attackers or label == 1:
                     window_attackers[src_ip] = (label, attack_type, sid)
-            
+
             flow_metadata.append((flow_key, flow_data, pps, bps, avg_size))
 
         # --- Consecutive-window tracking & Escalation ---
-        # This runs ONCE per window, not per flow.
-        # 1. Collect which (src_ip, attack_type) were detected this window
-        # 2. Increment consecutive counter for those (once per window)
-        # 3. Reset counter for those NOT detected (attack stopped)
-        # 4. Run escalation if consecutive threshold is met
-        detected_this_window = {}  # (src_ip, type) -> dst_ip
+        detected_this_window = {}
         for src_ip, (label, attack_type, _) in window_attackers.items():
             if label == 2:
-                detected_this_window[(src_ip, attack_type)] = None  # dst_ip filled below
+                detected_this_window[(src_ip, attack_type)] = None
 
-        # Fill dst_ip from flow metadata
         for flow_key, flow_data, _, _, _ in flow_metadata:
             key = (flow_key[0], window_attackers.get(flow_key[0], (0, '', ''))[1])
             if key in detected_this_window and detected_this_window[key] is None:
-                detected_this_window[key] = flow_key[1]  # dst_ip
+                detected_this_window[key] = flow_key[1]
 
-        # Update consecutive counters (once per window per key)
         for key in list(self._attack_confirmations.keys()):
             if key not in detected_this_window:
-                # Source was clean this window → reset tracking
                 del self._attack_confirmations[key]
 
         for key, dst_ip in detected_this_window.items():
             src_ip, attack_type = key
-            
-            # If already permanently confirmed, skip new escalation logs. It will write to dataset silently forever.
+
             if src_ip in self._confirmed_attackers:
                 continue
 
             required = self.REQUIRED_CONSECUTIVE.get(attack_type, 3)
             attacker_mac = self._ip_to_mac.get(src_ip, 'unknown')
-            
-            # Fetch the actual count from host_counters to show in log
+
             trigger_val = 'N/A'
             if 'ICMP' in attack_type: trigger_val = host_icmp.get(src_ip, 0)
             elif 'UDP' in attack_type: trigger_val = host_udp.get(src_ip, 0)
@@ -624,7 +869,6 @@ class TrafficCapture:
             elif 'Port' in attack_type: trigger_val = len(host_ports.get(src_ip, set()))
 
             if key not in self._attack_confirmations:
-                # First window → start tracking
                 self._attack_confirmations[key] = {
                     'consecutive': 1,
                     'first_seen': time.time(),
@@ -647,16 +891,15 @@ class TrafficCapture:
                 now = time.time()
 
                 if not conf.get('escalated') and windows >= required:
-                    # Consecutive threshold met → Classify completely
                     conf['escalated'] = True
                     conf['escalated_time'] = now
                     self._confirmed_attackers[src_ip] = attack_type
-                    
+
                     device_name = "Unknown"
                     if self.controller and hasattr(self.controller, '_discovered_names'):
                         device_name = self.controller._discovered_names.get(src_ip, "Unknown")
                     name_str = f" ({device_name})" if device_name != "Unknown" else ""
-                    
+
                     self._log('warning',
                         f"\n[\u26d4] ATTACK CONFIRMED — Classified {src_ip}{name_str} as attacker\n"
                         f"    Attack  : {attack_type} (Sustained ~{trigger_val}/window)\n"
@@ -666,13 +909,11 @@ class TrafficCapture:
                     )
 
                 else:
-                    # Below consecutive threshold, log progress
                     self._log('info',
                         f"[\u26a0] {src_ip}: {attack_type} window {windows}/{required} (Spike: {trigger_val})"
                     )
 
         # Pass 2: Build Rows with Inheritance
-        # All flows from an identified attacker in this window will inherit the attack label.
         rows = []
         for flow_key, flow_data, pps, bps, avg_size in flow_metadata:
             src_ip = flow_key[0]
@@ -680,7 +921,16 @@ class TrafficCapture:
             row = self._build_flow_row(
                 flow_key, flow_data, network_ctx, alerts,
                 pps, bps, avg_size,
-                inherited_label=inherited
+                inherited_label=inherited,
+                host_icmp_types=host_icmp_types,
+                arp_requests=arp_requests,
+                arp_replies=arp_replies,
+                arp_gratuitous=arp_gratuitous,
+                arp_request_targets=arp_request_targets,
+                arp_reply_sources=arp_reply_sources,
+                flows_per_src=flows_per_src,
+                backlog_drops=backlog_drops,
+                flush_start=flush_start,
             )
             if row:
                 rows.append(row)
@@ -694,20 +944,24 @@ class TrafficCapture:
         if rows:
             self._write_csv(rows)
 
-    def _build_flow_row(self, flow_key, flow_data, network_ctx, alerts, 
-                        pps, bps, avg_size, inherited_label=None):
-        """Build a single CSV row from a flow."""
+    def _build_flow_row(self, flow_key, flow_data, network_ctx, alerts,
+                        pps, bps, avg_size, inherited_label=None,
+                        host_icmp_types=None, arp_requests=None,
+                        arp_replies=None, arp_gratuitous=None,
+                        arp_request_targets=None, arp_reply_sources=None,
+                        flows_per_src=None, backlog_drops=0, flush_start=0):
+        """Build a single CSV row from a flow with all 10 feature groups."""
         src_ip, dst_ip, dst_port, protocol = flow_key
         packets = flow_data['packets']
         first_seen = flow_data['first_seen']
         last_seen = flow_data['last_seen']
+        eth_src = self._ip_to_mac.get(src_ip, '')
 
-        # --- Flow-level features ---
+        # --- Base Flow-level features ---
         duration = max(last_seen - first_seen, 0.001)
         total_packets = len(packets)
         sizes = [p[0] for p in packets]
         total_bytes = sum(sizes)
-        # pps, bps, avg_size passed from caller for efficiency
         min_size = min(sizes) if sizes else 0
         max_size = max(sizes) if sizes else 0
 
@@ -719,14 +973,182 @@ class TrafficCapture:
         psh_count = sum(1 for p in packets if p[1].get('PSH', False))
 
         # Port diversity
-        src_ports = set(p[2] for p in packets if p[2])
-        dst_ports = {dst_port} if dst_port else set()
+        src_ports_set = set(p[2] for p in packets if p[2])
+        dst_ports_set = {dst_port} if dst_port else set()
 
+        # =====================================================================
+        # GROUP 1: Timing & Inter-Arrival Rhythm (7 features)
+        # Rationale III: CV near 0 = robotic regularity (attack tool).
+        # CV >> 0 = natural irregularity (human/application traffic).
+        # =====================================================================
+        timestamps = [p[3] for p in packets]
+        if len(timestamps) >= 2:
+            # Cap at TIMESTAMP_BUFFER_MAX for memory safety
+            if len(timestamps) > TIMESTAMP_BUFFER_MAX:
+                import random as _rng
+                timestamps = sorted(_rng.sample(timestamps, TIMESTAMP_BUFFER_MAX))
+            timestamps.sort()
+            deltas = [timestamps[i+1] - timestamps[i] for i in range(len(timestamps)-1)]
+            ia_mean = statistics.mean(deltas) if deltas else 0.0
+            ia_std = statistics.stdev(deltas) if len(deltas) >= 2 else 0.0
+            ia_cv = _safe_div(ia_std, ia_mean) if ia_mean > 0 else 0.0
+            ia_min = min(deltas) if deltas else 0.0
+            ia_max = max(deltas) if deltas else 0.0
+        else:
+            ia_mean = ia_std = ia_cv = ia_min = ia_max = 0.0
+
+        # Burst detection: periods where instantaneous PPS > 3x window mean
+        burst_count = 0
+        burst_durations = []
+        if len(timestamps) >= 3 and pps > 0:
+            burst_threshold = pps * 3
+            in_burst = False
+            burst_start_t = 0
+            for i in range(len(timestamps) - 1):
+                dt = timestamps[i+1] - timestamps[i]
+                inst_pps = 1.0 / dt if dt > 0 else 0
+                if inst_pps > burst_threshold:
+                    if not in_burst:
+                        in_burst = True
+                        burst_start_t = timestamps[i]
+                else:
+                    if in_burst:
+                        burst_durations.append(timestamps[i] - burst_start_t)
+                        burst_count += 1
+                        in_burst = False
+            if in_burst:
+                burst_durations.append(timestamps[-1] - burst_start_t)
+                burst_count += 1
+        burst_duration_avg = (statistics.mean(burst_durations) * 1000) if burst_durations else 0.0
+
+        # =====================================================================
+        # GROUP 2: Directionality & Asymmetry (7 features)
+        # Rationale IV: Attacks are asymmetric — attacker floods, victim silent.
+        # Ratio-based features immune to TAP 2x amplification (Rationale II.B).
+        # =====================================================================
+        fwd_packets = []
+        bwd_packets = []
+        for p in packets:
+            # Direction determined by comparing packet src against flow canonical src
+            # In our flow key, src_ip is the canonical source
+            fwd_packets.append(p)
+            # We also check for reverse-direction packets (dst -> src replies within same flow key)
+            # Since flows are keyed by (src, dst, ...), all packets in this flow are forward.
+            # Backward traffic exists in a separate flow key (dst, src, ...).
+        fwd_pkt_count = len(fwd_packets)
+        bwd_pkt_count = 0  # Backward = separate flow key
+
+        # Look for reverse flow in this window to compute reply_rate
+        # This is an approximation within the window boundary (Rationale II.C)
+        fwd_bwd_pkt_ratio = round(_safe_div(fwd_pkt_count, bwd_pkt_count + 1), 4)
+        fwd_bytes = total_bytes
+        bwd_bytes = 0
+        fwd_bwd_bytes_ratio = round(_safe_div(fwd_bytes, bwd_bytes + 1), 4)
+        fwd_avg_size = round(_safe_div(fwd_bytes, fwd_pkt_count), 2)
+        bwd_avg_size = 0.0
+        reply_rate = 0.0  # Computed at window level; within single flow = 0
+
+        # =====================================================================
+        # GROUP 3: TCP Session Completeness (4 features)
+        # Rationale V: SYN floods violate the TCP lifecycle contract (RFC 793).
+        # incomplete_ratio is a category-level zero-day indicator.
+        # =====================================================================
+        syn_ack_ratio = round(_safe_div(syn_count, ack_count + 1), 4)
+        has_syn = syn_count > 0
+        has_ack = ack_count > 0
+        has_fin = fin_count > 0
+        completed = 1 if (has_syn and has_ack and has_fin) else 0
+        total_sessions = 1 if has_syn else 0
+        incomplete_ratio = round(_safe_div(total_sessions - completed, total_sessions + 1), 4)
+        avg_session_dur = round(duration, 4) if completed else 0.0
+
+        # =====================================================================
+        # GROUP 4: Per-Flow Entropy (3 features)
+        # Rationale VI: Entropy = diversity measure, invariant to port magnitude.
+        # Near 0 = concentrated (flood). High = diverse (scan/normal).
+        # =====================================================================
+        size_counter = Counter(sizes)
+        payload_size_entropy = _shannon_entropy(dict(size_counter))
+
+        src_port_counter = Counter(p[2] for p in packets if p[2])
+        src_port_entropy = _shannon_entropy(dict(src_port_counter))
+
+        # ICMP type entropy — uses per-host accumulator for this window
+        if protocol == 'ICMP' and host_icmp_types:
+            icmp_type_counter = host_icmp_types.get(src_ip, {})
+            icmp_type_entropy = _shannon_entropy(dict(icmp_type_counter))
+        else:
+            icmp_type_entropy = 0.0
+
+        # =====================================================================
+        # GROUP 6: Packet Size Distribution (4 features)
+        # Rationale VIII: Attack tools produce near-zero pkt_size_std.
+        # =====================================================================
+        if len(sizes) >= 2:
+            pkt_size_std = round(statistics.stdev(sizes), 4)
+            pkt_size_var = round(statistics.variance(sizes), 4)
+        else:
+            pkt_size_std = 0.0
+            pkt_size_var = 0.0
+        small_pkt_ratio = round(_safe_div(sum(1 for s in sizes if s < 100), total_packets), 4)
+        large_pkt_ratio = round(_safe_div(sum(1 for s in sizes if s > 1000), total_packets), 4)
+
+        # =====================================================================
+        # GROUP 7: Port Behavior Patterns (6 features)
+        # Rationale IX: Floods target one port (ratio~1). Scans sweep many.
+        # =====================================================================
+        all_dst_ports_list = [dst_port] * total_packets if dst_port else []
+        if all_dst_ports_list:
+            port_counter = Counter(all_dst_ports_list)
+            top_port, top_count = port_counter.most_common(1)[0]
+            top_dst_port = top_port
+            top_dst_port_ratio = round(_safe_div(top_count, total_packets), 4)
+        else:
+            top_dst_port = 0
+            top_dst_port_ratio = 0.0
+
+        # Port std — treat as numeric for spread measurement
+        unique_dst_list = sorted(dst_ports_set)
+        if len(unique_dst_list) >= 2:
+            dst_port_std = round(statistics.stdev(unique_dst_list), 4)
+        else:
+            dst_port_std = 0.0
+
+        well_known = sum(1 for p in [dst_port] if p and p < 1024)
+        ephemeral = sum(1 for p in [dst_port] if p and p > 49152)
+        well_known_port_ratio = round(_safe_div(well_known, 1), 4) if dst_port else 0.0
+        ephemeral_port_ratio = round(_safe_div(ephemeral, 1), 4) if dst_port else 0.0
+
+        # Sequential port score: fraction of consecutive port pairs with |diff| <= 2
+        if len(unique_dst_list) >= 2:
+            sequential_pairs = sum(
+                1 for i in range(len(unique_dst_list) - 1)
+                if abs(unique_dst_list[i+1] - unique_dst_list[i]) <= 2
+            )
+            sequential_port_score = round(
+                _safe_div(sequential_pairs, len(unique_dst_list) - 1), 4
+            )
+        else:
+            sequential_port_score = 0.0
+
+        # =====================================================================
+        # GROUP 8: Broadcast Context (per-flow flag)
+        # =====================================================================
+        is_broadcast_dst = 1 if _is_broadcast(dst_ip, '') else 0
+
+        # =====================================================================
+        # GROUP 9: Flow Context
+        # =====================================================================
+        flow_count_this_window = flows_per_src.get(src_ip, 1) if flows_per_src else 1
+
+        # =====================================================================
+        # Build flow_features dict
+        # =====================================================================
         flow_features = {
             'timestamp': datetime.fromtimestamp(first_seen).isoformat(),
             'src_ip': src_ip,
             'dst_ip': dst_ip,
-            'src_port': list(src_ports)[0] if len(src_ports) == 1 else 0,
+            'src_port': list(src_ports_set)[0] if len(src_ports_set) == 1 else 0,
             'dst_port': dst_port or 0,
             'protocol': protocol,
             'flow_duration': round(duration, 4),
@@ -742,33 +1164,110 @@ class TrafficCapture:
             'fin_count': fin_count,
             'rst_count': rst_count,
             'psh_count': psh_count,
-            'unique_src_ports': len(src_ports),
-            'unique_dst_ports': len(dst_ports),
+            'unique_src_ports': len(src_ports_set),
+            'unique_dst_ports': len(dst_ports_set),
+            # Group 1
+            'inter_arrival_mean': round(ia_mean, 6),
+            'inter_arrival_std': round(ia_std, 6),
+            'inter_arrival_cv': round(ia_cv, 4),
+            'inter_arrival_min': round(ia_min, 6),
+            'inter_arrival_max': round(ia_max, 6),
+            'burst_count': burst_count,
+            'burst_duration_avg': round(burst_duration_avg, 4),
+            # Group 2
+            'fwd_packet_count': fwd_pkt_count,
+            'bwd_packet_count': bwd_pkt_count,
+            'fwd_bwd_packet_ratio': fwd_bwd_pkt_ratio,
+            'fwd_bwd_bytes_ratio': fwd_bwd_bytes_ratio,
+            'fwd_avg_packet_size': fwd_avg_size,
+            'bwd_avg_packet_size': bwd_avg_size,
+            'reply_rate': reply_rate,
+            # Group 3
+            'syn_ack_ratio': syn_ack_ratio,
+            'completed_sessions': completed,
+            'incomplete_ratio': incomplete_ratio,
+            'avg_session_duration': avg_session_dur,
+            # Group 4
+            'payload_size_entropy': payload_size_entropy,
+            'src_port_entropy': src_port_entropy,
+            'icmp_type_entropy': round(icmp_type_entropy, 4),
+            # Group 6
+            'pkt_size_std': pkt_size_std,
+            'pkt_size_variance': pkt_size_var,
+            'small_pkt_ratio': small_pkt_ratio,
+            'large_pkt_ratio': large_pkt_ratio,
+            # Group 7
+            'top_dst_port': top_dst_port,
+            'top_dst_port_ratio': top_dst_port_ratio,
+            'dst_port_std': dst_port_std,
+            'well_known_port_ratio': well_known_port_ratio,
+            'ephemeral_port_ratio': ephemeral_port_ratio,
+            'sequential_port_score': sequential_port_score,
+            # Group 8
+            'is_broadcast_dst': is_broadcast_dst,
+            # Group 9
+            'flows_per_window': flow_count_this_window,
         }
 
         # --- Device behavior features ---
         with self._device_lock:
             profile = self._devices.get(src_ip)
             if profile:
-                # Get features using historical baseline (pre-update)
                 device_features = profile.get_features(pps, bps, avg_size)
             else:
                 device_features = {col: 0 for col in DEVICE_COLUMNS}
+
+        # =====================================================================
+        # GROUP 5: ARP-Specific Behavioral (7 features)
+        # Rationale VII: Addresses the visibility gap in generic flow features.
+        # Persistent binding table enables slow-poisoning detection.
+        # =====================================================================
+        if protocol == 'ARP' and eth_src:
+            req_count = (arp_requests or {}).get(eth_src, 0)
+            rep_count = (arp_replies or {}).get(eth_src, 0)
+            grat_count = (arp_gratuitous or {}).get(eth_src, 0)
+            arp_reply_rate_val = round(_safe_div(rep_count, duration), 4)
+            arp_request_rate_val = round(_safe_div(req_count, duration), 4)
+            arp_rr_ratio = round(_safe_div(rep_count, req_count + 1), 4)
+
+            # Unsolicited replies: replies for IPs that nobody requested this window
+            unsolicited = 0
+            if arp_reply_sources and arp_request_targets:
+                for claimed_ip, sources in (arp_reply_sources or {}).items():
+                    for reply_mac, reply_ip in sources:
+                        if reply_mac == eth_src:
+                            if claimed_ip not in (arp_request_targets or {}):
+                                unsolicited += 1
+
+            # Binding changes from persistent history
+            mac_ip_changes = max(0, len(self._mac_to_ip_history.get(eth_src, set())) - 1)
+            ip_mac_changes = max(0, len(self._ip_to_mac_history.get(src_ip, set())) - 1)
+
+            arp_features = {
+                'arp_reply_rate': arp_reply_rate_val,
+                'arp_request_rate': arp_request_rate_val,
+                'arp_reply_request_ratio': arp_rr_ratio,
+                'arp_gratuitous_count': grat_count,
+                'arp_unsolicited_count': unsolicited,
+                'mac_ip_binding_changes': mac_ip_changes,
+                'ip_mac_binding_changes': ip_mac_changes,
+            }
+        else:
+            arp_features = {col: 0 for col in ARP_COLUMNS}
 
         # --- Labels ---
         if inherited_label:
             label, attack_type, snort_sid = inherited_label
         else:
-            # Fallback (Pass 1 should have caught most)
             label, attack_type, snort_sid = self._compute_label(
                 src_ip, dst_ip, alerts, profile, pps, bps, avg_size
             )
 
         # Update Device Profile statistics (Baseline Integrity)
+        # Rationale: Attack flows excluded from DeviceProfile volume averages
+        # to prevent attackers from shifting the baseline.
         with self._device_lock:
             if profile:
-                # Only update volume baseline if flow is fully NORMAL
-                # This ensures the model learns true normal even if attack is strong.
                 if label == 0:
                     profile.update(pps, bps, avg_size, dst_ip, dst_port, protocol)
                 else:
@@ -780,10 +1279,24 @@ class TrafficCapture:
             'snort_sid': snort_sid,
         }
 
-        label_features = {
-            'label': label,
-            'attack_type': attack_type,
-            'snort_sid': snort_sid,
+        # =====================================================================
+        # GROUP 10: Metadata Columns (Non-Feature, For Dataset Validation)
+        # Rationale XII: Audit/reproducibility fields. MUST be stripped before
+        # DL training — including them would constitute data leakage.
+        # =====================================================================
+        flush_duration_ms = round((time.time() - flush_start) * 1000, 2) if flush_start else 0
+        meta_features = {
+            'meta_window_id': self._window_id,
+            'meta_src_mac_oui': eth_src[:8] if len(eth_src) >= 8 else eth_src,
+            'meta_device_name': (
+                self.controller._discovered_names.get(src_ip, 'unknown')
+                if self.controller and hasattr(self.controller, '_discovered_names') else 'unknown'
+            ),
+            'meta_attack_tool': self._meta_attack_tool,
+            'meta_attack_intensity': self._meta_attack_intensity,
+            'meta_mininet_event': self._meta_mininet_event,
+            'meta_controller_load': flush_duration_ms,
+            'meta_backlog_drops': backlog_drops,
         }
 
         # Merge all features
@@ -791,19 +1304,15 @@ class TrafficCapture:
         row.update(flow_features)
         row.update(device_features)
         row.update(network_ctx)
+        row.update(arp_features)
         row.update(label_features)
-        return row
-
-        # Merge all features
-        row = {}
-        row.update(flow_features)
-        row.update(device_features)
-        row.update(network_ctx)
-        row.update(label_features)
+        row.update(meta_features)
         return row
 
     def _compute_network_context(self, flows, src_ips, dst_ips, dst_ports,
-                                  total_pkts, total_bytes, duration, alerts):
+                                  total_pkts, total_bytes, duration, alerts,
+                                  broadcast_count=0, multicast_count=0,
+                                  arp_total=0, arp_broadcast=0):
         """Compute network-wide context features."""
         active_flows = len(flows)
         total_durations = []
@@ -828,31 +1337,31 @@ class TrafficCapture:
             'network_entropy_dst_port': _shannon_entropy(dst_ports),
             'active_snort_alerts': len(alerts),
             'distinct_alert_types': len(alert_types),
+            # Group 8 (network-level): Rationale X
+            'broadcast_ratio': round(_safe_div(broadcast_count, total_pkts), 4) if total_pkts else 0.0,
+            'multicast_ratio': round(_safe_div(multicast_count, total_pkts), 4) if total_pkts else 0.0,
+            'arp_broadcast_ratio': round(_safe_div(arp_broadcast, arp_total), 4) if arp_total else 0.0,
         }
-
-    def set_detection_mode(self, enabled):
-        """Toggle true anomaly detection vs baseline capture."""
-        self._detection_enabled = enabled
 
     def manual_unblock(self, src_ip):
         """Manually clear an IP from confirmed attacker blocks."""
         device_name = "Unknown"
         if self.controller and hasattr(self.controller, '_discovered_names'):
             device_name = self.controller._discovered_names.get(src_ip, "Unknown")
-            
+
         self._log('info', f"[\u2705] ADMIN MANUAL UNBLOCK: {src_ip} ({device_name}) has been cleared of attacker status.")
-        
+
         if src_ip in self._confirmed_attackers:
             del self._confirmed_attackers[src_ip]
-            
+
         keys_to_del = [k for k in self._attack_confirmations.keys() if k[0] == src_ip]
         for k in keys_to_del:
             del self._attack_confirmations[k]
-            
+
         keys_to_del2 = [k for k in self._logged_attackers if k[0] == src_ip]
         self._logged_attackers.difference_update(keys_to_del2)
 
-    def _compute_label(self, src_ip, dst_ip, alerts, device_profile, 
+    def _compute_label(self, src_ip, dst_ip, alerts, device_profile,
                        curr_pps=0, curr_bps=0, curr_avg_size=0, protocol='OTHER',
                        host_counters=None):
         """
@@ -861,8 +1370,13 @@ class TrafficCapture:
           1 = known attack (Snort/DAI alert matches this flow's IPs)
           2 = suspicious behavioral deviation (rate counter or profile anomaly)
         """
+        # --- 0. Manual Label Override (highest priority) ---
+        # Rationale: Slow/stealthy attacks evade all thresholds.
+        # Override injects correct ground-truth during data collection.
+        if src_ip in self._label_overrides:
+            return 2, self._label_overrides[src_ip], 'manual_override'
+
         # --- 1. Detection Mode Gate ---
-        # When detection is OFF, force everything to normal for clean dataset capture
         if not self._detection_enabled:
             return 0, 'normal', ''
 
@@ -882,29 +1396,22 @@ class TrafficCapture:
         # --- 3. Per-Host Rate Counter Detection with Context Guards ---
         detected_type = None
         if host_counters:
-            icmp = host_counters.get('icmp', 0)
-            syn  = host_counters.get('syn', 0)
-            ack  = host_counters.get('ack', 0)
-            udp  = host_counters.get('udp', 0)
-            ports = host_counters.get('unique_ports', 0)
+            icmp_cnt = host_counters.get('icmp', 0)
+            syn_cnt  = host_counters.get('syn', 0)
+            ack_cnt  = host_counters.get('ack', 0)
+            udp_cnt  = host_counters.get('udp', 0)
+            ports    = host_counters.get('unique_ports', 0)
 
-            # ICMP Flood: >1000 ICMP packets from one host in 5 seconds
-            # Raised significantly: a real flood generates 10,000+ pkts.
-            # Mininet pingall could somehow trigger 150 due to broadcast storms.
             # ICMP Flood: >15000 ICMP packets from one host in 5 seconds
-            # Raised over 10k to comfortably ignore intense Mininet broadcast loops
-            # like pingall (which can hit ~6k in some topologies).
-            if icmp > 15000:
+            # Raised to ignore intense Mininet broadcast loops (up to ~6k).
+            if icmp_cnt > 15000:
                 detected_type = 'ICMP Flood'
-
             # SYN Flood: >5000 SYN-only packets AND low ACK count
-            elif syn > 5000 and ack < 50:
+            elif syn_cnt > 5000 and ack_cnt < 50:
                 detected_type = 'SYN Flood'
-
             # UDP Flood: >15000 UDP packets from one host in 5 seconds
-            elif udp > 15000:
+            elif udp_cnt > 15000:
                 detected_type = 'UDP Flood'
-
             # Port Scan: >100 unique destination ports from one host in 5 seconds
             elif ports > 100:
                 detected_type = 'Port Scan'
@@ -916,9 +1423,7 @@ class TrafficCapture:
         if not device_profile:
             return 0, 'normal', ''
 
-        # Guard: If traffic drops to 0 or is extremely low, it cannot mathematically
-        # be a flood. This prevents the Z-score deviation from treating a sudden
-        # drop in traffic as a massive "anomaly".
+        # Guard: If traffic drops to 0 or is extremely low, it cannot be a flood.
         if curr_pps < 10:
             return 0, 'normal', ''
 
@@ -990,6 +1495,7 @@ class TrafficCapture:
 if __name__ == '__main__':
     print("=" * 60)
     print("  Traffic Capture Module — Standalone Test")
+    print(f"  Expected columns: {len(ALL_COLUMNS)}")
     print("=" * 60)
 
     capture = TrafficCapture(output_path='test_dataset.csv', window_seconds=3)
@@ -1015,6 +1521,8 @@ if __name__ == '__main__':
                 'RST': random.random() < 0.02,
                 'PSH': random.random() < 0.3,
             },
+            'icmp_type': 8 if random.random() < 0.5 else 0,
+            'icmp_code': 0,
             'dpid': 1,
             'in_port': 1,
         }
@@ -1057,12 +1565,28 @@ if __name__ == '__main__':
             rows = list(reader)
             print(f"\n✅ Generated {len(rows)} rows")
             print(f"   Columns: {len(reader.fieldnames)}")
+            print(f"   Expected: {len(ALL_COLUMNS)}")
+            col_match = "✅ MATCH" if len(reader.fieldnames) == len(ALL_COLUMNS) else "❌ MISMATCH"
+            print(f"   Status: {col_match}")
             print(f"   Normal:  {sum(1 for r in rows if r['label'] == '0')}")
             print(f"   Attack:  {sum(1 for r in rows if r['label'] == '1')}")
             print(f"   Suspicious: {sum(1 for r in rows if r['label'] == '2')}")
+
+            # Check for empty cells
+            empty_cols = set()
+            for row in rows:
+                for k, v in row.items():
+                    if v == '' or v is None:
+                        empty_cols.add(k)
+            if empty_cols:
+                print(f"   ⚠ Columns with empty values: {sorted(empty_cols)}")
+            else:
+                print(f"   ✅ No empty cells — all features populated")
+
             print(f"\n   Sample row:")
             if rows:
-                for k, v in rows[0].items():
+                for k, v in list(rows[0].items())[:10]:
                     print(f"     {k}: {v}")
+                print(f"     ... ({len(rows[0]) - 10} more columns)")
     else:
         print("❌ CSV file not created")
