@@ -6,7 +6,7 @@ import threading
 import socket as _socket
 
 # Controller physical IP (used for direct UDP commands)
-CONTROLLER_IP = '192.168.1.19'
+CONTROLLER_IP = '192.168.1.24'
 CONTROLLER_CMD_PORT = 9999
 
 def _send_to_controller(msg):

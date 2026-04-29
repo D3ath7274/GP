@@ -109,6 +109,24 @@ def classify_attack(msg):
     return msg.strip('" ')
 
 
+def _protocol_aware_reclassify(attack_type, proto, msg):
+    """
+    Post-classification fixup: Snort rules like SID 469 (ICMP PING NMAP)
+    contain 'nmap' in the message causing classify_attack() to return
+    'Port Scan'. But when the protocol is ICMP, that's wrong — it's an
+    ICMP flood, not a port scan. Port scans use TCP/UDP by definition.
+    """
+    if not proto:
+        return attack_type
+    proto_upper = proto.upper()
+    if proto_upper == 'ICMP':
+        # ICMP cannot be a port scan (no ports). Reclassify.
+        if attack_type in ('Port Scan', 'Exploit Attempt', 'Brute Force',
+                          'SQL Injection', 'XSS Attack'):
+            return 'ICMP Flood'
+    return attack_type
+
+
 # =============================================================================
 # Alert Fast Parser
 # =============================================================================
@@ -258,6 +276,10 @@ class SnortManager:
         self._lock = threading.Lock()
         # Hard blocklist: these SIDs are FULLY DROPPED (no storage, no callback, no CSV label).
         # They are known false positives in SDN/Mininet environments.
+        # NOTE: SID 469 (ICMP PING NMAP) is intentionally NOT blocked here.
+        # It fires during hping3 --icmp floods, and the protocol reclassifier
+        # (_protocol_aware_reclassify) converts "Port Scan" → "ICMP Flood".
+        # Alert dedup (30s window) prevents log flooding.
         self._blocked_sids = {
             527,             # BAD-TRAFFIC same SRC/DST (TAP mirror artifact)
             366, 384, 408,   # ICMP PING, ICMP Echo Reply (normal pingall)
@@ -274,6 +296,12 @@ class SnortManager:
             2101424,         # GPL DNS request
             1000001,         # Often used for custom probe/test rules
         }
+
+        # Alert deduplication: suppress repeated alerts for same SID+src_ip
+        # to prevent log flooding during attacks. Same combo logs at most
+        # once every _dedup_window_seconds.
+        self._dedup_window_seconds = 30
+        self._dedup_cache = {}  # (sid, src_ip) -> last_log_time
 
     # ---- Logging helpers ----
 
@@ -506,7 +534,7 @@ class SnortManager:
                 time.sleep(5)
 
     def _process_alert_line(self, line):
-        """Parse an alert line and invoke the callback."""
+        """Parse an alert line, deduplicate, and invoke the callback."""
         alert = parse_alert_line(line)
         if not alert:
             return
@@ -522,32 +550,60 @@ class SnortManager:
         if sid_int in self._blocked_sids:
             return
 
+        # Protocol-aware reclassification: fix ICMP alerts being
+        # labeled as "Port Scan" because the rule message contains "nmap".
+        proto = alert.get('proto', '')
+        alert['attack_type'] = _protocol_aware_reclassify(
+            alert['attack_type'], proto, alert.get('msg', '')
+        )
+
+        src_ip = alert.get('src_ip', '?')
+        now = time.time()
+
         with self._lock:
             self._alert_count += 1
             alert['alert_number'] = self._alert_count
             alert['detected_at'] = datetime.now().isoformat()
             self._alerts.append(alert)
 
-        # Log the alert
-        self._log_warning(
-            "\n"
-            "========================================\n"
-            "  \U0001f6a8 IDS ALERT #%d\n"
-            "========================================\n"
-            "  Attack : %s\n"
-            "  From   : %s:%s\n"
-            "  To     : %s:%s\n"
-            "  Proto  : %s\n"
-            "  Rule   : SID %s\n"
-            "========================================",
-            self._alert_count,
-            alert['attack_type'],
-            alert['src_ip'], alert['src_port'],
-            alert['dst_ip'], alert['dst_port'],
-            alert['proto'],
-            alert['sid'],
-        )
-        # Invoke callback (for Ryu controller integration)
+        # --- Alert Deduplication / Rate Limiting ---
+        # During floods, Snort fires per-packet (150K+ alerts/sec).
+        # Log the FIRST occurrence, then suppress repeats for 30s.
+        # The alert is ALWAYS stored and forwarded to the callback
+        # (for CSV labeling), but the console log is suppressed.
+        dedup_key = (sid, src_ip)
+        last_logged = self._dedup_cache.get(dedup_key, 0)
+        should_log = (now - last_logged) >= self._dedup_window_seconds
+
+        if should_log:
+            self._dedup_cache[dedup_key] = now
+            # Clean old entries from dedup cache periodically
+            if len(self._dedup_cache) > 500:
+                cutoff = now - self._dedup_window_seconds * 2
+                self._dedup_cache = {
+                    k: v for k, v in self._dedup_cache.items() if v > cutoff
+                }
+
+            self._log_warning(
+                "\n"
+                "========================================\n"
+                "  \U0001f6a8 IDS ALERT #%d\n"
+                "========================================\n"
+                "  Attack : %s\n"
+                "  From   : %s:%s\n"
+                "  To     : %s:%s\n"
+                "  Proto  : %s\n"
+                "  Rule   : SID %s\n"
+                "========================================",
+                self._alert_count,
+                alert['attack_type'],
+                src_ip, alert['src_port'],
+                alert['dst_ip'], alert['dst_port'],
+                proto,
+                alert['sid'],
+            )
+
+        # Always invoke callback (for CSV labeling) regardless of log suppression
         if self.on_alert:
             try:
                 self.on_alert(alert)

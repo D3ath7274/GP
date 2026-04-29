@@ -192,30 +192,13 @@ class SimpleSwitch(app_manager.RyuApp):
     def _handle_snort_alert(self, alert):
         """
         Called by SnortManager for each new Snort alert.
-        Logs the attack type and source to the Ryu controller output.
-        
-        This covers traffic on ALL controller ports including:
-        - Physical interface (ens33)
-        - Any Mininet-wifi virtual network traffic routed through the controller
+        Forwards the alert to TrafficCapture for CSV flow labeling.
+
+        NOTE: Console logging is handled by snort_monitor.py with
+        rate-limited deduplication (same SID+src logs at most once/30s).
+        Do NOT add logging here — it would bypass deduplication and
+        flood the terminal during attacks (200K+ alerts/sec).
         """
-        self.logger.warning(
-            "\n"
-            "╔══════════════════════════════════════════════════════════╗\n"
-            "║  🚨 IDS ALERT: %-40s ║\n"
-            "╠══════════════════════════════════════════════════════════╣\n"
-            "║  Attack : %-46s ║\n"
-            "║  Source : %-46s ║\n"
-            "║  Target : %-46s ║\n"
-            "║  Proto  : %-46s ║\n"
-            "║  Rule   : SID %-42s ║\n"
-            "╚══════════════════════════════════════════════════════════╝",
-            alert.get('attack_type', 'Unknown')[:40],
-            alert.get('attack_type', 'Unknown'),
-            '%s:%s' % (alert.get('src_ip', '?'), alert.get('src_port', '?')),
-            '%s:%s' % (alert.get('dst_ip', '?'), alert.get('dst_port', '?')),
-            alert.get('proto', '?'),
-            alert.get('sid', '?'),
-        )
         # Forward alert to traffic capture for labeling anomalous flows
         if hasattr(self, 'traffic_capture') and self.traffic_capture:
             self.traffic_capture.record_alert(alert)
@@ -805,6 +788,24 @@ class SimpleSwitch(app_manager.RyuApp):
         actions.append(datapath.ofproto_parser.OFPActionOutput(
             ofproto.OFPP_CONTROLLER, 0xffff  # Send full packet data to controller for IDS/ML
         ))
+
+        # ── AMPLIFICATION GUARD ──────────────────────────────────────
+        # When a flow rule has output:CONTROLLER in its actions, every
+        # matching packet is forwarded by the flow rule AND a copy is
+        # sent here as packet_in with reason=OFPR_ACTION.
+        #
+        # If we send a PacketOut for these, the switch delivers the
+        # packet AGAIN (duplicate) AND sends ANOTHER copy to the
+        # controller (infinite loop). This caused:
+        #   - 319 duplicate ICMP replies for 20 pings (~17x per seq)
+        #   - False "ICMP Flood" detection during normal baseline
+        #   - 1830-5581 phantom packet counts per 5s window
+        #
+        # Fix: if the packet was already forwarded by a flow rule
+        # (reason=OFPR_ACTION), we've already recorded it above for
+        # traffic_capture and Snort. Do NOT re-forward or re-install.
+        if msg.reason == ofproto.OFPR_ACTION:
+            return
 
         # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:

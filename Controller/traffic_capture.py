@@ -1378,10 +1378,10 @@ class TrafficCapture:
 
         # --- 1. Detection Mode Gate ---
         if not self._detection_enabled:
-            return 0, 'normal', ''
+            return 0, 'normal', 'none'
 
         if src_ip in self._confirmed_attackers:
-            return 2, self._confirmed_attackers[src_ip], ""
+            return 2, self._confirmed_attackers[src_ip], "none"
 
         # --- 2. Known Attacks (Snort + DAI) ---
         matching_alerts = [
@@ -1391,9 +1391,18 @@ class TrafficCapture:
         ]
         if matching_alerts:
             alert = matching_alerts[-1]
-            return 1, alert['attack_type'], str(alert.get('sid', ''))
+            return 1, alert['attack_type'], str(alert.get('sid', 'none'))
 
         # --- 3. Per-Host Rate Counter Detection with Context Guards ---
+        # THRESHOLD CALIBRATION NOTE (2026-04):
+        # hping3 --icmp --flood sends ~25K pkt/sec, but the controller
+        # only sees ~600 pkt/sec through the OpenFlow control channel.
+        # OVS fast-paths matched flows through the kernel datapath;
+        # the TCP control channel to Ryu saturates and drops overflow.
+        # Observed rates (from dataset11.csv analysis):
+        #   Normal ICMP per host per 5s window: 5-30 packets
+        #   Flood ICMP per host per 5s window:  50-3000 packets
+        # Thresholds are set at ~15x above max normal to avoid FPs.
         detected_type = None
         if host_counters:
             icmp_cnt = host_counters.get('icmp', 0)
@@ -1402,30 +1411,29 @@ class TrafficCapture:
             udp_cnt  = host_counters.get('udp', 0)
             ports    = host_counters.get('unique_ports', 0)
 
-            # ICMP Flood: >15000 ICMP packets from one host in 5 seconds
-            # Raised to ignore intense Mininet broadcast loops (up to ~6k).
-            if icmp_cnt > 15000:
+            # ICMP Flood: >500 ICMP packets from one host in 5 seconds
+            if icmp_cnt > 500:
                 detected_type = 'ICMP Flood'
-            # SYN Flood: >5000 SYN-only packets AND low ACK count
-            elif syn_cnt > 5000 and ack_cnt < 50:
+            # SYN Flood: >300 SYN-only packets AND low ACK count
+            elif syn_cnt > 300 and ack_cnt < 50:
                 detected_type = 'SYN Flood'
-            # UDP Flood: >15000 UDP packets from one host in 5 seconds
-            elif udp_cnt > 15000:
+            # UDP Flood: >500 UDP packets from one host in 5 seconds
+            elif udp_cnt > 500:
                 detected_type = 'UDP Flood'
             # Port Scan: >100 unique destination ports from one host in 5 seconds
             elif ports > 100:
                 detected_type = 'Port Scan'
 
         if detected_type:
-            return 2, detected_type, ''
+            return 2, detected_type, 'none'
 
         # --- 4. Z-Score Behavioral Analysis (Secondary / Fallback) ---
         if not device_profile:
-            return 0, 'normal', ''
+            return 0, 'normal', 'none'
 
         # Guard: If traffic drops to 0 or is extremely low, it cannot be a flood.
         if curr_pps < 10:
-            return 0, 'normal', ''
+            return 0, 'normal', 'none'
 
         MIN_FLOWS = 20
         STABILIZATION_SEC = 180
@@ -1433,7 +1441,7 @@ class TrafficCapture:
 
         age = time.time() - device_profile.first_seen
         if device_profile.total_flows < MIN_FLOWS or age < STABILIZATION_SEC:
-            return 0, 'normal', ''
+            return 0, 'normal', 'none'
 
         features = device_profile.get_features(curr_pps, curr_bps, curr_avg_size)
         pkt_dev = abs(features.get('device_pkt_rate_deviation', 0))
@@ -1447,21 +1455,21 @@ class TrafficCapture:
         # Volumetric spike
         if pkt_dev > Z_THRESHOLD or byte_dev > Z_THRESHOLD:
             if proto_upper == 'ICMP':
-                return 2, 'ICMP Flood', ''
+                return 2, 'ICMP Flood', 'none'
             elif proto_upper == 'UDP':
-                return 2, 'UDP Flood', ''
+                return 2, 'UDP Flood', 'none'
             elif proto_upper == 'TCP':
-                return 2, 'SYN Flood', ''
+                return 2, 'SYN Flood', 'none'
 
         # Payload anomaly
         if payload_dev > Z_THRESHOLD:
-            return 2, 'UDP Flood', ''
+            return 2, 'UDP Flood', 'none'
 
         # Host sweep
         if new_dst_ratio > 0.9 and ips_count > 10:
-            return 2, 'Port Scan', ''
+            return 2, 'Port Scan', 'none'
 
-        return 0, 'normal', ''
+        return 0, 'normal', 'none'
 
     def _write_csv(self, rows):
         """Append rows to the CSV file. Create with headers if first time."""
