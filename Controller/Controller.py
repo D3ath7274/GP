@@ -618,8 +618,8 @@ class SimpleSwitch(app_manager.RyuApp):
                                         "\n"
                                         "╔══════════════════════════════════════════════════════════╗\n"
                                         "║  🚨 DETECTION MODE: ON                                    ║\n"
-                                        "║  Anomaly detection + blocking ACTIVE.                   ║\n"
-                                        "║  Attacks will be detected and blocked.                  ║\n"
+                                        "║  Anomaly detection ACTIVE.                             ║\n"
+                                        "║  Attacks will be detected and labeled.                  ║\n"
                                         "╚══════════════════════════════════════════════════════════╝"
                                     )
                                 elif mode == 'OFF':

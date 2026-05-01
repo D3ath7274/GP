@@ -454,12 +454,6 @@ class TrafficCapture:
         self._mac_to_ip_history = defaultdict(set)   # src_mac -> set of IPs ever claimed
         self._ip_to_mac_history = defaultdict(set)   # ip -> set of MACs ever claiming it
 
-        # --- DAI Baseline Binding Table (FIX: P9) ---
-        # Frozen snapshot of IP->MAC bindings learned during DETECT:OFF.
-        # When detection turns ON, these become the "known good" bindings.
-        # Any ARP reply claiming an IP with a different MAC than baseline = spoof.
-        self._dai_baseline_bindings = {}  # ip -> mac (frozen when detect ON)
-
         # --- IP to MAC mapping (for block_attacker calls) ---
         self._ip_to_mac = {}  # src_ip -> eth_src MAC address
 
@@ -479,9 +473,8 @@ class TrafficCapture:
         self._meta_mininet_event = 'normal'
         self._meta_backlog_drops = 0
 
-        # --- Per-window UNIQUE FLOW count per src_ip (Group 9) ---
-        # FIX P12: Changed from counter (int) to set of flow keys
-        self._flows_per_src = defaultdict(set)
+        # --- Per-window flow count per src_ip (Group 9) ---
+        self._flows_per_src = defaultdict(int)
 
     # ---- Logging helpers ----
 
@@ -508,13 +501,7 @@ class TrafficCapture:
                 self._host_ack_count = defaultdict(int)
                 self._host_udp_count = defaultdict(int)
                 self._host_dst_ports = defaultdict(set)
-            # FIX P9: Freeze DAI baseline bindings from traffic learned during DETECT:OFF
-            # These are the "known good" IP->MAC mappings.
-            self._dai_baseline_bindings = dict(self._ip_to_mac)
-            baseline_count = len(self._dai_baseline_bindings)
-            self._log('info',
-                f'Detection mode ENABLED — anomaly detection active '
-                f'(counters reset, DAI baseline: {baseline_count} bindings frozen)')
+            self._log('info', 'Detection mode ENABLED — anomaly detection active (counters reset)')
         else:
             self._log('info', 'Detection mode DISABLED — capture only, all labels = normal')
 
@@ -681,9 +668,8 @@ class TrafficCapture:
             if dst_port and src_ip:
                 self._host_dst_ports[src_ip].add(dst_port)
 
-            # Unique flow count per src_ip (Group 9) — FIX P12
-            # Counts unique flow keys, not packets
-            self._flows_per_src[src_ip].add(flow_key)
+            # Flow count per src_ip (Group 9)
+            self._flows_per_src[src_ip] += 1
 
         # Track IP → MAC mapping
         if src_ip and eth_src:
@@ -795,8 +781,8 @@ class TrafficCapture:
             self._net_arp_broadcast = 0
 
             # Snapshot flows-per-src
-            flows_per_src = {ip: len(keys) for ip, keys in self._flows_per_src.items()}
-            self._flows_per_src = defaultdict(set)
+            flows_per_src = dict(self._flows_per_src)
+            self._flows_per_src = defaultdict(int)
 
             # Snapshot backlog drops
             backlog_drops = self._meta_backlog_drops
@@ -845,6 +831,34 @@ class TrafficCapture:
                 src_ip, flow_key[1], alerts, profile, pps, bps, avg_size, protocol,
                 host_counters
             )
+
+            # ═══════════════════════════════════════════════════════════
+            # DIAGNOSTIC BLOCK — REMOVE AFTER DEBUGGING
+            # Logs every flow's label decision when detection is ON
+            # ═══════════════════════════════════════════════════════════
+            if self._detection_enabled:
+                matching_alerts = [
+                    a for a in alerts
+                    if a['src_ip'] == src_ip or a['dst_ip'] == flow_key[1]
+                    or a['src_ip'] == flow_key[1] or a['dst_ip'] == src_ip
+                ]
+                self._log('warning',
+                    f"[DIAG-W{self._window_id}] "
+                    f"flow={src_ip}->{flow_key[1]} proto={protocol} "
+                    f"pkts={len(flow_data['packets'])} "
+                    f"label={label} type={attack_type} sid={sid} | "
+                    f"COUNTERS: icmp={host_counters['icmp']} "
+                    f"syn={host_counters['syn']} ack={host_counters['ack']} "
+                    f"udp={host_counters['udp']} ports={host_counters['unique_ports']} | "
+                    f"ALERTS: buf_total={len(alerts)} matching={len(matching_alerts)} "
+                    f"recent_total={len(self._recent_alerts)} | "
+                    f"STATE: detect={self._detection_enabled} "
+                    f"confirmed={list(self._confirmed_attackers.keys())} "
+                    f"overrides={list(self._label_overrides.keys())}"
+                )
+            # ═══════════════════════════════════════════════════════════
+            # END DIAGNOSTIC BLOCK
+            # ═══════════════════════════════════════════════════════════
 
             if label > 0:
                 if src_ip not in window_attackers or label == 1:
@@ -1104,9 +1118,7 @@ class TrafficCapture:
         else:
             pkt_size_std = 0.0
             pkt_size_var = 0.0
-        # FIX P13: Lowered from 100→64 bytes. Normal ICMP=84 bytes (no longer "small"),
-        # but SYN flood=40 bytes and ARP=42 bytes remain "small" → better discrimination.
-        small_pkt_ratio = round(_safe_div(sum(1 for s in sizes if s < 64), total_packets), 4)
+        small_pkt_ratio = round(_safe_div(sum(1 for s in sizes if s < 100), total_packets), 4)
         large_pkt_ratio = round(_safe_div(sum(1 for s in sizes if s > 1000), total_packets), 4)
 
         # =====================================================================
@@ -1246,24 +1258,14 @@ class TrafficCapture:
             arp_request_rate_val = round(_safe_div(req_count, duration), 4)
             arp_rr_ratio = round(_safe_div(rep_count, req_count + 1), 4)
 
-            # FIX P10: Unsolicited replies — count ARP replies from this MAC
-            # for IPs that don't match the DAI baseline binding.
-            # arpspoof sends replies claiming to be an IP that belongs to a
-            # different MAC in the baseline. This catches exactly that.
+            # Unsolicited replies: replies for IPs that nobody requested this window
             unsolicited = 0
-            if arp_reply_sources:
+            if arp_reply_sources and arp_request_targets:
                 for claimed_ip, sources in (arp_reply_sources or {}).items():
                     for reply_mac, reply_ip in sources:
                         if reply_mac == eth_src:
-                            # Check 1: Reply for IP nobody requested this window
                             if claimed_ip not in (arp_request_targets or {}):
                                 unsolicited += 1
-                            # Check 2: Reply claiming IP that belongs to a different
-                            # MAC in the DAI baseline (the core arpspoof indicator)
-                            elif claimed_ip in self._dai_baseline_bindings:
-                                baseline_mac = self._dai_baseline_bindings[claimed_ip]
-                                if baseline_mac and reply_mac != baseline_mac:
-                                    unsolicited += 1
 
             # Binding changes from persistent history
             mac_ip_changes = max(0, len(self._mac_to_ip_history.get(eth_src, set())) - 1)
@@ -1409,7 +1411,7 @@ class TrafficCapture:
         if src_ip in self._confirmed_attackers:
             return 2, self._confirmed_attackers[src_ip], "none"
 
-        # --- 2a. Known Attacks (Snort alerts) ---
+        # --- 2. Known Attacks (Snort + DAI) ---
         matching_alerts = [
             a for a in alerts
             if a['src_ip'] == src_ip or a['dst_ip'] == dst_ip
@@ -1418,22 +1420,6 @@ class TrafficCapture:
         if matching_alerts:
             alert = matching_alerts[-1]
             return 1, alert['attack_type'], str(alert.get('sid', 'none'))
-
-        # --- 2b. DAI Baseline Violation (FIX P9: persistent detection) ---
-        # During ARP traffic, check if this source MAC is claiming an IP
-        # that belongs to a different MAC in the frozen baseline.
-        # Unlike the original DAI check which only fired once on binding change,
-        # this fires EVERY window the violation persists.
-        if protocol == 'ARP' and self._dai_baseline_bindings:
-            eth_src_mac = self._ip_to_mac.get(src_ip, '')
-            if eth_src_mac:
-                # Check all IPs this MAC has ever claimed
-                claimed_ips = self._mac_to_ip_history.get(eth_src_mac, set())
-                for claimed_ip in claimed_ips:
-                    if claimed_ip in self._dai_baseline_bindings:
-                        baseline_mac = self._dai_baseline_bindings[claimed_ip]
-                        if baseline_mac and eth_src_mac != baseline_mac:
-                            return 1, 'ARP Spoofing', 'DAI'
 
         # --- 3. Per-Host Rate Counter Detection with Context Guards ---
         # THRESHOLD CALIBRATION NOTE (2026-04):
