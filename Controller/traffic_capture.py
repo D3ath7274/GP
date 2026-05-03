@@ -1428,10 +1428,14 @@ class TrafficCapture:
             return 2, self._confirmed_attackers[src_ip], "none"
 
         # --- 2a. Known Attacks (Snort alerts) ---
+        # IMPORTANT: Only match if the FLOW's src_ip is the ALERT's src_ip.
+        # Previous logic matched on any IP overlap (including dst_ip), which
+        # caused victim response flows to inherit attack labels from Snort.
+        # Example: Snort fires "SNMP request" for 10.0.0.4:80→10.0.0.3:161
+        # (victim responding to SYN flood) — we must NOT label all 10.0.0.4 flows.
         matching_alerts = [
             a for a in alerts
-            if a['src_ip'] == src_ip or a['dst_ip'] == dst_ip
-            or a['src_ip'] == dst_ip or a['dst_ip'] == src_ip
+            if a['src_ip'] == src_ip
         ]
         if matching_alerts:
             alert = matching_alerts[-1]
