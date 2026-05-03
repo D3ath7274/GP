@@ -618,6 +618,23 @@ class TrafficCapture:
         flow_key = (src_ip, dst_ip, dst_port, protocol)
 
         with self._flow_lock:
+            # --- Flow Aggregation Cap ---
+            # Victim response traffic creates thousands of flow keys per window
+            # (each RST/SYN-ACK to attacker's random port = unique flow key).
+            # Cap at MAX_FLOWS_PER_PAIR: once exceeded, redirect to aggregate
+            # flow with dst_port=0. Preserves first 50 real port flows.
+            MAX_FLOWS_PER_PAIR = 50
+            pair_key = (src_ip, dst_ip, protocol)
+            if flow_key not in self._flows:
+                # Count existing flows for this (src, dst, proto) pair
+                if not hasattr(self, '_pair_flow_count'):
+                    self._pair_flow_count = defaultdict(int)
+                if self._pair_flow_count[pair_key] >= MAX_FLOWS_PER_PAIR:
+                    # Redirect to aggregate overflow flow
+                    flow_key = (src_ip, dst_ip, 0, protocol)
+                else:
+                    self._pair_flow_count[pair_key] += 1
+
             flow = self._flows[flow_key]
             if not flow['packets']:
                 flow['first_seen'] = now
@@ -767,6 +784,7 @@ class TrafficCapture:
             self._host_ack_count = defaultdict(int)
             self._host_udp_count = defaultdict(int)
             self._host_dst_ports = defaultdict(set)
+            self._pair_flow_count = defaultdict(int)  # Reset flow aggregation cap
 
             # Snapshot ICMP types
             host_icmp_types = dict(self._host_icmp_types)
@@ -1459,7 +1477,13 @@ class TrafficCapture:
             # SYN Flood: >300 SYN-only packets AND low ACK count
             elif syn_cnt > 300 and ack_cnt < 50:
                 detected_type = 'SYN Flood'
-            # UDP Flood: >500 UDP packets from one host in 5 seconds
+            # Control Plane Saturation: high UDP + high port diversity
+            # (many tiny UDP packets to incrementing ports → each creates a
+            # new flow → Packet-In to controller → overwhelms control plane)
+            # Distinguishes from UDP Flood (one port) and Port Scan (TCP SYN)
+            elif udp_cnt > 500 and ports > 100:
+                detected_type = 'Control Plane Saturation'
+            # UDP Flood: >500 UDP packets to few ports (one port hammered)
             elif udp_cnt > 500:
                 detected_type = 'UDP Flood'
             # Port Scan: >100 unique destination ports from one host in 5 seconds
