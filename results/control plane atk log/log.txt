@@ -1,0 +1,1081 @@
+ryu@ubuntu:~/final testing/GP/Controller$ sudo ryu-manager Controller.py 
+loading app Controller.py
+loading app ryu.controller.ofp_handler
+instantiating app Controller.py of SimpleSwitch
+Traffic mirror TAP 'snort_tap' started.
+Snort 2.x detected. Note: This monitor is optimized for Snort 3 (Lua).
+Starting Snort IDS on interface ens33 (using /etc/snort/snort.conf)...
+Snort on ens33 started (PID: 4267)
+Starting Snort IDS on interface snort_tap (using /etc/snort/snort.conf)...
+Snort on snort_tap started (PID: 4275)
+Snort alert monitor started — watching 2 interface(s): ens33, snort_tap
+Traffic capture started → dataset.csv (window: 5.0s)
+
+╔══════════════════════════════════════════════════════════╗
+║  🛡 DETECTION MODE: OFF (Capture Only)                    ║
+║  Traffic is being recorded. All labels = normal.        ║
+║  Send CONTROL:DETECT:ON to enable attack detection.     ║
+╚══════════════════════════════════════════════════════════╝
+UDP command listener running on 0.0.0.0:9999
+UDP command listener started on port 9999
+instantiating app ryu.controller.ofp_handler of OFPHandler
+UDP command received from 192.168.1.23: REGISTER:NAME:sta1:10.0.0.1
+Registered hostname (UDP): 10.0.0.1 → sta1
+UDP command received from 192.168.1.23: REGISTER:NAME:sta2:10.0.0.2
+Registered hostname (UDP): 10.0.0.2 → sta2
+UDP command received from 192.168.1.23: REGISTER:NAME:h1:10.0.0.3
+Registered hostname (UDP): 10.0.0.3 → h1
+UDP command received from 192.168.1.23: REGISTER:NAME:h2:10.0.0.4
+Registered hostname (UDP): 10.0.0.4 → h2
+port added 4
+UDP command received from 192.168.1.23: REGISTER:IOT:IOT:TemperatureSensor
+IoT registration via UDP from 192.168.1.23: IOT:TemperatureSensor
+UDP command received from 192.168.1.23: REGISTER:NAME:TempSensor:10.0.0.5
+Registered hostname (UDP): 10.0.0.5 → TempSensor
+port added 5
+UDP command received from 192.168.1.23: REGISTER:IOT:IOT:SecurityCamera
+IoT registration via UDP from 192.168.1.23: IOT:SecurityCamera
+UDP command received from 192.168.1.23: REGISTER:NAME:Cam:10.0.0.6
+Registered hostname (UDP): 10.0.0.6 → Cam
+UDP command received from 192.168.1.23: MININET_EVENT:normal
+[META] Mininet event set: normal
+META: Mininet event set to 'normal'
+Traffic capture: 101 rows written to dataset.csv
+Traffic capture: 205 rows written to dataset.csv
+Traffic capture: 309 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #1
+========================================
+  Attack : INFO web bug 0x0 gif attempt
+  From   : 142.251.208.238:80
+  To     : 192.168.1.49:18296
+  Proto  : TCP
+  Rule   : SID 2925
+========================================
+Traffic capture: 407 rows written to dataset.csv
+Traffic capture: 501 rows written to dataset.csv
+Traffic capture: 603 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #2
+========================================
+  Attack : Exploit Attempt
+  From   : 10.0.0.6:59166
+  To     : 10.0.0.4:8883
+  Proto  : UDP
+  Rule   : SID 2329
+========================================
+Traffic capture: 702 rows written to dataset.csv
+UDP command received from 192.168.1.23: CONTROL:DETECT:ON
+Detection mode ENABLED — anomaly detection active (counters reset, DAI baseline: 6 bindings frozen)
+
+╔══════════════════════════════════════════════════════════╗
+║  🚨 DETECTION MODE: ON                                    ║
+║  Anomaly detection ACTIVE.                             ║
+║  Attacks will be detected and labeled.                  ║
+╚══════════════════════════════════════════════════════════╝
+UDP command received from 192.168.1.23: ATTACK_START:hping3:saturation
+[META] Attack metadata set: tool=hping3, intensity=saturation
+META: Attack started — tool=hping3, intensity=saturation
+
+========================================
+  🚨 IDS ALERT #3
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.3:2161
+  To     : 10.0.0.4:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #4
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.3:2162
+  To     : 10.0.0.4:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 815 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #5
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:63536
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 931 rows written to dataset.csv
+Traffic capture: 1044 rows written to dataset.csv
+Traffic capture: 1102 rows written to dataset.csv
+Traffic capture: 1215 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.3
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.4
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 1329 rows written to dataset.csv
+[⚠] 10.0.0.3: Control Plane Saturation window 2/3 (Spike: N/A)
+
+[⛔] ATTACK CONFIRMED — Classified 10.0.0.3 (h1) as attacker
+    Attack  : Control Plane Saturation (Sustained ~N/A/window)
+    Target  : 10.0.0.4
+    Evidence: 3 consecutive windows in 10s
+    Action  : Host represents a persistent threat. Label locked-in indefinitely.
+
+Traffic capture: 1444 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #17
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:63536
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+
+========================================
+  🚨 IDS ALERT #20
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.3:2161
+  To     : 10.0.0.4:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #21
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.3:2162
+  To     : 10.0.0.4:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 1500 rows written to dataset.csv
+Traffic capture: 1613 rows written to dataset.csv
+Traffic capture: 1728 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #24
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.3:2000
+  To     : 10.0.0.4:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+
+========================================
+  🚨 IDS ALERT #25
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.3:2161
+  To     : 10.0.0.4:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #26
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.3:2162
+  To     : 10.0.0.4:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 1847 rows written to dataset.csv
+Traffic capture: 1903 rows written to dataset.csv
+Traffic capture: 2017 rows written to dataset.csv
+Traffic capture: 2132 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #37
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:63536
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 2250 rows written to dataset.csv
+Traffic capture: 2307 rows written to dataset.csv
+Traffic capture: 2421 rows written to dataset.csv
+Traffic capture: 2536 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #39
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.3:2000
+  To     : 10.0.0.4:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+
+========================================
+  🚨 IDS ALERT #40
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.3:2161
+  To     : 10.0.0.4:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #41
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.3:2162
+  To     : 10.0.0.4:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 2648 rows written to dataset.csv
+Traffic capture: 2705 rows written to dataset.csv
+Traffic capture: 2821 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #46
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:63536
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 2936 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #49
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.3:2161
+  To     : 10.0.0.4:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #50
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.3:2162
+  To     : 10.0.0.4:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 3051 rows written to dataset.csv
+Traffic capture: 3109 rows written to dataset.csv
+Traffic capture: 3222 rows written to dataset.csv
+Traffic capture: 3342 rows written to dataset.csv
+Traffic capture: 3457 rows written to dataset.csv
+Traffic capture: 3515 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #53
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:63536
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+
+========================================
+  🚨 IDS ALERT #55
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.3:2161
+  To     : 10.0.0.4:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #56
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.3:2162
+  To     : 10.0.0.4:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 3627 rows written to dataset.csv
+Traffic capture: 3746 rows written to dataset.csv
+Traffic capture: 3806 rows written to dataset.csv
+Traffic capture: 3921 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #57
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:63536
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+
+========================================
+  🚨 IDS ALERT #59
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.3:2161
+  To     : 10.0.0.4:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #60
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.3:2162
+  To     : 10.0.0.4:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 4032 rows written to dataset.csv
+Traffic capture: 4147 rows written to dataset.csv
+Traffic capture: 4203 rows written to dataset.csv
+UDP command received from 192.168.1.23: ATTACK_STOP
+[META] Attack metadata cleared
+META: Attack stopped
+UDP command received from 192.168.1.23: CONTROL:UNBLOCK:10.0.0.3
+[✅] ADMIN MANUAL UNBLOCK: 10.0.0.3 (h1) has been cleared of attacker status.
+  Cooldown set: 10.0.0.3 immune to re-detection for 30s
+ADMIN: Unblocked attacker 10.0.0.3
+
+╔══════════════════════════════════════════════════════════╗
+║  ✅ UNBLOCKED: 10.0.0.3                                 ║
+║  Attacker status cleared. Detection remains active.     ║
+╚══════════════════════════════════════════════════════════╝
+Traffic capture: 4324 rows written to dataset.csv
+UDP command received from 192.168.1.23: ATTACK_START:hping3:saturation
+[META] Attack metadata set: tool=hping3, intensity=saturation
+META: Attack started — tool=hping3, intensity=saturation
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.4
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+
+[⚠] SUSPECTED ATTACK from 10.0.0.5
+    Suspected : ICMP Flood (Spike: 6 detected)
+    Target    : 10.0.0.4
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 4441 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #64
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #65
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.5
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 4548 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #66
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:0
+  To     : 10.0.0.5:63755
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 4601 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.5
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 4708 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #73
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #74
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 4816 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #77
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:1781
+  To     : 10.0.0.5:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 4925 rows written to dataset.csv
+Traffic capture: 5031 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #83
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #84
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 5137 rows written to dataset.csv
+Traffic capture: 5246 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #86
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:0
+  To     : 10.0.0.5:63755
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 5301 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.5
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 5411 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #88
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #89
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 5519 rows written to dataset.csv
+Traffic capture: 5628 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.5
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+[⚠] 10.0.0.6: Control Plane Saturation window 2/3 (Spike: N/A)
+Traffic capture: 5737 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #92
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:1781
+  To     : 10.0.0.5:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 5844 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.5
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 5951 rows written to dataset.csv
+[⚠] 10.0.0.6: Control Plane Saturation window 2/3 (Spike: N/A)
+Traffic capture: 6005 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #99
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #100
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 6114 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #101
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:1781
+  To     : 10.0.0.5:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 6222 rows written to dataset.csv
+Traffic capture: 6330 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #110
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #111
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 6438 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #115
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:1781
+  To     : 10.0.0.5:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 6547 rows written to dataset.csv
+Traffic capture: 6602 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.5
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 6709 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.5
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 6817 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #119
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:1781
+  To     : 10.0.0.5:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+
+========================================
+  🚨 IDS ALERT #120
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #121
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 6924 rows written to dataset.csv
+Traffic capture: 7032 rows written to dataset.csv
+Traffic capture: 7140 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.5
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+
+========================================
+  🚨 IDS ALERT #127
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:1781
+  To     : 10.0.0.5:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+
+========================================
+  🚨 IDS ALERT #128
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #129
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 7248 rows written to dataset.csv
+Traffic capture: 7302 rows written to dataset.csv
+Traffic capture: 7412 rows written to dataset.csv
+Traffic capture: 7519 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #140
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.6:1781
+  To     : 10.0.0.5:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 7626 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #142
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.6:1942
+  To     : 10.0.0.5:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #143
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.6:1943
+  To     : 10.0.0.5:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+UDP command received from 192.168.1.23: ATTACK_STOP
+[META] Attack metadata cleared
+META: Attack stopped
+Traffic capture: 7733 rows written to dataset.csv
+UDP command received from 192.168.1.23: CONTROL:UNBLOCK:10.0.0.6
+[✅] ADMIN MANUAL UNBLOCK: 10.0.0.6 (Cam) has been cleared of attacker status.
+  Cooldown set: 10.0.0.6 immune to re-detection for 30s
+ADMIN: Unblocked attacker 10.0.0.6
+
+╔══════════════════════════════════════════════════════════╗
+║  ✅ UNBLOCKED: 10.0.0.6                                 ║
+║  Attacker status cleared. Detection remains active.     ║
+╚══════════════════════════════════════════════════════════╝
+Traffic capture: 7805 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #147
+========================================
+  Attack : WEB-MISC Invalid HTTP Version String
+  From   : 192.168.1.23:55388
+  To     : 91.189.91.83:80
+  Proto  : TCP
+  Rule   : SID 2570
+========================================
+UDP command received from 192.168.1.23: ATTACK_START:hping3:saturation
+[META] Attack metadata set: tool=hping3, intensity=saturation
+META: Attack started — tool=hping3, intensity=saturation
+
+========================================
+  🚨 IDS ALERT #151
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.5:1986
+  To     : 10.0.0.3:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #152
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.5:1987
+  To     : 10.0.0.3:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 7902 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #153
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.5:0
+  To     : 10.0.0.3:63711
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 8011 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.5
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.3
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 8120 rows written to dataset.csv
+Traffic capture: 8232 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #159
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.5:1986
+  To     : 10.0.0.3:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #160
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.5:1987
+  To     : 10.0.0.3:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 8338 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.5
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.3
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+
+========================================
+  🚨 IDS ALERT #161
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.5:1825
+  To     : 10.0.0.3:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 8445 rows written to dataset.csv
+Traffic capture: 8552 rows written to dataset.csv
+
+[⚠] SUSPECTED ATTACK from 10.0.0.5
+    Suspected : Control Plane Saturation (Spike: N/A detected)
+    Target    : 10.0.0.3
+    Window    : 1/3 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 8606 rows written to dataset.csv
+[⚠] 10.0.0.5: Control Plane Saturation window 2/3 (Spike: N/A)
+
+[⛔] ATTACK CONFIRMED — Classified 10.0.0.5 (TempSensor) as attacker
+    Attack  : Control Plane Saturation (Sustained ~N/A/window)
+    Target  : 10.0.0.3
+    Evidence: 3 consecutive windows in 10s
+    Action  : Host represents a persistent threat. Label locked-in indefinitely.
+
+Traffic capture: 8714 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #166
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.5:0
+  To     : 10.0.0.3:63711
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 8820 rows written to dataset.csv
+Traffic capture: 8930 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #169
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.5:1986
+  To     : 10.0.0.3:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #170
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.5:1987
+  To     : 10.0.0.3:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 9037 rows written to dataset.csv
+Traffic capture: 9144 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #171
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.5:0
+  To     : 10.0.0.3:63711
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 9250 rows written to dataset.csv
+Traffic capture: 9305 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #177
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.5:1986
+  To     : 10.0.0.3:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #178
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.5:1987
+  To     : 10.0.0.3:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 9412 rows written to dataset.csv
+Traffic capture: 9520 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #183
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.5:0
+  To     : 10.0.0.3:63711
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 9627 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #188
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.5:1986
+  To     : 10.0.0.3:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #189
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.5:1987
+  To     : 10.0.0.3:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 9735 rows written to dataset.csv
+Traffic capture: 9845 rows written to dataset.csv
+Traffic capture: 9952 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #194
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.5:1825
+  To     : 10.0.0.3:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 10006 rows written to dataset.csv
+Traffic capture: 10112 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #198
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.5:1986
+  To     : 10.0.0.3:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #199
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.5:1987
+  To     : 10.0.0.3:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 10222 rows written to dataset.csv
+Traffic capture: 10330 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #201
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.5:1825
+  To     : 10.0.0.3:0
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+Traffic capture: 10438 rows written to dataset.csv
+Traffic capture: 10547 rows written to dataset.csv
+Traffic capture: 10601 rows written to dataset.csv
+Traffic capture: 10711 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #208
+========================================
+  Attack : BAD-TRAFFIC udp port 0 traffic
+  From   : 10.0.0.5:0
+  To     : 10.0.0.3:63711
+  Proto  : UDP
+  Rule   : SID 525
+========================================
+
+========================================
+  🚨 IDS ALERT #210
+========================================
+  Attack : SNMP request udp
+  From   : 10.0.0.5:1986
+  To     : 10.0.0.3:161
+  Proto  : UDP
+  Rule   : SID 1417
+========================================
+
+========================================
+  🚨 IDS ALERT #211
+========================================
+  Attack : SNMP trap udp
+  From   : 10.0.0.5:1987
+  To     : 10.0.0.3:162
+  Proto  : UDP
+  Rule   : SID 1419
+========================================
+Traffic capture: 10819 rows written to dataset.csv
+UDP command received from 192.168.1.23: ATTACK_STOP
+[META] Attack metadata cleared
+META: Attack stopped
+UDP command received from 192.168.1.23: CONTROL:UNBLOCK:10.0.0.5
+[✅] ADMIN MANUAL UNBLOCK: 10.0.0.5 (TempSensor) has been cleared of attacker status.
+  Cooldown set: 10.0.0.5 immune to re-detection for 30s
+ADMIN: Unblocked attacker 10.0.0.5
+
+╔══════════════════════════════════════════════════════════╗
+║  ✅ UNBLOCKED: 10.0.0.5                                 ║
+║  Attacker status cleared. Detection remains active.     ║
+╚══════════════════════════════════════════════════════════╝
+Traffic capture: 10928 rows written to dataset.csv
+Traffic capture: 11002 rows written to dataset.csv
+UDP command received from 192.168.1.23: CONTROL:DETECT:OFF
+Detection mode DISABLED — capture only, all labels = normal
+UDP command received from 192.168.1.23: MININET_EVENT:recovery
+[META] Mininet event set: recovery
+META: Mininet event set to 'recovery'
+Traffic capture: 11100 rows written to dataset.csv
+Traffic capture: 11201 rows written to dataset.csv
+Traffic capture: 11307 rows written to dataset.csv
+Traffic capture: 11400 rows written to dataset.csv
+Traffic capture: 11505 rows written to dataset.csv
+UDP command received from 192.168.1.23: MININET_EVENT:normal
+[META] Mininet event set: normal
+META: Mininet event set to 'normal'
+port deleted 2
+port deleted 1
+port deleted 2
+port deleted 3
+port deleted 4
+port deleted 5
+^CController shutting down — stopping Snort IDS...

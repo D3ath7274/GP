@@ -1,0 +1,1248 @@
+loading app Controller.py
+loading app ryu.controller.ofp_handler
+instantiating app Controller.py of SimpleSwitch
+Traffic mirror TAP 'snort_tap' started.
+Snort 2.x detected. Note: This monitor is optimized for Snort 3 (Lua).
+Starting Snort IDS on interface ens33 (using /etc/snort/snort.conf)...
+Snort on ens33 started (PID: 2799)
+Starting Snort IDS on interface snort_tap (using /etc/snort/snort.conf)...
+Snort on snort_tap started (PID: 2808)
+Snort alert monitor started — watching 2 interface(s): ens33, snort_tap
+Traffic capture started → dataset.csv (window: 5.0s)
+
+╔══════════════════════════════════════════════════════════╗
+║  🛡 DETECTION MODE: OFF (Capture Only)                    ║
+║  Traffic is being recorded. All labels = normal.        ║
+║  Send CONTROL:DETECT:ON to enable attack detection.     ║
+╚══════════════════════════════════════════════════════════╝
+UDP command listener running on 0.0.0.0:9999
+UDP command listener started on port 9999
+instantiating app ryu.controller.ofp_handler of OFPHandler
+UDP command received from 192.168.1.23: REGISTER:NAME:sta1:10.0.0.1
+Registered hostname (UDP): 10.0.0.1 → sta1
+UDP command received from 192.168.1.23: REGISTER:NAME:sta2:10.0.0.2
+Registered hostname (UDP): 10.0.0.2 → sta2
+UDP command received from 192.168.1.23: REGISTER:NAME:h1:10.0.0.3
+Registered hostname (UDP): 10.0.0.3 → h1
+UDP command received from 192.168.1.23: REGISTER:NAME:h2:10.0.0.4
+Registered hostname (UDP): 10.0.0.4 → h2
+port added 4
+UDP command received from 192.168.1.23: REGISTER:IOT:IOT:TemperatureSensor
+IoT registration via UDP from 192.168.1.23: IOT:TemperatureSensor
+UDP command received from 192.168.1.23: REGISTER:NAME:TempSensor:10.0.0.5
+Registered hostname (UDP): 10.0.0.5 → TempSensor
+port added 5
+UDP command received from 192.168.1.23: REGISTER:IOT:IOT:SecurityCamera
+IoT registration via UDP from 192.168.1.23: IOT:SecurityCamera
+UDP command received from 192.168.1.23: REGISTER:NAME:Cam:10.0.0.6
+Registered hostname (UDP): 10.0.0.6 → Cam
+Traffic capture: 101 rows written to dataset.csv
+UDP command received from 192.168.1.23: MININET_EVENT:normal
+[META] Mininet event set: normal
+META: Mininet event set to 'normal'
+Traffic capture: 211 rows written to dataset.csv
+Traffic capture: 303 rows written to dataset.csv
+Traffic capture: 409 rows written to dataset.csv
+Traffic capture: 507 rows written to dataset.csv
+Traffic capture: 604 rows written to dataset.csv
+Traffic capture: 702 rows written to dataset.csv
+UDP command received from 192.168.1.23: CONTROL:DETECT:ON
+Detection mode ENABLED — anomaly detection active (counters reset, DAI baseline: 6 bindings frozen)
+
+╔══════════════════════════════════════════════════════════╗
+║  🚨 DETECTION MODE: ON                                    ║
+║  Anomaly detection ACTIVE.                             ║
+║  Attacks will be detected and labeled.                  ║
+╚══════════════════════════════════════════════════════════╝
+UDP command received from 192.168.1.23: ATTACK_START:hping3:flood
+[META] Attack metadata set: tool=hping3, intensity=flood
+META: Attack started — tool=hping3, intensity=flood
+
+[⚠] SUSPECTED ATTACK from 10.0.0.3
+    Suspected : SYN Flood (Spike: 4602 detected)
+    Target    : 10.0.0.4
+    Window    : 1/2 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 839 rows written to dataset.csv
+
+[⛔] ATTACK CONFIRMED — Classified 10.0.0.3 (h1) as attacker
+    Attack  : SYN Flood (Sustained ~9031/window)
+    Target  : 10.0.0.4
+    Evidence: 2 consecutive windows in 5s
+    Action  : Host represents a persistent threat. Label locked-in indefinitely.
+
+Traffic capture: 959 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #1
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #2
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #3
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.3:20
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+
+========================================
+  🚨 IDS ALERT #4
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.3:53
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+
+========================================
+  🚨 IDS ALERT #5
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #6
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 1016 rows written to dataset.csv
+Traffic capture: 1128 rows written to dataset.csv
+Traffic capture: 1240 rows written to dataset.csv
+Traffic capture: 1356 rows written to dataset.csv
+Traffic capture: 1414 rows written to dataset.csv
+Traffic capture: 1532 rows written to dataset.csv
+Traffic capture: 1644 rows written to dataset.csv
+Traffic capture: 1700 rows written to dataset.csv
+Traffic capture: 1815 rows written to dataset.csv
+Traffic capture: 1930 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #13
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 2045 rows written to dataset.csv
+Traffic capture: 2106 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #14
+========================================
+  Attack : ICMP traceroute
+  From   : 192.168.1.49:?
+  To     : 8.209.125.112:?
+  Proto  : ICMP
+  Rule   : SID 385
+========================================
+
+========================================
+  🚨 IDS ALERT #15
+========================================
+  Attack : INFO web bug 0x0 gif attempt
+  From   : 142.251.208.238:80
+  To     : 192.168.1.49:50646
+  Proto  : TCP
+  Rule   : SID 2925
+========================================
+Traffic capture: 2218 rows written to dataset.csv
+Traffic capture: 2335 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #25
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 2452 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #27
+========================================
+  Attack : ICMP traceroute
+  From   : 192.168.1.49:?
+  To     : 104.18.6.235:?
+  Proto  : ICMP
+  Rule   : SID 385
+========================================
+Traffic capture: 2508 rows written to dataset.csv
+Traffic capture: 2626 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #31
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #32
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #33
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.3:20
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+
+========================================
+  🚨 IDS ALERT #34
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.3:53
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+
+========================================
+  🚨 IDS ALERT #37
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #38
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 2740 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #40
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 2800 rows written to dataset.csv
+Traffic capture: 2919 rows written to dataset.csv
+Traffic capture: 3038 rows written to dataset.csv
+Traffic capture: 3155 rows written to dataset.csv
+Traffic capture: 3214 rows written to dataset.csv
+Traffic capture: 3329 rows written to dataset.csv
+Traffic capture: 3445 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #42
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #43
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 3507 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #44
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.3:0
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #45
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #46
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.3:20
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+
+========================================
+  🚨 IDS ALERT #47
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.3:53
+  To     : 10.0.0.4:80
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+
+========================================
+  🚨 IDS ALERT #50
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:80
+  To     : 10.0.0.3:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 3626 rows written to dataset.csv
+Traffic capture: 3744 rows written to dataset.csv
+Traffic capture: 3806 rows written to dataset.csv
+Traffic capture: 3919 rows written to dataset.csv
+Traffic capture: 4038 rows written to dataset.csv
+Traffic capture: 4154 rows written to dataset.csv
+Traffic capture: 4215 rows written to dataset.csv
+UDP command received from 192.168.1.23: ATTACK_STOP
+[META] Attack metadata cleared
+META: Attack stopped
+Traffic capture: 4332 rows written to dataset.csv
+UDP command received from 192.168.1.23: CONTROL:UNBLOCK:10.0.0.3
+[✅] ADMIN MANUAL UNBLOCK: 10.0.0.3 (h1) has been cleared of attacker status.
+  Cooldown set: 10.0.0.3 immune to re-detection for 30s
+ADMIN: Unblocked attacker 10.0.0.3
+
+╔══════════════════════════════════════════════════════════╗
+║  ✅ UNBLOCKED: 10.0.0.3                                 ║
+║  Attacker status cleared. Detection remains active.     ║
+╚══════════════════════════════════════════════════════════╝
+Traffic capture: 4401 rows written to dataset.csv
+UDP command received from 192.168.1.23: ATTACK_START:hping3:iot-flood
+[META] Attack metadata set: tool=hping3, intensity=iot-flood
+META: Attack started — tool=hping3, intensity=iot-flood
+
+[⚠] SUSPECTED ATTACK from 10.0.0.6
+    Suspected : SYN Flood (Spike: 3052 detected)
+    Target    : 10.0.0.4
+    Window    : 1/2 consecutive required
+    Action    : Monitoring only (no block yet)
+
+Traffic capture: 4530 rows written to dataset.csv
+
+[⛔] ATTACK CONFIRMED — Classified 10.0.0.6 (Cam) as attacker
+    Attack  : SYN Flood (Sustained ~5440/window)
+    Target  : 10.0.0.5
+    Evidence: 2 consecutive windows in 5s
+    Action  : Host represents a persistent threat. Label locked-in indefinitely.
+
+
+========================================
+  🚨 IDS ALERT #56
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #57
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.6:0
+  To     : 10.0.0.5:1883
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #58
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #59
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+
+========================================
+  🚨 IDS ALERT #60
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 4638 rows written to dataset.csv
+Traffic capture: 4750 rows written to dataset.csv
+Traffic capture: 4805 rows written to dataset.csv
+Traffic capture: 4913 rows written to dataset.csv
+Traffic capture: 5022 rows written to dataset.csv
+Traffic capture: 5131 rows written to dataset.csv
+Traffic capture: 5244 rows written to dataset.csv
+Traffic capture: 5353 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #65
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.6:0
+  To     : 10.0.0.5:1883
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #66
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #67
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #68
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 5407 rows written to dataset.csv
+Traffic capture: 5515 rows written to dataset.csv
+Traffic capture: 5625 rows written to dataset.csv
+Traffic capture: 5738 rows written to dataset.csv
+Traffic capture: 5848 rows written to dataset.csv
+Traffic capture: 5902 rows written to dataset.csv
+Traffic capture: 6012 rows written to dataset.csv
+Traffic capture: 6120 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #73
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 6237 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #74
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.6:0
+  To     : 10.0.0.5:1883
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #75
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #76
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #77
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 6345 rows written to dataset.csv
+Traffic capture: 6453 rows written to dataset.csv
+Traffic capture: 6507 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #82
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 6618 rows written to dataset.csv
+Traffic capture: 6726 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #83
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.6:0
+  To     : 10.0.0.5:1883
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #84
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #85
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #86
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 6834 rows written to dataset.csv
+Traffic capture: 6944 rows written to dataset.csv
+Traffic capture: 7054 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #88
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 7111 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #89
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.6:0
+  To     : 10.0.0.5:1883
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #90
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #91
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #92
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 7221 rows written to dataset.csv
+Traffic capture: 7331 rows written to dataset.csv
+Traffic capture: 7441 rows written to dataset.csv
+Traffic capture: 7550 rows written to dataset.csv
+Traffic capture: 7606 rows written to dataset.csv
+Traffic capture: 7718 rows written to dataset.csv
+^CError in the datapath 1000000000000001 from ('192.168.1.23', 43608)
+hub: uncaught exception: Traceback (most recent call last):
+  File "/usr/local/lib/python3.8/dist-packages/ryu/lib/hub.py", line 60, in _launch
+    return func(*args, **kwargs)
+  File "/usr/local/lib/python3.8/dist-packages/ryu/controller/controller.py", line 551, in datapath_connection_factory
+    datapath.serve()
+  File "/usr/local/lib/python3.8/dist-packages/ryu/controller/controller.py", line 469, in serve
+    self._recv_loop()
+  File "/usr/local/lib/python3.8/dist-packages/ryu/controller/controller.py", line 211, in deactivate
+    method(self)
+  File "/usr/local/lib/python3.8/dist-packages/ryu/controller/controller.py", line 330, in _recv_loop
+    ret = self.socket.recv(read_len)
+  File "/usr/local/lib/python3.8/dist-packages/eventlet/greenio/base.py", line 365, in recv
+    return self._recv_loop(self.fd.recv, b'', bufsize, flags)
+  File "/usr/local/lib/python3.8/dist-packages/eventlet/greenio/base.py", line 349, in _recv_loop
+    return recv_meth(*args)
+KeyboardInterrupt
+
+
+========================================
+  🚨 IDS ALERT #103
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.5:1883
+  To     : 10.0.0.6:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 7827 rows written to dataset.csv
+Traffic capture: 7947 rows written to dataset.csv
+UDP command received from 192.168.1.23: ATTACK_STOP
+[META] Attack metadata cleared
+META: Attack stopped
+UDP command received from 192.168.1.23: CONTROL:UNBLOCK:10.0.0.6
+[✅] ADMIN MANUAL UNBLOCK: 10.0.0.6 (Cam) has been cleared of attacker status.
+  Cooldown set: 10.0.0.6 immune to re-detection for 30s
+ADMIN: Unblocked attacker 10.0.0.6
+
+╔══════════════════════════════════════════════════════════╗
+║  ✅ UNBLOCKED: 10.0.0.6                                 ║
+║  Attacker status cleared. Detection remains active.     ║
+╚══════════════════════════════════════════════════════════╝
+Traffic capture: 8004 rows written to dataset.csv
+UDP command received from 192.168.1.23: ATTACK_START:hping3:flood
+[META] Attack metadata set: tool=hping3, intensity=flood
+META: Attack started — tool=hping3, intensity=flood
+Traffic capture: 8111 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #104
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.1:0
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #105
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.1:20
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+
+========================================
+  🚨 IDS ALERT #106
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.1:53
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+Traffic capture: 8219 rows written to dataset.csv
+Traffic capture: 8325 rows written to dataset.csv
+Traffic capture: 8431 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #107
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.1:20
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+
+========================================
+  🚨 IDS ALERT #108
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.1:53
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+Traffic capture: 8539 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #109
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.1:0
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #115
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #116
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 8646 rows written to dataset.csv
+Traffic capture: 8752 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #120
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #121
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 8805 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #124
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.1:20
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+
+========================================
+  🚨 IDS ALERT #125
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.1:53
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+
+========================================
+  🚨 IDS ALERT #129
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.1:0
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+Traffic capture: 8911 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #133
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 9019 rows written to dataset.csv
+Traffic capture: 9125 rows written to dataset.csv
+Traffic capture: 9231 rows written to dataset.csv
+Traffic capture: 9339 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #134
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #135
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #136
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 9445 rows written to dataset.csv
+Traffic capture: 9555 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #139
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.1:0
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #140
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.1:20
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+Traffic capture: 9608 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #142
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 9714 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #145
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.1:53
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+
+========================================
+  🚨 IDS ALERT #146
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #147
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #148
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 9820 rows written to dataset.csv
+Traffic capture: 9926 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #153
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.1:0
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #154
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.1:20
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+Traffic capture: 10032 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #160
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #162
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.1:53
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+
+========================================
+  🚨 IDS ALERT #163
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #164
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 10140 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #165
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 10246 rows written to dataset.csv
+Traffic capture: 10300 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #174
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.1:0
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #175
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.1:20
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+Traffic capture: 10406 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #178
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #179
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+
+========================================
+  🚨 IDS ALERT #182
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.1:53
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+Traffic capture: 10512 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #183
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+
+========================================
+  🚨 IDS ALERT #186
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+Traffic capture: 10620 rows written to dataset.csv
+Traffic capture: 10726 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #196
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #197
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 10832 rows written to dataset.csv
+Traffic capture: 10942 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #198
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 11050 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #201
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.1:0
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #202
+========================================
+  Attack : MISC Source Port 20 to <1024
+  From   : 10.0.0.1:20
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 503
+========================================
+
+========================================
+  🚨 IDS ALERT #203
+========================================
+  Attack : BAD-TRAFFIC tcp port 0 traffic
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:0
+  Proto  : TCP
+  Rule   : SID 524
+========================================
+
+========================================
+  🚨 IDS ALERT #204
+========================================
+  Attack : MISC source port 53 to <1024
+  From   : 10.0.0.1:53
+  To     : 10.0.0.4:443
+  Proto  : TCP
+  Rule   : SID 504
+========================================
+Traffic capture: 11105 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #207
+========================================
+  Attack : SNMP request tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:161
+  Proto  : TCP
+  Rule   : SID 1418
+========================================
+
+========================================
+  🚨 IDS ALERT #208
+========================================
+  Attack : SNMP trap tcp
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:162
+  Proto  : TCP
+  Rule   : SID 1420
+========================================
+Traffic capture: 11213 rows written to dataset.csv
+
+========================================
+  🚨 IDS ALERT #210
+========================================
+  Attack : SNMP AgentX/tcp request
+  From   : 10.0.0.4:443
+  To     : 10.0.0.1:705
+  Proto  : TCP
+  Rule   : SID 1421
+========================================
+Traffic capture: 11329 rows written to dataset.csv
+UDP command received from 192.168.1.23: ATTACK_STOP
+[META] Attack metadata cleared
+META: Attack stopped
+UDP command received from 192.168.1.23: CONTROL:UNBLOCK:10.0.0.1
+[✅] ADMIN MANUAL UNBLOCK: 10.0.0.1 (sta1) has been cleared of attacker status.
+  Cooldown set: 10.0.0.1 immune to re-detection for 30s
+ADMIN: Unblocked attacker 10.0.0.1
+
+╔══════════════════════════════════════════════════════════╗
+║  ✅ UNBLOCKED: 10.0.0.1                                 ║
+║  Attacker status cleared. Detection remains active.     ║
+╚══════════════════════════════════════════════════════════╝
+UDP command received from 192.168.1.24: CONTROL:DETECT:OFF
+Detection mode DISABLED — capture only, all labels = normal
+UDP command received from 192.168.1.24: MININET_EVENT:recovery
+[META] Mininet event set: recovery
+META: Mininet event set to 'recovery'
+Traffic capture: 11401 rows written to dataset.csv
+Traffic capture: 11503 rows written to dataset.csv
+Traffic capture: 11603 rows written to dataset.csv
+UDP command received from 192.168.1.24: MININET_EVENT:normal
+[META] Mininet event set: normal
+META: Mininet event set to 'normal'
+Traffic capture: 11703 rows written to dataset.csv
+UDP command received from 192.168.1.23: MININET_EVENT:normal
+[META] Mininet event set: normal
+META: Mininet event set to 'normal'

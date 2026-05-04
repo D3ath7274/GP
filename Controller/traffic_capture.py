@@ -473,6 +473,9 @@ class TrafficCapture:
         # Without override, stealthy attack traffic gets labeled 'normal' — corrupted training data.
         self._label_overrides = {}  # src_ip -> attack_type string
 
+        # --- Unblock Cooldown (prevents residual traffic re-confirmation) ---
+        self._unblock_cooldowns = {}  # src_ip -> expiry_timestamp
+
         # --- Metadata Signals (Group 10) ---
         self._meta_attack_tool = 'none'
         self._meta_attack_intensity = 0
@@ -657,9 +660,12 @@ class TrafficCapture:
 
             # --- Per-host rate counters (for attack detection) ---
             if protocol == 'ICMP':
-                self._host_icmp_count[src_ip] += 1
-                # Track ICMP type for entropy (Group 4)
+                # Count only Echo Request (type=8) for flood detection.
+                # Echo replies from victims should not trigger attacker detection.
                 icmp_type = pkt_info.get('icmp_type')
+                if icmp_type == 8:
+                    self._host_icmp_count[src_ip] += 1
+                # Track ICMP type for entropy (Group 4)
                 if icmp_type is not None:
                     self._host_icmp_types[src_ip][icmp_type] += 1
             elif protocol == 'UDP':
@@ -1388,7 +1394,9 @@ class TrafficCapture:
         }
 
     def manual_unblock(self, src_ip):
-        """Manually clear an IP from confirmed attacker blocks."""
+        """Manually clear an IP from confirmed attacker blocks.
+        Includes a 30-second cooldown to prevent immediate re-confirmation
+        from residual traffic still flowing through kernel buffers."""
         device_name = "Unknown"
         if self.controller and hasattr(self.controller, '_discovered_names'):
             device_name = self.controller._discovered_names.get(src_ip, "Unknown")
@@ -1404,6 +1412,34 @@ class TrafficCapture:
 
         keys_to_del2 = [k for k in self._logged_attackers if k[0] == src_ip]
         self._logged_attackers.difference_update(keys_to_del2)
+
+        # FIX: Clear rate counters for this IP to flush residual attack traffic
+        with self._flow_lock:
+            self._host_icmp_count.pop(src_ip, None)
+            self._host_syn_count.pop(src_ip, None)
+            self._host_ack_count.pop(src_ip, None)
+            self._host_udp_count.pop(src_ip, None)
+            self._host_dst_ports.pop(src_ip, None)
+
+        # FIX: Set cooldown — suppress re-detection for 30 seconds
+        self._unblock_cooldowns[src_ip] = time.time() + 30
+        self._log('info', f"  Cooldown set: {src_ip} immune to re-detection for 30s")
+
+    @staticmethod
+    def _attack_protocol_matches(attack_type, protocol):
+        """Return True when a flow protocol is compatible with attack type."""
+        if not attack_type:
+            return False
+        if attack_type in ('SYN Flood', 'Port Scan'):
+            return protocol == 'TCP'
+        if attack_type in ('ICMP Flood',):
+            return protocol == 'ICMP'
+        if attack_type in ('UDP Flood', 'Control Plane Saturation'):
+            return protocol == 'UDP'
+        if attack_type in ('ARP Spoofing',):
+            return protocol == 'ARP'
+        # Snort-native alert names: allow all protocols unless explicitly known.
+        return True
 
     def _compute_label(self, src_ip, dst_ip, alerts, device_profile,
                        curr_pps=0, curr_bps=0, curr_avg_size=0, protocol='OTHER',
@@ -1424,8 +1460,17 @@ class TrafficCapture:
         if not self._detection_enabled:
             return 0, 'normal', 'none'
 
+        # --- 1b. Cooldown Gate — skip detection for recently-unblocked IPs ---
+        if src_ip in self._unblock_cooldowns:
+            if time.time() < self._unblock_cooldowns[src_ip]:
+                return 0, 'normal', 'none'
+            else:
+                del self._unblock_cooldowns[src_ip]  # Cooldown expired
+
         if src_ip in self._confirmed_attackers:
-            return 2, self._confirmed_attackers[src_ip], "none"
+            confirmed_type = self._confirmed_attackers[src_ip]
+            if self._attack_protocol_matches(confirmed_type, protocol):
+                return 2, confirmed_type, "none"
 
         # --- 2a. Known Attacks (Snort alerts) ---
         # IMPORTANT: Only match if the FLOW's src_ip is the ALERT's src_ip.
@@ -1433,10 +1478,17 @@ class TrafficCapture:
         # caused victim response flows to inherit attack labels from Snort.
         # Example: Snort fires "SNMP request" for 10.0.0.4:80→10.0.0.3:161
         # (victim responding to SYN flood) — we must NOT label all 10.0.0.4 flows.
-        matching_alerts = [
-            a for a in alerts
-            if a['src_ip'] == src_ip
-        ]
+        response_sids = {'524', '1418', '1420', '1421', '503', '504'}
+        matching_alerts = []
+        for a in alerts:
+            if a.get('src_ip') != src_ip:
+                continue
+            if str(a.get('sid', '')) in response_sids:
+                continue
+            alert_proto = str(a.get('proto', '')).upper()
+            if alert_proto and alert_proto != '?' and protocol and alert_proto != protocol.upper():
+                continue
+            matching_alerts.append(a)
         if matching_alerts:
             alert = matching_alerts[-1]
             return 1, alert['attack_type'], str(alert.get('sid', 'none'))
@@ -1478,8 +1530,14 @@ class TrafficCapture:
             # ICMP Flood: >500 ICMP packets from one host in 5 seconds
             if icmp_cnt > 500:
                 detected_type = 'ICMP Flood'
-            # SYN Flood: >300 SYN-only packets AND low ACK count
-            elif syn_cnt > 300 and ack_cnt < 50:
+            # Port Scan: >100 unique destination ports AND sending SYN-only traffic.
+            # Guard: ack_cnt < 50 ensures this host is INITIATING connections,
+            # not a VICTIM responding with SYN-ACK/RST to an attacker's random ports.
+            elif ports > 100 and syn_cnt > 100 and ack_cnt < 50:
+                detected_type = 'Port Scan'
+            # SYN Flood: >300 SYN-only packets AND low ACK AND low port diversity
+            # (flood hammers 1-2 ports; scan spreads across hundreds)
+            elif syn_cnt > 300 and ack_cnt < 50 and ports <= 10:
                 detected_type = 'SYN Flood'
             # Control Plane Saturation: high UDP + high port diversity
             # (many tiny UDP packets to incrementing ports → each creates a
@@ -1490,11 +1548,8 @@ class TrafficCapture:
             # UDP Flood: >500 UDP packets to few ports (one port hammered)
             elif udp_cnt > 500:
                 detected_type = 'UDP Flood'
-            # Port Scan: >100 unique destination ports from one host in 5 seconds
-            elif ports > 100:
-                detected_type = 'Port Scan'
 
-        if detected_type:
+        if detected_type and self._attack_protocol_matches(detected_type, protocol):
             return 2, detected_type, 'none'
 
         # --- 4. Z-Score Behavioral Analysis (Secondary / Fallback) ---
