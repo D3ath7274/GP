@@ -44,6 +44,29 @@ import threading
 from collections import defaultdict, Counter, deque
 from datetime import datetime
 
+try:
+    from iot_contracts import check_contracts_for_window
+except ImportError:
+    check_contracts_for_window = None
+
+try:
+    from incident_logger import get_incident_logger
+    _incident_logger = get_incident_logger()
+except ImportError:
+    _incident_logger = None
+
+try:
+    from ml_inference import MLInferenceEngine
+    _HAS_ML_INFERENCE = True
+except ImportError:
+    _HAS_ML_INFERENCE = False
+
+try:
+    from online_learner import OnlineLearner
+    _HAS_ONLINE_LEARNER = True
+except ImportError:
+    _HAS_ONLINE_LEARNER = False
+
 
 # =========================================================================
 # Constants
@@ -486,6 +509,39 @@ class TrafficCapture:
         # FIX P12: Changed from counter (int) to set of flow keys
         self._flows_per_src = defaultdict(set)
 
+        # --- ML Inference Engine (Tier 4, loaded if models exist) ---
+        self._ml_engine = None
+        if _HAS_ML_INFERENCE:
+            model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
+            if os.path.isdir(model_dir):
+                try:
+                    self._ml_engine = MLInferenceEngine(model_dir)
+                    if self._ml_engine.is_loaded:
+                        self._log('info', f'ML inference engine loaded from {model_dir}')
+                    else:
+                        self._ml_engine = None
+                except Exception as e:
+                    self._log('warning', f'ML inference engine failed to load: {e}')
+                    self._ml_engine = None
+
+        # --- Online Learner (Phase 4: Adaptive Learning) ---
+        self._online_learner = None
+        if _HAS_ONLINE_LEARNER:
+            model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
+            if os.path.isdir(model_dir):
+                try:
+                    self._online_learner = OnlineLearner(
+                        model_dir=model_dir,
+                        buffer_size=5000,
+                        drift_threshold=3.0,
+                        retrain_cooldown_sec=3600,
+                        logger=self.logger,
+                    )
+                    self._log('info', 'Online learner initialized')
+                except Exception as e:
+                    self._log('warning', f'Online learner failed to init: {e}')
+                    self._online_learner = None
+
     # ---- Logging helpers ----
 
     def _log(self, level, msg, *args):
@@ -871,7 +927,13 @@ class TrafficCapture:
             )
 
             if label > 0:
-                if src_ip not in window_attackers or label == 1:
+                # Behavioral detection (label=2) takes priority over Snort alerts
+                # (label=1) because the consecutive-window tracker (below) only
+                # processes label==2 entries. If Snort's label=1 overwrites a
+                # behavioral label=2, the tracker loses visibility of the attack
+                # for that window and resets the consecutive counter.
+                existing = window_attackers.get(src_ip)
+                if existing is None or label > existing[0]:
                     window_attackers[src_ip] = (label, attack_type, sid)
 
             flow_metadata.append((flow_key, flow_data, pps, bps, avg_size))
@@ -889,7 +951,17 @@ class TrafficCapture:
 
         for key in list(self._attack_confirmations.keys()):
             if key not in detected_this_window:
-                del self._attack_confirmations[key]
+                # Allow 1 missed window before resetting (boundary jitter tolerance).
+                # hping3 floods can straddle two 5s windows; if the first half of the
+                # window has fewer packets than threshold, detected_this_window won't
+                # include the key even though the attack is ongoing.
+                conf = self._attack_confirmations[key]
+                conf['missed_windows'] = conf.get('missed_windows', 0) + 1
+                if conf['missed_windows'] > 1:
+                    del self._attack_confirmations[key]
+            else:
+                # Reset missed window counter whenever attack is detected again
+                self._attack_confirmations[key]['missed_windows'] = 0
 
         for key, dst_ip in detected_this_window.items():
             src_ip, attack_type = key
@@ -913,6 +985,7 @@ class TrafficCapture:
                     'target': dst_ip,
                     'escalated': False,
                     'escalated_time': 0,
+                    'missed_windows': 0,
                 }
                 self._log('warning',
                     f"\n[\u26a0] SUSPECTED ATTACK from {src_ip}\n"
@@ -977,6 +1050,133 @@ class TrafficCapture:
         with self._device_lock:
             for profile in self._devices.values():
                 profile.reset_recent()
+
+        # --- IoT Behavioral Contract Check + Auto-Quarantine (Fix #4) ---
+        if check_contracts_for_window and self.controller and rows:
+            discovered_names = getattr(self.controller, '_discovered_names', {})
+            iot_devices = getattr(self.controller, 'iot_devices', {})
+            violations = check_contracts_for_window(
+                iot_devices, rows, discovered_names
+            )
+            # Track violations per-IP to avoid duplicate quarantines in same window
+            quarantined_this_window = set()
+            for v in violations:
+                # --- ML Forensic Investigation (SOC Tier 1 Report) ---
+                ml_verdict = 'N/A (model not loaded)'
+                ml_confidence = 0.0
+                ml_attack_type = 'unknown'
+                offending_rows = [r for r in rows if r.get('src_ip') == v.device_ip]
+                if self._ml_engine and offending_rows:
+                    # Find the offending flow row for this device
+                    ml_label, ml_attack_type, ml_confidence = self._ml_engine.predict(offending_rows[0])
+                    if ml_label > 0:
+                        ml_verdict = f'MALICIOUS — {ml_attack_type} (confidence: {ml_confidence:.2%})'
+                    else:
+                        ml_verdict = f'LIKELY BENIGN anomaly (attack confidence: {ml_confidence:.2%})'
+
+                self._log('warning',
+                    f"\n[\u26d4] CONTRACT VIOLATION: {v.device_name} ({v.device_ip})\n"
+                    f"    Class    : {v.device_class}\n"
+                    f"    Violation: {v.violation_type}\n"
+                    f"    Details  : {v.details}\n"
+                    f"    ML Verdict: {ml_verdict}\n"
+                    f"    Action   : PERMANENT QUARANTINE (admin unblock required)\n"
+                )
+                # Log to incident logger
+                if _incident_logger:
+                    _incident_logger.log(
+                        'CONTRACT_VIOLATION',
+                        src_ip=v.device_ip,
+                        device=v.device_name,
+                        device_class=v.device_class,
+                        violation_type=v.violation_type,
+                        details=v.details,
+                        ml_verdict=ml_verdict,
+                        ml_confidence=ml_confidence,
+                    )
+                # --- Write SOC-style forensic report ---
+                self._write_forensic_report(v, ml_verdict, ml_attack_type, ml_confidence, offending_rows[0] if offending_rows else {})
+
+                # Auto-quarantine: PERMANENT (timeout=0 → OpenFlow hard_timeout=0 = infinite)
+                # Device stays blocked until admin sends CONTROL:UNBLOCK:<ip>
+                if v.device_ip not in quarantined_this_window:
+                    quarantined_this_window.add(v.device_ip)
+                    attacker_mac = self._ip_to_mac.get(v.device_ip, 'unknown')
+                    if attacker_mac != 'unknown' and self.controller:
+                        self.controller.block_attacker(
+                            src_ip=v.device_ip,
+                            src_mac=attacker_mac,
+                            attack_type=f'Contract: {v.violation_type}',
+                            timeout=0,  # PERMANENT — admin must unblock
+                            detection_time=time.time(),
+                            target_ip='',
+                            reason='contract_violation',
+                        )
+
+        # --- Tier 4: ML Inference + Auto-Quarantine ---
+        if self._ml_engine and self._detection_enabled and rows:
+            ml_quarantined = set()
+            for row in rows:
+                # Only run ML on flows that Tiers 1-3 labeled as normal
+                if row.get('label', 0) == 0:
+                    ml_label, ml_attack, ml_conf = self._ml_engine.predict(row)
+                    if ml_label > 0 and ml_conf >= 0.85:
+                        # ML detected attack — override label
+                        row['label'] = ml_label
+                        row['attack_type'] = ml_attack
+                        row['snort_sid'] = 'ml_model'
+                        src_ip = row.get('src_ip', '')
+                        self._log('warning',
+                            f"\n[\U0001f916] ML DETECTION: {ml_attack} from {src_ip} "
+                            f"(confidence={ml_conf:.2f})\n"
+                            f"    Tiers 1-3 missed this. Tier 4 ML caught it.\n"
+                        )
+                        # Log to incident logger
+                        if _incident_logger:
+                            _incident_logger.log(
+                                'ML_DETECTION',
+                                src_ip=src_ip,
+                                attack_type=ml_attack,
+                                confidence=ml_conf,
+                            )
+                        # Auto-quarantine (one block per IP per window)
+                        if src_ip and src_ip not in ml_quarantined:
+                            ml_quarantined.add(src_ip)
+                            attacker_mac = self._ip_to_mac.get(src_ip, 'unknown')
+                            if attacker_mac != 'unknown' and self.controller:
+                                self.controller.block_attacker(
+                                    src_ip=src_ip,
+                                    src_mac=attacker_mac,
+                                    attack_type=f'ML: {ml_attack}',
+                                    timeout=120,  # 2-minute ML quarantine
+                                    detection_time=time.time(),
+                                    target_ip='',
+                                    reason='ml_detection',
+                                )
+
+        # --- Online Learning: Feed Confirmed Labels + Drift Check ---
+        if self._online_learner and rows:
+            # Feed confirmed attack flows (from rows with label > 0)
+            for row in rows:
+                if row.get('label', 0) > 0:
+                    self._online_learner.record_confirmed_flow(
+                        flow_features=row,
+                        label=row['label'],
+                        attack_type=row.get('attack_type', 'unknown'),
+                        source='tier2_confirmed' if row.get('snort_sid', '') != 'ml_model' else 'ml_quarantine_confirmed',
+                    )
+            # Sample normal flows (1 in 10) for baseline
+            import random
+            for row in rows:
+                if row.get('label', 0) == 0 and random.random() < 0.1:
+                    self._online_learner.record_confirmed_flow(
+                        flow_features=row,
+                        label=0,
+                        attack_type='normal',
+                        source='normal_baseline',
+                    )
+            # Run drift detection on full window
+            self._online_learner.check_and_report_drift(rows)
 
         # Write to CSV
         if rows:
@@ -1306,12 +1506,11 @@ class TrafficCapture:
             arp_features = {col: 0 for col in ARP_COLUMNS}
 
         # --- Labels ---
+        label, attack_type, snort_sid = 0, 'normal', 'none'
         if inherited_label:
-            label, attack_type, snort_sid = inherited_label
-        else:
-            label, attack_type, snort_sid = self._compute_label(
-                src_ip, dst_ip, alerts, profile, pps, bps, avg_size
-            )
+            l, a, s = inherited_label
+            if self._attack_protocol_matches(a, flow_key[3]):
+                label, attack_type, snort_sid = l, a, s
 
         # Update Device Profile statistics (Baseline Integrity)
         # Rationale: Attack flows excluded from DeviceProfile volume averages
@@ -1427,7 +1626,14 @@ class TrafficCapture:
 
     @staticmethod
     def _attack_protocol_matches(attack_type, protocol):
-        """Return True when a flow protocol is compatible with attack type."""
+        """Return True when a flow protocol is compatible with attack type.
+
+        For known behavioral attack types (SYN Flood, UDP Flood, etc.) we
+        enforce strict protocol equality. For Snort-native alert names we
+        parse the alert message for protocol keywords — this prevents e.g.
+        "BAD-TRAFFIC udp port 0 traffic" (SID 525) from being inherited by
+        ICMP or ARP flows from the same source IP.
+        """
         if not attack_type:
             return False
         if attack_type in ('SYN Flood', 'Port Scan'):
@@ -1438,7 +1644,24 @@ class TrafficCapture:
             return protocol == 'UDP'
         if attack_type in ('ARP Spoofing',):
             return protocol == 'ARP'
-        # Snort-native alert names: allow all protocols unless explicitly known.
+
+        # --- Snort-native alert names: parse name for explicit protocol hint ---
+        # Many Snort rule messages embed the protocol: "BAD-TRAFFIC udp port 0",
+        # "SNMP AgentX/tcp request", "MISC Source Port 20 to <1024" (TCP context).
+        # If we can infer the protocol from the name, enforce it. This prevents
+        # a UDP-specific Snort alert from contaminating ICMP/ARP/TCP flows that
+        # happen to come from the same attacker IP in the same window.
+        name_lower = attack_type.lower()
+        if ' udp ' in name_lower or name_lower.startswith('udp ') or name_lower.endswith(' udp'):
+            return protocol == 'UDP'
+        if ' tcp ' in name_lower or '/tcp' in name_lower or name_lower.startswith('tcp '):
+            return protocol == 'TCP'
+        if ' icmp ' in name_lower or name_lower.startswith('icmp ') or name_lower.endswith(' icmp'):
+            return protocol == 'ICMP'
+        if 'arp' in name_lower:
+            return protocol == 'ARP'
+
+        # Truly ambiguous Snort alerts (e.g. "POLICY FTP") — allow all protocols.
         return True
 
     def _compute_label(self, src_ip, dst_ip, alerts, device_profile,
@@ -1531,13 +1754,11 @@ class TrafficCapture:
             if icmp_cnt > 500:
                 detected_type = 'ICMP Flood'
             # Port Scan: >100 unique destination ports AND sending SYN-only traffic.
-            # Guard: ack_cnt < 50 ensures this host is INITIATING connections,
-            # not a VICTIM responding with SYN-ACK/RST to an attacker's random ports.
-            elif ports > 100 and syn_cnt > 100 and ack_cnt < 50:
+            elif ports > 100 and syn_cnt > 100:
                 detected_type = 'Port Scan'
-            # SYN Flood: >300 SYN-only packets AND low ACK AND low port diversity
+            # SYN Flood: >300 SYN-only packets AND low port diversity
             # (flood hammers 1-2 ports; scan spreads across hundreds)
-            elif syn_cnt > 300 and ack_cnt < 50 and ports <= 10:
+            elif syn_cnt > 300 and ports <= 10:
                 detected_type = 'SYN Flood'
             # Control Plane Saturation: high UDP + high port diversity
             # (many tiny UDP packets to incrementing ports → each creates a
@@ -1553,48 +1774,112 @@ class TrafficCapture:
             return 2, detected_type, 'none'
 
         # --- 4. Z-Score Behavioral Analysis (Secondary / Fallback) ---
-        if not device_profile:
-            return 0, 'normal', 'none'
-
-        # Guard: If traffic drops to 0 or is extremely low, it cannot be a flood.
-        if curr_pps < 10:
-            return 0, 'normal', 'none'
-
-        MIN_FLOWS = 20
-        STABILIZATION_SEC = 180
-        Z_THRESHOLD = 8.0
-
-        age = time.time() - device_profile.first_seen
-        if device_profile.total_flows < MIN_FLOWS or age < STABILIZATION_SEC:
-            return 0, 'normal', 'none'
-
-        features = device_profile.get_features(curr_pps, curr_bps, curr_avg_size)
-        pkt_dev = abs(features.get('device_pkt_rate_deviation', 0))
-        byte_dev = abs(features.get('device_byte_rate_deviation', 0))
-        payload_dev = abs(features.get('device_payload_size_deviation', 0))
-        new_dst_ratio = features.get('device_new_dst_ratio', 0)
-        ips_count = features.get('device_unique_dst_ips', 0)
-
-        proto_upper = protocol.upper() if protocol else 'OTHER'
-
-        # Volumetric spike
-        if pkt_dev > Z_THRESHOLD or byte_dev > Z_THRESHOLD:
-            if proto_upper == 'ICMP':
-                return 2, 'ICMP Flood', 'none'
-            elif proto_upper == 'UDP':
-                return 2, 'UDP Flood', 'none'
-            elif proto_upper == 'TCP':
-                return 2, 'SYN Flood', 'none'
-
-        # Payload anomaly
-        if payload_dev > Z_THRESHOLD:
-            return 2, 'UDP Flood', 'none'
-
-        # Host sweep
-        if new_dst_ratio > 0.9 and ips_count > 10:
-            return 2, 'Port Scan', 'none'
-
+        # Features are computed and saved to device_profile, but we no longer
+        # use them to force a label here because victims responding to floods
+        # also experience massive statistical deviations (victim-blaming).
         return 0, 'normal', 'none'
+
+    # ===================================================================
+    # SOC Tier 1 Forensic Report Generator
+    # ===================================================================
+
+    def _write_forensic_report(self, violation, ml_verdict, ml_attack_type,
+                                ml_confidence, flow_row):
+        """
+        Write a SOC Tier 1-style forensic investigation report for a
+        contract violation. The ML model acts as an automated analyst,
+        investigating the offending flow and recording its findings.
+
+        Reports are saved to: Controller/reports/REPORT-<timestamp>.json
+        """
+        import json as _json
+        from datetime import datetime as _dt
+
+        reports_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
+        try:
+            os.makedirs(reports_dir, exist_ok=True)
+        except OSError:
+            return
+
+        timestamp = _dt.now()
+        filename = f"REPORT-{timestamp.strftime('%Y%m%d-%H%M%S')}-{violation.device_ip.replace('.', '_')}.json"
+        filepath = os.path.join(reports_dir, filename)
+
+        # Extract key flow features for the report
+        key_features = {}
+        feature_keys = [
+            'packets_per_second', 'bytes_per_second', 'avg_packet_size',
+            'total_packets', 'total_bytes', 'duration',
+            'protocol', 'dst_port', 'src_port',
+            'syn_ratio', 'fin_ratio', 'rst_ratio', 'ack_ratio',
+            'device_unique_dst_ports', 'device_unique_dst_ips',
+            'device_total_flows', 'device_avg_pps',
+            'fwd_bwd_packet_ratio', 'payload_entropy',
+        ]
+        for k in feature_keys:
+            if k in flow_row:
+                val = flow_row[k]
+                # Round floats for readability
+                if isinstance(val, float):
+                    val = round(val, 4)
+                key_features[k] = val
+
+        # Determine threat level
+        if ml_confidence >= 0.90:
+            threat_level = 'CRITICAL'
+            recommendation = 'Device is almost certainly compromised. Keep quarantined. Investigate device firmware and network logs for lateral movement.'
+        elif ml_confidence >= 0.70:
+            threat_level = 'HIGH'
+            recommendation = 'Strong indicators of compromise. Keep quarantined. Cross-reference with Snort alerts and check for data exfiltration attempts.'
+        elif ml_confidence >= 0.50:
+            threat_level = 'MEDIUM'
+            recommendation = 'Suspicious behavior detected. Keep quarantined pending manual investigation. Could be misconfiguration or compromise.'
+        else:
+            threat_level = 'LOW'
+            recommendation = 'Behavioral anomaly but ML confidence is low. Likely a misconfiguration or policy violation rather than active attack. Admin review recommended before unblocking.'
+
+        report = {
+            'report_id': filename.replace('.json', ''),
+            'generated_at': timestamp.isoformat(),
+            'threat_level': threat_level,
+
+            'device': {
+                'ip': violation.device_ip,
+                'name': violation.device_name,
+                'class': violation.device_class,
+                'mac': self._ip_to_mac.get(violation.device_ip, 'unknown'),
+            },
+
+            'violation': {
+                'type': violation.violation_type,
+                'details': violation.details,
+                'timestamp': violation.timestamp,
+            },
+
+            'ml_investigation': {
+                'verdict': ml_verdict,
+                'attack_type': ml_attack_type,
+                'confidence': round(ml_confidence, 4),
+                'model_loaded': self._ml_engine is not None and self._ml_engine.is_loaded if self._ml_engine else False,
+            },
+
+            'flow_evidence': key_features,
+
+            'action_taken': 'PERMANENT QUARANTINE — OpenFlow DROP rule installed on all switches (hard_timeout=0)',
+            'recommendation': recommendation,
+
+            'admin_actions': {
+                'unblock_command': f"CONTROL:UNBLOCK:{violation.device_ip}",
+                'unblock_usage': f"py net._send_to_controller('CONTROL:UNBLOCK:{violation.device_ip}')",
+            },
+        }
+
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                _json.dump(report, f, indent=2, default=str)
+            self._log('info', f'Forensic report written: {filename}')
+        except Exception as e:
+            self._log('warning', f'Failed to write forensic report: {e}')
 
     def _write_csv(self, rows):
         """Append rows to the CSV file. Create with headers if first time."""

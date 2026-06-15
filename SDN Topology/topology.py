@@ -2,18 +2,37 @@ from mininet.node import RemoteController
 from mn_wifi.net import Mininet_wifi
 from mn_wifi.cli import CLI
 import time
+import sys
+import os
 import threading
 import socket as _socket
+
+# Add Controller directory to path for shared_secret import
+_controller_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Controller')
+if os.path.isdir(_controller_dir):
+    sys.path.insert(0, _controller_dir)
+try:
+    from shared_secret import sign_command
+except ImportError:
+    # Fallback: if shared_secret is not available, send unsigned (backward compat)
+    print("*** WARNING: shared_secret.py not found — commands will be sent UNSIGNED")
+    sign_command = None
 
 # Controller physical IP (used for direct UDP commands)
 CONTROLLER_IP = '192.168.1.19'
 CONTROLLER_CMD_PORT = 9999
 
 def _send_to_controller(msg):
-    """Send a UDP command directly to the controller over the physical network."""
+    """Send a signed UDP command directly to the controller over the physical network.
+    Commands are authenticated with HMAC-SHA256 to prevent forgery (Fix #1)."""
     try:
+        # Sign the command before sending
+        if sign_command is not None:
+            signed_msg = sign_command(msg)
+        else:
+            signed_msg = msg  # Fallback: unsigned (development only)
         s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
-        s.sendto(msg.encode(), (CONTROLLER_IP, CONTROLLER_CMD_PORT))
+        s.sendto(signed_msg.encode(), (CONTROLLER_IP, CONTROLLER_CMD_PORT))
         s.close()
     except Exception as e:
         print(f"*** Error sending to controller: {e}")
