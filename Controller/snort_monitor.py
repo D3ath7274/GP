@@ -303,12 +303,6 @@ class SnortManager:
         self._dedup_window_seconds = 30
         self._dedup_cache = {}  # (sid, src_ip) -> last_log_time
 
-        # Fix #5: Strike counter for escalation. When the same alert is
-        # suppressed by dedup N times within the window, force-log an
-        # [ESCALATION] alert so persistent attacks don't go silent.
-        self._strike_counter = {}  # (sid, src_ip) -> {'count': int, 'first': float}
-        self._strike_escalation_threshold = 3  # Strikes before forced log
-
     # ---- Logging helpers ----
 
     def _log_info(self, msg, *args):
@@ -583,8 +577,6 @@ class SnortManager:
 
         if should_log:
             self._dedup_cache[dedup_key] = now
-            # Reset strike counter on fresh log
-            self._strike_counter.pop(dedup_key, None)
             # Clean old entries from dedup cache periodically
             if len(self._dedup_cache) > 500:
                 cutoff = now - self._dedup_window_seconds * 2
@@ -610,37 +602,6 @@ class SnortManager:
                 proto,
                 alert['sid'],
             )
-        else:
-            # --- Fix #5: Strike Counter Escalation ---
-            # Alert was suppressed by dedup. Track strikes.
-            if dedup_key not in self._strike_counter:
-                self._strike_counter[dedup_key] = {'count': 1, 'first': now}
-            else:
-                self._strike_counter[dedup_key]['count'] += 1
-
-            strikes = self._strike_counter[dedup_key]['count']
-            if strikes >= self._strike_escalation_threshold:
-                # Force-log an escalation alert
-                elapsed = now - self._strike_counter[dedup_key]['first']
-                self._log_warning(
-                    "\n"
-                    "========================================\n"
-                    "  \u26a0 [ESCALATION] IDS ALERT (Persistent)\n"
-                    "========================================\n"
-                    "  Attack : %s\n"
-                    "  From   : %s\n"
-                    "  Rule   : SID %s\n"
-                    "  Strikes: %d suppressed in %.0fs\n"
-                    "  Status : Attack is ONGOING despite dedup\n"
-                    "========================================",
-                    alert['attack_type'],
-                    src_ip,
-                    alert['sid'],
-                    strikes,
-                    elapsed,
-                )
-                # Reset counter after escalation to prevent log flood
-                self._strike_counter[dedup_key] = {'count': 0, 'first': now}
 
         # Always invoke callback (for CSV labeling) regardless of log suppression
         if self.on_alert:

@@ -42,21 +42,17 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snort_monitor import SnortManager
 from traffic_mirror import TrafficMirror
 from traffic_capture import TrafficCapture  # Added
-from shared_secret import verify_command     # HMAC authentication (Fix #1)
-from rate_limiter import TokenBucket          # Rate limiting (Fix #6)
-from watchdog import start_heartbeat_thread   # Watchdog heartbeat (Fix #7)
-from incident_logger import get_incident_logger  # Incident logging (Fix #4)
 
 
 # =============================================================================
-# COLLECTION_MODE: Set via environment variable IPS_COLLECTION_MODE=true.
+# COLLECTION_MODE: Set to True during dataset collection.
 # When True, rate limiting / active blocking is bypassed so that ground-truth
 # attack features are recorded at full intensity. A clipped flood produces
 # corrupted feature values — the model would learn the threshold, not the attack.
-# SECURITY (Fix #3): Defaults to False. Must be explicitly enabled via:
-#   export IPS_COLLECTION_MODE=true
+# Set to False ONLY after dataset_training.csv is finalized and the system
+# moves into live detection / deployment.
 # =============================================================================
-COLLECTION_MODE = os.environ.get("IPS_COLLECTION_MODE", "false").lower() == "true"
+COLLECTION_MODE = True
 
 
 class SimpleSwitch(app_manager.RyuApp):
@@ -110,13 +106,6 @@ class SimpleSwitch(app_manager.RyuApp):
         )
         self.traffic_capture.start()
 
-        # Watchdog heartbeat thread (Fix #7)
-        self._heartbeat_thread = start_heartbeat_thread(interval=3)
-        self.logger.info("Watchdog heartbeat thread started (interval=3s)")
-
-        # Incident logger (Fix #4)
-        self._incident_logger = get_incident_logger()
-
         # IoT configuration
         # Vendor/OUI prefixes (lowercase) commonly used by IoT devices.
         self.iot_mac_prefixes = ['00:11:22', 'aa:bb:cc']
@@ -166,20 +155,6 @@ class SimpleSwitch(app_manager.RyuApp):
         # OFF = capture traffic normally, label everything as 'normal' (clean dataset)
         # ON  = full anomaly detection + blocking active
         self._detection_enabled = False
-
-        # Rate limiter for UDP command channel (Fix #6)
-        self._udp_limiter = TokenBucket(rate=10, burst=20, violation_threshold=100)
-
-        # COLLECTION_MODE startup banner (Fix #3)
-        if COLLECTION_MODE:
-            self.logger.warning(
-                "\n"
-                "╔══════════════════════════════════════════════════════════╗\n"
-                "║  ⚠ COLLECTION MODE: ACTIVE                              ║\n"
-                "║  Blocking is DISABLED — attack traffic will flow freely.║\n"
-                "║  Set IPS_COLLECTION_MODE=false for production.          ║\n"
-                "╚══════════════════════════════════════════════════════════╝"
-            )
         self.logger.info(
             "\n"
             "╔══════════════════════════════════════════════════════════╗\n"
@@ -251,32 +226,12 @@ class SimpleSwitch(app_manager.RyuApp):
         Listen on UDP port 9999 for CONTROL and REGISTER commands sent
         directly over the physical network from the topology VM.
         """
-        self.logger.info("UDP command listener running on 0.0.0.0:9999 (HMAC-authenticated)")
+        self.logger.info("UDP command listener running on 0.0.0.0:9999")
         while True:
             try:
                 data, addr = self._udp_sock.recvfrom(4096)
+                message = data.decode('utf-8', errors='ignore').strip()
                 sender_ip = addr[0]
-
-                # --- Fix #6: Rate Limiting ---
-                if not self._udp_limiter.allow(sender_ip):
-                    if self._udp_limiter.is_pivot_attack(sender_ip):
-                        self.logger.warning(
-                            "[PIVOT ATTACK] %s has exceeded %d rate violations on UDP 9999 — "
-                            "possible control-plane flooding attack",
-                            sender_ip, self._udp_limiter.violation_threshold
-                        )
-                    continue  # Silently drop rate-exceeded commands
-
-                # --- Fix #1: HMAC Authentication ---
-                message, hmac_status = verify_command(data)
-                if hmac_status != 'OK':
-                    self.logger.warning(
-                        "[SECURITY] Rejected UDP command from %s — reason: %s (raw: %s)",
-                        sender_ip, hmac_status,
-                        data.decode('utf-8', errors='replace')[:100]
-                    )
-                    continue
-
                 self.logger.info("UDP command received from %s: %s", sender_ip, message)
 
                 if message.startswith("CONTROL:"):
@@ -311,15 +266,6 @@ class SimpleSwitch(app_manager.RyuApp):
                                 "║  Traffic is being recorded. All labels = normal.        ║\n"
                                 "╚══════════════════════════════════════════════════════════╝"
                             )
-                    elif len(parts) >= 2 and parts[1] == 'STATUS':
-                        # Fix #3: Report current system status
-                        status_msg = (
-                            f"STATUS: detection={'ON' if self._detection_enabled else 'OFF'}, "
-                            f"collection_mode={COLLECTION_MODE}, "
-                            f"blocked_ips={len(self._blocked_ips)}, "
-                            f"rate_limiter={self._udp_limiter.get_stats()}"
-                        )
-                        self.logger.info(status_msg)
 
                 elif message.startswith("LABEL_OVERRIDE:"):
                     # Format: LABEL_OVERRIDE:ip:attack_type
@@ -477,20 +423,6 @@ class SimpleSwitch(app_manager.RyuApp):
             f"{timeout}s",
             f"{rules_installed} switch(es)",
         )
-
-        # --- Persistent Incident Log (Fix #4) ---
-        if hasattr(self, '_incident_logger') and self._incident_logger:
-            self._incident_logger.log(
-                'QUARANTINE' if reason == 'contract_violation' else 'BLOCK',
-                src_ip=src_ip,
-                src_mac=src_mac,
-                device=device_name,
-                target_ip=target_ip,
-                attack_type=attack_type,
-                reason=reason,
-                action=f'DROP rule for {timeout}s on {rules_installed} switch(es)',
-                latency_s=round(latency, 3),
-            )
 
     def add_flow(self, datapath, in_port, dst, src, actions, idle_timeout=0, hard_timeout=0, priority=None):
         ofproto = datapath.ofproto
