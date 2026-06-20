@@ -135,6 +135,46 @@ def ping_controller(net, host_name='h1', controller_ip=CONTROLLER_IP):
     except Exception as e:
         print(f"Error: {e}")
 
+def start_background_traffic(net):
+    """
+    Starts realistic background traffic (pings, HTTP requests, IoT heartbeats)
+    to simulate real-world activity without triggering flood alerts.
+    """
+    print("*** Starting HTTP server on h2 (10.0.0.4)...")
+    h2 = net.getNodeByName('h2')
+    h2.cmd('python3 -m http.server 80 &')
+    
+    print("*** Starting iperf server on h2 (10.0.0.4) on port 5001...")
+    h2.cmd('iperf -s -p 5001 &')
+    
+    time.sleep(1)
+    
+    print("*** Starting simulated web browsing on sta1 and sta2...")
+    sta1 = net.getNodeByName('sta1')
+    sta2 = net.getNodeByName('sta2')
+    sta1.cmd('while true; do curl -s --connect-timeout 2 http://10.0.0.4/ > /dev/null; sleep $((RANDOM % 8 + 3)); done &')
+    sta2.cmd('while true; do curl -s --connect-timeout 2 http://10.0.0.4/ > /dev/null; sleep $((RANDOM % 8 + 3)); done &')
+    
+    print("*** Starting periodic iperf traffic from sta1 to h2 on port 5001...")
+    sta1.cmd('while true; do iperf -c 10.0.0.4 -p 5001 -t 2 > /dev/null; sleep $((RANDOM % 20 + 15)); done &')
+    
+    print("*** Starting low-frequency connectivity check on h1...")
+    h1 = net.getNodeByName('h1')
+    h1.cmd('while true; do ping -c 1 -W 1 10.0.0.1 > /dev/null; ping -c 1 -W 1 10.0.0.2 > /dev/null; sleep 10; done &')
+    
+    # Check if dynamic IoT devices exist and start their telemetry
+    if 'TempSensor' in net.nameToNode:
+        print("*** Starting UDP telemetry on TempSensor...")
+        temp = net.nameToNode['TempSensor']
+        temp.cmd('while true; do echo "temp=$((RANDOM % 10 + 20))" | nc -u -w1 10.0.0.4 8883; sleep 5; done &')
+        
+    if 'Cam' in net.nameToNode:
+        print("*** Starting TCP heartbeats on Cam...")
+        cam = net.nameToNode['Cam']
+        cam.cmd('while true; do echo "ping" | nc -w1 10.0.0.4 1883; sleep 4; done &')
+
+    print("*** Background traffic successfully started!")
+
 def topology():
     net = Mininet_wifi(controller=RemoteController)
     
@@ -170,6 +210,7 @@ def topology():
     net.register_iot_device = register_iot_device
     net.connect_iot_device = connect_iot_device
     net.ping_controller = ping_controller
+    net.start_background_traffic = start_background_traffic
 
     # --- Detection Mode Toggle ---
     def detect_on(net):

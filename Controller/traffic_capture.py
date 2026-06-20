@@ -642,6 +642,7 @@ class TrafficCapture:
             if not flow['packets']:
                 flow['first_seen'] = now
             flow['last_seen'] = now
+            flow['eth_dst'] = eth_dst  # FIX(B): retain L2 dst for broadcast detection
             flow['packets'].append((packet_size, tcp_flags, src_port, now))
 
             # Update network-wide counters
@@ -839,6 +840,26 @@ class TrafficCapture:
             broadcast_count, multicast_count, arp_total, arp_broadcast
         )
 
+        # --- Reverse-direction aggregates (FIX C): directionality & session features ---
+        # The flow key is uni-directional (src->dst->port), so a flow never sees its own
+        # reply traffic. Aggregate every flow into (src, dst, proto) totals here so that
+        # _build_flow_row can look up the reverse pair (dst, src, proto) to populate
+        # bwd_*, reply_rate, and TCP session-completeness features within the window.
+        reverse_agg = {}
+        for _fk, _fd in flows_snapshot.items():
+            _s, _d, _port, _proto = _fk
+            _a = reverse_agg.get((_s, _d, _proto))
+            if _a is None:
+                _a = {'pkts': 0, 'bytes': 0, 'syn': 0, 'ack': 0}
+                reverse_agg[(_s, _d, _proto)] = _a
+            for _size, _flags, _sport, _ts in _fd['packets']:
+                _a['pkts'] += 1
+                _a['bytes'] += _size
+                if _flags.get('SYN'):
+                    _a['syn'] += 1
+                if _flags.get('ACK'):
+                    _a['ack'] += 1
+
         # Pass 1: Identify "Attacker" IPs in this window
         window_attackers = {}  # ip -> (label, attack_type, sid)
 
@@ -969,6 +990,8 @@ class TrafficCapture:
                 flows_per_src=flows_per_src,
                 backlog_drops=backlog_drops,
                 flush_start=flush_start,
+                host_ports=host_ports,
+                reverse_agg=reverse_agg,
             )
             if row:
                 rows.append(row)
@@ -978,16 +1001,82 @@ class TrafficCapture:
             for profile in self._devices.values():
                 profile.reset_recent()
 
+        # =====================================================================
+        # ML Tier 4: Per-Flow ML Inference (if mode is OBSERVE or AUTHORIZE)
+        # =====================================================================
+        # Runs AFTER row building so existing rate counter labels are preserved.
+        # ML can upgrade label=0 (normal) to label=3 (ML-detected) if confident.
+        # In OBSERVE mode: log predictions only, do not block.
+        # In AUTHORIZE mode: log + install OpenFlow DROP rule via block_attacker().
+        # =====================================================================
+        if (rows and self.controller and
+                hasattr(self.controller, '_ml_mode') and
+                self.controller._ml_mode in ('OBSERVE', 'AUTHORIZE') and
+                hasattr(self.controller, '_ml_engine') and
+                self.controller._ml_engine and
+                self.controller._ml_engine.is_loaded):
+
+            ml_mode = self.controller._ml_mode
+            ml_threshold = getattr(self.controller, '_ml_confidence_threshold', 0.80)
+            ml_engine = self.controller._ml_engine
+            ml_blocked_this_window = set()  # Avoid duplicate blocks per IP per window
+
+            for row in rows:
+                # Skip rows already labeled as attacks by rate counters
+                if str(row.get('label', '0')) != '0':
+                    continue
+
+                try:
+                    ml_label, ml_type, ml_conf = ml_engine.predict(row)
+                except Exception:
+                    continue
+
+                if ml_label > 0 and ml_conf >= ml_threshold:
+                    src_ip = row.get('src_ip', '?')
+                    dst_ip = row.get('dst_ip', '?')
+
+                    # Update the row with ML prediction
+                    row['label'] = 3  # 3 = ML-detected (distinct from 2=rate counter)
+                    row['attack_type'] = ml_type
+
+                    # Log the detection
+                    self._log('warning',
+                        "[ML] %s detected: %s → %s (confidence: %.2f, type: %s, mode: %s)",
+                        "ATTACK", src_ip, dst_ip, ml_conf, ml_type, ml_mode
+                    )
+
+                    # In AUTHORIZE mode: block the attacker via OpenFlow DROP
+                    if (ml_mode == 'AUTHORIZE' and
+                            src_ip not in ml_blocked_this_window and
+                            src_ip not in self._confirmed_attackers):
+                        attacker_mac = self._ip_to_mac.get(src_ip, '')
+                        if attacker_mac and self.controller:
+                            try:
+                                self.controller.block_attacker(
+                                    src_ip=src_ip,
+                                    src_mac=attacker_mac,
+                                    attack_type=ml_type,
+                                    timeout=30,
+                                    detection_time=time.time(),
+                                    target_ip=dst_ip,
+                                    reason=f'ml-{ml_conf:.2f}'
+                                )
+                                ml_blocked_this_window.add(src_ip)
+                            except Exception as e:
+                                self._log('error', "ML block_attacker failed: %s", e)
+
         # Write to CSV
         if rows:
             self._write_csv(rows)
+
 
     def _build_flow_row(self, flow_key, flow_data, network_ctx, alerts,
                         pps, bps, avg_size, inherited_label=None,
                         host_icmp_types=None, arp_requests=None,
                         arp_replies=None, arp_gratuitous=None,
                         arp_request_targets=None, arp_reply_sources=None,
-                        flows_per_src=None, backlog_drops=0, flush_start=0):
+                        flows_per_src=None, backlog_drops=0, flush_start=0,
+                        host_ports=None, reverse_agg=None):
         """Build a single CSV row from a flow with all 10 feature groups."""
         src_ip, dst_ip, dst_port, protocol = flow_key
         packets = flow_data['packets']
@@ -1064,38 +1153,42 @@ class TrafficCapture:
         # Rationale IV: Attacks are asymmetric — attacker floods, victim silent.
         # Ratio-based features immune to TAP 2x amplification (Rationale II.B).
         # =====================================================================
-        fwd_packets = []
-        bwd_packets = []
-        for p in packets:
-            # Direction determined by comparing packet src against flow canonical src
-            # In our flow key, src_ip is the canonical source
-            fwd_packets.append(p)
-            # We also check for reverse-direction packets (dst -> src replies within same flow key)
-            # Since flows are keyed by (src, dst, ...), all packets in this flow are forward.
-            # Backward traffic exists in a separate flow key (dst, src, ...).
-        fwd_pkt_count = len(fwd_packets)
-        bwd_pkt_count = 0  # Backward = separate flow key
-
-        # Look for reverse flow in this window to compute reply_rate
-        # This is an approximation within the window boundary (Rationale II.C)
-        fwd_bwd_pkt_ratio = round(_safe_div(fwd_pkt_count, bwd_pkt_count + 1), 4)
+        # FIX(C): Reverse-direction traffic lives in the pair (dst, src, proto), which is
+        # a separate flow key. Look it up in this window's reverse_agg so the
+        # directionality/asymmetry features (Rationale IV) are actually populated
+        # instead of being structurally pinned to zero.
+        fwd_pkt_count = len(packets)
         fwd_bytes = total_bytes
-        bwd_bytes = 0
+        rev = (reverse_agg or {}).get((dst_ip, src_ip, protocol), {})
+        fwd_pair = (reverse_agg or {}).get((src_ip, dst_ip, protocol), {})
+        bwd_pkt_count = rev.get('pkts', 0)
+        bwd_bytes = rev.get('bytes', 0)
+        fwd_pair_pkts = fwd_pair.get('pkts', fwd_pkt_count)
+
+        fwd_bwd_pkt_ratio = round(_safe_div(fwd_pkt_count, bwd_pkt_count + 1), 4)
         fwd_bwd_bytes_ratio = round(_safe_div(fwd_bytes, bwd_bytes + 1), 4)
         fwd_avg_size = round(_safe_div(fwd_bytes, fwd_pkt_count), 2)
-        bwd_avg_size = 0.0
-        reply_rate = 0.0  # Computed at window level; within single flow = 0
+        bwd_avg_size = round(_safe_div(bwd_bytes, bwd_pkt_count), 2)
+        # reply_rate: destination responsiveness = reverse pkts / forward pkts
+        # (Rationale IV.C). ~1.0 for healthy bidirectional traffic, ~0 for floods/scans
+        # hitting a silent or non-existent victim.
+        reply_rate = round(_safe_div(bwd_pkt_count, fwd_pair_pkts), 4)
 
         # =====================================================================
         # GROUP 3: TCP Session Completeness (4 features)
         # Rationale V: SYN floods violate the TCP lifecycle contract (RFC 793).
         # incomplete_ratio is a category-level zero-day indicator.
         # =====================================================================
+        # FIX(C): Session completeness now uses reverse-direction evidence within the
+        # window. A completed handshake needs the forward SYN, a reverse SYN-ACK (the
+        # reverse flow shows both SYN and ACK), and a forward ACK. This remains a
+        # within-window approximation (Rationale II.C, V) but is no longer pinned to 0.
         syn_ack_ratio = round(_safe_div(syn_count, ack_count + 1), 4)
+        rev_syn = rev.get('syn', 0)
+        rev_ack = rev.get('ack', 0)
         has_syn = syn_count > 0
-        has_ack = ack_count > 0
-        has_fin = fin_count > 0
-        completed = 1 if (has_syn and has_ack and has_fin) else 0
+        handshake_done = has_syn and rev_syn > 0 and rev_ack > 0 and ack_count > 0
+        completed = 1 if handshake_done else 0
         total_sessions = 1 if has_syn else 0
         incomplete_ratio = round(_safe_div(total_sessions - completed, total_sessions + 1), 4)
         avg_session_dur = round(duration, 4) if completed else 0.0
@@ -1147,20 +1240,17 @@ class TrafficCapture:
             top_dst_port = 0
             top_dst_port_ratio = 0.0
 
-        # Port std — treat as numeric for spread measurement
-        unique_dst_list = sorted(dst_ports_set)
+        # FIX(B): Port-diversity is a HOST behaviour, not a single-flow property
+        # (Rationale IX). The flow key pins each flow to one dst_port, so per-flow spread
+        # is always 0. Use the source host's full set of destination ports this window.
+        host_port_set = (host_ports or {}).get(src_ip, set())
+        if not host_port_set and dst_port:
+            host_port_set = {dst_port}
+        unique_dst_list = sorted(p for p in host_port_set if p)
+        host_unique_dst_ports = len(unique_dst_list)
+
         if len(unique_dst_list) >= 2:
             dst_port_std = round(statistics.stdev(unique_dst_list), 4)
-        else:
-            dst_port_std = 0.0
-
-        well_known = sum(1 for p in [dst_port] if p and p < 1024)
-        ephemeral = sum(1 for p in [dst_port] if p and p > 49152)
-        well_known_port_ratio = round(_safe_div(well_known, 1), 4) if dst_port else 0.0
-        ephemeral_port_ratio = round(_safe_div(ephemeral, 1), 4) if dst_port else 0.0
-
-        # Sequential port score: fraction of consecutive port pairs with |diff| <= 2
-        if len(unique_dst_list) >= 2:
             sequential_pairs = sum(
                 1 for i in range(len(unique_dst_list) - 1)
                 if abs(unique_dst_list[i+1] - unique_dst_list[i]) <= 2
@@ -1169,12 +1259,25 @@ class TrafficCapture:
                 _safe_div(sequential_pairs, len(unique_dst_list) - 1), 4
             )
         else:
+            dst_port_std = 0.0
             sequential_port_score = 0.0
+
+        if unique_dst_list:
+            well_known = sum(1 for p in unique_dst_list if p < 1024)
+            ephemeral = sum(1 for p in unique_dst_list if p > 49152)
+            well_known_port_ratio = round(_safe_div(well_known, len(unique_dst_list)), 4)
+            ephemeral_port_ratio = round(_safe_div(ephemeral, len(unique_dst_list)), 4)
+        else:
+            well_known_port_ratio = 0.0
+            ephemeral_port_ratio = 0.0
 
         # =====================================================================
         # GROUP 8: Broadcast Context (per-flow flag)
         # =====================================================================
-        is_broadcast_dst = 1 if _is_broadcast(dst_ip, '') else 0
+        # FIX(B): use the flow's retained L2 destination MAC so real broadcasts
+        # (eth_dst = ff:ff:ff:ff:ff:ff, e.g. ARP requests) are actually flagged.
+        flow_eth_dst = flow_data.get('eth_dst', '')
+        is_broadcast_dst = 1 if _is_broadcast(dst_ip, flow_eth_dst) else 0
 
         # =====================================================================
         # GROUP 9: Flow Context
@@ -1205,7 +1308,7 @@ class TrafficCapture:
             'rst_count': rst_count,
             'psh_count': psh_count,
             'unique_src_ports': len(src_ports_set),
-            'unique_dst_ports': len(dst_ports_set),
+            'unique_dst_ports': host_unique_dst_ports,  # FIX(B): host-level port diversity
             # Group 1
             'inter_arrival_mean': round(ia_mean, 6),
             'inter_arrival_std': round(ia_std, 6),
@@ -1253,6 +1356,19 @@ class TrafficCapture:
         with self._device_lock:
             profile = self._devices.get(src_ip)
             if profile:
+                # FIX(D): IoT/gateway classification is discovered passively (ARP/DHCP)
+                # over time, but was previously sampled only once at device-creation —
+                # leaving is_registered_iot/is_gateway stuck at 0. Refresh each window.
+                if self.controller and eth_src:
+                    try:
+                        if (hasattr(self.controller, 'is_iot') and self.controller.is_iot(eth_src)) \
+                                or eth_src in getattr(self.controller, 'iot_devices', {}):
+                            profile.is_iot = 1
+                        if (hasattr(self.controller, 'is_gateway') and self.controller.is_gateway(eth_src)) \
+                                or eth_src.lower() in getattr(self.controller, 'discovered_gateways', {}):
+                            profile.is_gateway = 1
+                    except Exception:
+                        pass
                 device_features = profile.get_features(pps, bps, avg_size)
             else:
                 device_features = {col: 0 for col in DEVICE_COLUMNS}

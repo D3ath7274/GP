@@ -42,6 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snort_monitor import SnortManager
 from traffic_mirror import TrafficMirror
 from traffic_capture import TrafficCapture  # Added
+from ml_inference import MLInferenceEngine  # ML Inference Engine
 
 
 # =============================================================================
@@ -155,12 +156,35 @@ class SimpleSwitch(app_manager.RyuApp):
         # OFF = capture traffic normally, label everything as 'normal' (clean dataset)
         # ON  = full anomaly detection + blocking active
         self._detection_enabled = False
+
+        # ===================================================================
+        # ML Inference Engine
+        # ===================================================================
+        # Loads trained models from ml_models/ for real-time classification.
+        # Three authorization modes:
+        #   OFF       — ML disabled (dataset collection mode)
+        #   OBSERVE   — ML predicts + logs, NO blocking (verify accuracy first)
+        #   AUTHORIZE — ML predicts + blocks via OpenFlow DROP if confidence ≥ threshold
+        self._ml_mode = 'OFF'  # Start in OFF mode; switch via CONTROL:ML:OBSERVE/AUTHORIZE
+        self._ml_confidence_threshold = 0.80  # Calibrate on t530 in Phase 5
+        ml_model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
+        if os.path.isdir(ml_model_dir):
+            self._ml_engine = MLInferenceEngine(ml_model_dir, logger=self.logger)
+        else:
+            self._ml_engine = None
+            self.logger.warning(
+                "ml_models/ directory not found at %s — ML inference disabled. "
+                "Place full_ml_pipeline.joblib in this directory to enable it.", ml_model_dir
+            )
+
         self.logger.info(
             "\n"
             "╔══════════════════════════════════════════════════════════╗\n"
             "║  🛡 DETECTION MODE: OFF (Capture Only)                    ║\n"
             "║  Traffic is being recorded. All labels = normal.        ║\n"
             "║  Send CONTROL:DETECT:ON to enable attack detection.     ║\n"
+            "║  Send CONTROL:ML:OBSERVE to enable ML (log only).       ║\n"
+            "║  Send CONTROL:ML:AUTHORIZE:0.80 to enable ML blocking.  ║\n"
             "╚══════════════════════════════════════════════════════════╝"
         )
 
@@ -266,6 +290,64 @@ class SimpleSwitch(app_manager.RyuApp):
                                 "║  Traffic is being recorded. All labels = normal.        ║\n"
                                 "╚══════════════════════════════════════════════════════════╝"
                             )
+                    elif len(parts) >= 3 and parts[1] == 'ML':
+                        # -------------------------------------------------------
+                        # ML Authorization Control
+                        # CONTROL:ML:OFF       — disable ML inference
+                        # CONTROL:ML:OBSERVE   — ML predicts + logs, no blocking
+                        # CONTROL:ML:AUTHORIZE — ML predicts + blocks attackers
+                        # CONTROL:ML:AUTHORIZE:0.80 — with custom threshold
+                        # -------------------------------------------------------
+                        ml_cmd = parts[2].strip().upper()
+                        if ml_cmd == 'OFF':
+                            self._ml_mode = 'OFF'
+                            self.logger.warning(
+                                "\n"
+                                "╔══════════════════════════════════════════════════════════╗\n"
+                                "║  🤖 ML MODE: OFF                                         ║\n"
+                                "║  ML inference disabled. Rate counters still active.     ║\n"
+                                "╚══════════════════════════════════════════════════════════╝"
+                            )
+                        elif ml_cmd == 'OBSERVE':
+                            self._ml_mode = 'OBSERVE'
+                            self.logger.warning(
+                                "\n"
+                                "╔══════════════════════════════════════════════════════════╗\n"
+                                "║  🤖 ML MODE: OBSERVE                                     ║\n"
+                                "║  ML predicts + logs every flow. NO blocking.            ║\n"
+                                "║  Watch output to verify accuracy before authorizing.    ║\n"
+                                "╚══════════════════════════════════════════════════════════╝"
+                            )
+                        elif ml_cmd == 'AUTHORIZE':
+                            self._ml_mode = 'AUTHORIZE'
+                            if len(parts) >= 4:
+                                try:
+                                    self._ml_confidence_threshold = float(parts[3])
+                                except ValueError:
+                                    pass
+                            self.logger.warning(
+                                "\n"
+                                "╔══════════════════════════════════════════════════════════╗\n"
+                                "║  🤖 ML MODE: AUTHORIZE                                   ║\n"
+                                "║  ML predicts + BLOCKS attackers via OpenFlow DROP.      ║\n"
+                                "║  Confidence threshold: %-33s ║\n"
+                                "║  ⚠  AI is now authorized to block network devices.      ║\n"
+                                "╚══════════════════════════════════════════════════════════╝",
+                                f"{self._ml_confidence_threshold:.2f}"
+                            )
+                        elif ml_cmd == 'STATS':
+                            # CONTROL:ML:STATS — print inference statistics
+                            if self._ml_engine and self._ml_engine.is_loaded:
+                                stats = self._ml_engine.get_stats()
+                                self.logger.info(
+                                    "ML Stats: %d predictions, %d attacks detected, "
+                                    "avg %.2fms/prediction",
+                                    stats['total_predictions'],
+                                    stats['total_attacks_detected'],
+                                    stats['avg_inference_ms']
+                                )
+                            else:
+                                self.logger.warning("ML engine not loaded")
 
                 elif message.startswith("LABEL_OVERRIDE:"):
                     # Format: LABEL_OVERRIDE:ip:attack_type
