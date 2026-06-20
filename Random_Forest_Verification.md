@@ -90,7 +90,25 @@ mininet-wifi> pingall
 
 ## Part C — Generate NORMAL traffic (the clean baseline)
 
-In the **Mininet CLI** (Topology VM):
+In the **Mininet CLI** (Topology VM), first **register the two IoT devices** so
+the node mix matches the training dataset. They are NOT created by default, and
+`start_background_traffic` only starts their telemetry if they exist by name:
+
+```text
+mininet-wifi> py net.register_iot_device(net, 'TempSensor', '10.0.0.5/24', '00:00:00:00:00:05', 's1', 'IOT:TempSensor')
+mininet-wifi> py net.register_iot_device(net, 'Cam', '10.0.0.6/24', '00:00:00:00:00:06', 's1', 'IOT:Camera')
+```
+
+Confirm they appear (you should now see `Cam` and `TempSensor`):
+```text
+mininet-wifi> nodes
+```
+
+> IoT devices are dynamic — re-register them on every fresh run. The MAC OUI
+> `00:00:00` matches the dataset; the registration also pushes `REGISTER:IOT:*`
+> to the controller so the device-behavioral features populate for these hosts.
+
+Then start the clean baseline:
 
 ```text
 mininet-wifi> py net.detect_off(net)
@@ -98,7 +116,8 @@ mininet-wifi> py net.start_background_traffic(net)
 ```
 
 - `detect_off` → all rows are labeled `normal` (clean data).
-- `start_background_traffic` → HTTP browsing, iperf, pings, IoT heartbeats.
+- `start_background_traffic` → HTTP browsing, iperf, pings, and the TempSensor /
+  Cam IoT heartbeats.
 
 **Let it run for at least 3–4 minutes.** The device baselines only become
 "mature" after 180 s (`is_baseline_mature` flips to 1), and you want a few
@@ -248,6 +267,7 @@ substitute a `pd.unique()`-derived one.
 - [ ] Controller VM: `ryu-manager Controller.py` running, capture started
 - [ ] `CONTROLLER_IP` in `topology.py` matches the Controller VM
 - [ ] Topology VM: `sudo python3 topology.py`, switch connected, `pingall` OK
+- [ ] Register IoT devices (TempSensor 10.0.0.5, Cam 10.0.0.6) → confirm with `nodes`
 - [ ] `detect_off` → `start_background_traffic` → wait ≥ 3 min (baseline matures)
 - [ ] `detect_on` → run the 6 attacks (one at a time, `timeout 20`)
 - [ ] Controller log shows `ATTACK CONFIRMED` for each

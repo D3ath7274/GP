@@ -152,8 +152,8 @@ def start_background_traffic(net):
     print("*** Starting simulated web browsing on sta1 and sta2...")
     sta1 = net.getNodeByName('sta1')
     sta2 = net.getNodeByName('sta2')
-    sta1.cmd('while true; do curl -s --connect-timeout 2 http://10.0.0.4/ > /dev/null; sleep $((RANDOM % 8 + 3)); done &')
-    sta2.cmd('while true; do curl -s --connect-timeout 2 http://10.0.0.4/ > /dev/null; sleep $((RANDOM % 8 + 3)); done &')
+    sta1.cmd('while true; do { curl -s --connect-timeout 2 -o /dev/null http://10.0.0.4/ || wget -q -O /dev/null --timeout=2 http://10.0.0.4/ ; } 2>/dev/null; sleep $((RANDOM % 8 + 3)); done &')
+    sta2.cmd('while true; do { curl -s --connect-timeout 2 -o /dev/null http://10.0.0.4/ || wget -q -O /dev/null --timeout=2 http://10.0.0.4/ ; } 2>/dev/null; sleep $((RANDOM % 8 + 3)); done &')
     
     print("*** Starting periodic iperf traffic from sta1 to h2 on port 5001...")
     sta1.cmd('while true; do iperf -c 10.0.0.4 -p 5001 -t 2 > /dev/null; sleep $((RANDOM % 20 + 15)); done &')
@@ -164,14 +164,24 @@ def start_background_traffic(net):
     
     # Check if dynamic IoT devices exist and start their telemetry
     if 'TempSensor' in net.nameToNode:
-        print("*** Starting UDP telemetry on TempSensor...")
+        print("*** Starting realistic IoT telemetry on TempSensor (10.0.0.5)...")
         temp = net.nameToNode['TempSensor']
-        temp.cmd('while true; do echo "temp=$((RANDOM % 10 + 20))" | nc -u -w1 10.0.0.4 8883; sleep 5; done &')
+        # Frequent small sensor publishes to the server (HTTP GET w/ query -> bidirectional, gets a reply)
+        temp.cmd('while true; do { curl -s --max-time 2 -o /dev/null "http://10.0.0.4/?temp=$((RANDOM%10+20))&hum=$((RANDOM%40+30))" || wget -q -O /dev/null --timeout=2 "http://10.0.0.4/?temp=$((RANDOM%10+20))&hum=$((RANDOM%40+30))" ; } 2>/dev/null; sleep $((RANDOM%4+3)); done &')
+        # MQTT-style UDP publish (protocol variety, fire-and-forget)
+        temp.cmd('while true; do echo "temp=$((RANDOM%10+20))" | nc -u -w1 10.0.0.4 8883; sleep $((RANDOM%3+4)); done &')
+        # Periodic keepalive to the server (jittered so it is not perfectly robotic)
+        temp.cmd('while true; do ping -c 1 -W 1 10.0.0.4 > /dev/null 2>&1; sleep $((RANDOM%6+12)); done &')
         
     if 'Cam' in net.nameToNode:
-        print("*** Starting TCP heartbeats on Cam...")
+        print("*** Starting realistic IoT traffic on Cam (10.0.0.6)...")
         cam = net.nameToNode['Cam']
-        cam.cmd('while true; do echo "ping" | nc -w1 10.0.0.4 1883; sleep 4; done &')
+        # Video-stream-like upload bursts (iperf simulates sustained camera bandwidth)
+        cam.cmd('while true; do iperf -c 10.0.0.4 -p 5001 -t 3 > /dev/null 2>&1; sleep $((RANDOM%15+15)); done &')
+        # Periodic config/snapshot pulls from the server (HTTP GET -> bidirectional, larger transfer)
+        cam.cmd('while true; do { curl -s --max-time 3 -o /dev/null http://10.0.0.4/ || wget -q -O /dev/null --timeout=2 http://10.0.0.4/ ; } 2>/dev/null; sleep $((RANDOM%10+10)); done &')
+        # Control-plane heartbeat (MQTT-style TCP keepalive)
+        cam.cmd('while true; do echo "ping" | nc -w1 10.0.0.4 1883; sleep $((RANDOM%3+3)); done &')
 
     print("*** Background traffic successfully started!")
 
