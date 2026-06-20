@@ -117,8 +117,10 @@ class MLInferenceEngine:
 
     def _load_pipeline(self):
         if not _ML_DEPS_OK:
-            self._log("warning", "ML dependencies missing (%s) — ML inference disabled. "
-                                 "Install: pip install scikit-learn==1.6.1 imbalanced-learn pandas",
+            self._log("warning", "ML dependencies missing (%s) — ML inference disabled "
+                                 "(this is fine for dataset collection). To run ML on this host "
+                                 "you need Python >=3.9, then: "
+                                 "pip install 'scikit-learn>=1.6' imbalanced-learn pandas numpy",
                       _ML_DEPS_ERR)
             return
 
