@@ -69,7 +69,9 @@ def register_iot_device(net, name, ip, mac, switch_name, device_type):
             print(f"*** Sending registration packet from {name}...")
             # Register device type + hostname via direct UDP to controller
             host_ip = ip.split('/')[0]
-            _send_to_controller(f"REGISTER:IOT:{device_type}")
+            # Include the device IP so the controller can register it as IoT by IP
+            # (REGISTER:IOT:<ip>:<type>) — its MAC OUI may not be recognised.
+            _send_to_controller(f"REGISTER:IOT:{host_ip}:{device_type}")
             _send_to_controller(f"REGISTER:NAME:{name}:{host_ip}")
             print(f"*** Registration packet sent for {name}")
 
