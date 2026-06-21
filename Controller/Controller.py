@@ -283,6 +283,16 @@ class SimpleSwitch(app_manager.RyuApp):
                             self._detection_enabled = False
                             if hasattr(self, 'traffic_capture') and self.traffic_capture:
                                 self.traffic_capture.set_detection_mode(False)
+                    elif len(parts) >= 2 and parts[1] == 'CLEAR':
+                        # CONTROL:CLEAR or CONTROL:CLEAR:<ip>
+                        # DATA-COLLECTION reset: release a source's confirmed/
+                        # suspicion state (no cooldown) so its benign background is
+                        # not labelled as the attack after it stops. The collection
+                        # harness sends this between attacks. NOT a production action
+                        # (production keeps attackers locked until admin UNBLOCK).
+                        clear_ip = parts[2].strip() if len(parts) >= 3 and parts[2].strip() else None
+                        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+                            self.traffic_capture.clear_detection_state(clear_ip)
                     elif len(parts) >= 3 and parts[1] == 'UNBLOCK':
                         target_ip = parts[2].strip()
                         if hasattr(self, 'traffic_capture') and self.traffic_capture:

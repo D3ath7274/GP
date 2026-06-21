@@ -297,11 +297,16 @@ class SnortManager:
             1000001,         # Often used for custom probe/test rules
         }
 
-        # Alert deduplication: suppress repeated alerts for same SID+src_ip
-        # to prevent log flooding during attacks. Same combo logs at most
-        # once every _dedup_window_seconds.
+        # Alert deduplication: suppress repeated alerts per SOURCE DEVICE
+        # to prevent log flooding during attacks. A single flood makes Snort
+        # fire many DIFFERENT SIDs from the same host (BAD-TRAFFIC 524, MISC
+        # 503/504, SNMP-misfire 1418/1420/1421 on victim responses, ...), so a
+        # per-(sid, src_ip) key still produced ~40 boxes per attack. Keying on
+        # src_ip alone caps the console to ~one alert per device per window
+        # ("a single alert or two per device"). Storage + the CSV-labeling
+        # callback are unaffected — they still receive every alert.
         self._dedup_window_seconds = 30
-        self._dedup_cache = {}  # (sid, src_ip) -> last_log_time
+        self._dedup_cache = {}  # src_ip -> last_log_time
 
     # ---- Logging helpers ----
 
@@ -567,11 +572,12 @@ class SnortManager:
             self._alerts.append(alert)
 
         # --- Alert Deduplication / Rate Limiting ---
-        # During floods, Snort fires per-packet (150K+ alerts/sec).
-        # Log the FIRST occurrence, then suppress repeats for 30s.
+        # During floods, Snort fires per-packet (150K+ alerts/sec) across many
+        # SIDs from the same host. Log the FIRST alert per SOURCE DEVICE, then
+        # suppress all of that device's alerts for the dedup window.
         # The alert is ALWAYS stored and forwarded to the callback
         # (for CSV labeling), but the console log is suppressed.
-        dedup_key = (sid, src_ip)
+        dedup_key = src_ip
         last_logged = self._dedup_cache.get(dedup_key, 0)
         should_log = (now - last_logged) >= self._dedup_window_seconds
 
