@@ -126,8 +126,17 @@ def main():
         if a == 'SYN Flood':
             if _f(r.get('syn_count')) < 50:
                 rate_bleed[a] += 1
-        elif a in ('ICMP Flood', 'UDP Flood', 'Control Plane Saturation'):
+        elif a in ('ICMP Flood', 'UDP Flood'):
+            # single-flow volumetric floods (one dst port hammered): a real row has
+            # high packets_per_second
             if _f(r.get('packets_per_second')) < 50:
+                rate_bleed[a] += 1
+        elif a == 'Control Plane Saturation':
+            # CPS is a MANY-TINY-FLOWS attack (incrementing dst ports, -p ++1): every
+            # real flow is only 1-3 packets, so per-flow pps is LOW *by design* — that
+            # IS the attack. The signature is huge dst-port diversity, so check
+            # unique_dst_ports (matches the detector's ports>100), not pps.
+            if _f(r.get('unique_dst_ports')) < 100:
                 rate_bleed[a] += 1
         elif a == 'Port Scan':
             if _f(r.get('unique_dst_ports')) < 20:
