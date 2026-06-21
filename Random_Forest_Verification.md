@@ -30,13 +30,16 @@ detects attacks correctly on data it has never seen.
    mislabel everything if your new data's rows are ordered differently.
    `test_model.py` hardcodes the correct map, so use it.
 
-3. **Capture-code caveat (faithfulness).** `traffic_capture.py` was recently
-   patched (dead-feature fixes), shifting 3 features. The pipeline **drops one of
-   them (`is_broadcast_dst`) entirely** and the other two are near-zero
-   importance — a worst-case stress test moved only 0.008% of predictions. So:
-   **just test on the current patched code.** (A purist revert via
-   `git stash push -- Controller/traffic_capture.py` is possible but is more
-   risk than it's worth — see our earlier analysis.)
+3. **Run capture in v1-compatible mode (the default) — this is critical.** The
+   capture bug-fixes change model-visible features (`fwd_bwd_packet_ratio`,
+   `fwd_bwd_bytes_ratio`, `unique_dst_ports`) that the friend's model depends on.
+   Feeding it the *corrected* values makes it miss attacks — we measured **0%
+   ICMP-flood recall** on a v2-captured dataset, because `fwd_bwd_bytes_ratio`
+   for a flood collapsed from ~172,000 (training) to ~1.0. So capture now defaults
+   to **v1-compatible mode**, reproducing the training-time feature behaviour.
+   **Do NOT set `IPS_V2_FEATURES=1`** for this verification — that mode is only for
+   collecting data to *retrain* a new (v2) model later. If you already captured a
+   dataset before this fix, **discard it and re-capture.**
 
 ---
 
@@ -131,6 +134,18 @@ verification it's not required.)*
 
 ## Part D — Generate ATTACK traffic (labeled)
 
+> **CRITICAL — attackers must have a CLEAN device profile, or the model misses
+> everything.** The friend's model keys heavily on the *attacker's device profile*
+> (`device_protocol_dist_*`, `device_avg_pkt_rate`, …). In training, each attack
+> came from a profile-clean, attack-dominated host. We proved that when the
+> attacker is *also* running heavy background traffic (web browsing + iperf), its
+> profile shifts and the model gets **0% recall** — substituting a clean profile
+> flips the same rows to **100%**. So **do not launch attacks from a host that is
+> generating heavy normal traffic.** Either run `start_background_traffic` only on
+> the *non-attacker* hosts, or use dedicated attacker hosts. (This brittleness is
+> itself a key finding — see the note at the end — and is exactly what the
+> anomaly-detector layer is meant to cover.)
+
 Turn detection **ON** so the controller labels attack rows with their type
 (`attack_type`), which is what lets `test_model.py` produce a scored report:
 
@@ -138,33 +153,55 @@ Turn detection **ON** so the controller labels attack rows with their type
 mininet-wifi> py net.detect_on(net)
 ```
 
-Now run each attack from the CLI. `timeout 20` bounds each to ~20 s (≈4 windows —
-enough for the controller's consecutive-window confirmation). **Run them one at a
-time, and pause ~10 s between them** so the detector settles.
+**Signal each attack to the controller** so the metadata columns
+(`meta_attack_tool`, `meta_attack_intensity`) are filled — wrap every attack in
+`attack_start` / `attack_stop`. `timeout 20` bounds each attack to ~20 s (≈4
+windows — enough for consecutive-window confirmation). **Run them one at a time,
+pausing ~10 s between** so the detector settles.
 
 ```text
 # ICMP Flood            (sta1 -> h2)
+mininet-wifi> py net.attack_start(net, 'hping3', 'icmp-flood')
 mininet-wifi> sta1 timeout 20 hping3 --icmp --flood 10.0.0.4
+mininet-wifi> py net.attack_stop(net)
 
 # SYN Flood             (sta1 -> h2:80)
+mininet-wifi> py net.attack_start(net, 'hping3', 'syn-flood')
 mininet-wifi> sta1 timeout 20 hping3 -S --flood -p 80 10.0.0.4
+mininet-wifi> py net.attack_stop(net)
 
 # UDP Flood             (sta1 -> h2:53)
+mininet-wifi> py net.attack_start(net, 'hping3', 'udp-flood')
 mininet-wifi> sta1 timeout 20 hping3 --udp --flood -p 53 10.0.0.4
+mininet-wifi> py net.attack_stop(net)
 
 # Control Plane Saturation  (UDP to incrementing dst ports -> many flows)
+mininet-wifi> py net.attack_start(net, 'hping3', 'cps')
 mininet-wifi> sta1 timeout 20 hping3 --udp --flood -p ++1 10.0.0.4
+mininet-wifi> py net.attack_stop(net)
 
 # Port Scan             (sta2 -> h2, sequential)
+mininet-wifi> py net.attack_start(net, 'nmap', 'port-scan')
 mininet-wifi> sta2 timeout 20 nmap -sS -p 1-1000 10.0.0.4
+mininet-wifi> py net.attack_stop(net)
 
 # ARP Spoofing          (sta2 poisons h2's view of h1)
+mininet-wifi> py net.attack_start(net, 'arpspoof', 'arp-spoof')
 mininet-wifi> sta2 timeout 20 arpspoof -i sta2-wlan0 -t 10.0.0.4 10.0.0.3
+mininet-wifi> py net.attack_stop(net)
 ```
 
-Watch the **controller log** — you should see `SUSPECTED ATTACK` then
-`ATTACK CONFIRMED` lines naming each source/type. That confirms the rows are
-being labeled.
+Watch the **controller log** — you should see the Snort/DAI alerts plus
+`SUSPECTED ATTACK` → `ATTACK CONFIRMED` lines naming each source/type.
+
+> **Labels are now protocol-correct.** A prior bug let an ICMP-flood Snort alert
+> tag the attacker's *TCP/ARP background* traffic as "ICMP Flood" too. That guard
+> is fixed, so only protocol-matching flows get the attack label. `attack_start`
+> fills audit metadata only — it does **not** change labels. For a stealthy
+> attack that stays below detection thresholds, you can force its label with
+> `py net.label_attacker(net, '10.0.0.1', 'Port Scan')` (then `…, 'clear'`), but
+> note it labels *all* protocols from that IP, so only use it on a host sending
+> nothing but the attack.
 
 > Interface names in Mininet-WiFi: stations are `sta1-wlan0` / `sta2-wlan0`,
 > wired hosts are `h1-eth0` / `h2-eth0`. Adjust the `arpspoof -i` interface if
@@ -265,12 +302,13 @@ substitute a `pd.unique()`-derived one.
 ## One-glance checklist
 
 - [ ] Controller VM: `ryu-manager Controller.py` running, capture started
+- [ ] Capture in **v1-compatible mode** (default; do NOT set `IPS_V2_FEATURES=1`); log says "Feature schema mode: v1-compatible"
 - [ ] `CONTROLLER_IP` in `topology.py` matches the Controller VM
 - [ ] Topology VM: `sudo python3 topology.py`, switch connected, `pingall` OK
 - [ ] Register IoT devices (TempSensor 10.0.0.5, Cam 10.0.0.6) → confirm with `nodes`
 - [ ] `detect_off` → `start_background_traffic` → wait ≥ 3 min (baseline matures)
-- [ ] `detect_on` → run the 6 attacks (one at a time, `timeout 20`)
-- [ ] Controller log shows `ATTACK CONFIRMED` for each
+- [ ] `detect_on` → for each of the 6 attacks: `attack_start` → run (`timeout 20`) → `attack_stop`
+- [ ] Controller log shows Snort/DAI alert + `ATTACK CONFIRMED` for each
 - [ ] `exit` topology, `Ctrl-C` controller → collect `Controller/dataset.csv`
 - [ ] Copy CSV to model host → `python "ML model/test_model.py" <csv>`
 - [ ] Read per-class recall + confusion matrix
