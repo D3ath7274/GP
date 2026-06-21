@@ -1401,16 +1401,23 @@ class TrafficCapture:
         with self._device_lock:
             profile = self._devices.get(src_ip)
             if profile:
-                # FIX(D): IoT/gateway classification is discovered passively (ARP/DHCP)
-                # over time, but was previously sampled only once at device-creation —
-                # leaving is_registered_iot/is_gateway stuck at 0. Refresh each window.
-                if self.controller and eth_src:
+                # FIX(D): IoT/gateway classification was previously sampled only once
+                # at device-creation, leaving is_registered_iot/is_gateway stuck at 0.
+                # Refresh each window. Primary signal is the controller's explicit
+                # by-IP registry (REGISTER:IOT:<ip>:<type>), since the IoT devices'
+                # MAC OUI (00:00:00) is not recognised by OUI-prefix detection.
+                if self.controller:
                     try:
-                        if (hasattr(self.controller, 'is_iot') and self.controller.is_iot(eth_src)) \
-                                or eth_src in getattr(self.controller, 'iot_devices', {}):
+                        reg_ips = getattr(self.controller, 'iot_registered_ips', {})
+                        iot_macs = getattr(self.controller, 'iot_devices', {})
+                        if (src_ip in reg_ips) \
+                                or (eth_src and eth_src in iot_macs) \
+                                or (eth_src and hasattr(self.controller, 'is_iot')
+                                    and self.controller.is_iot(eth_src)):
                             profile.is_iot = 1
-                        if (hasattr(self.controller, 'is_gateway') and self.controller.is_gateway(eth_src)) \
-                                or eth_src.lower() in getattr(self.controller, 'discovered_gateways', {}):
+                        if eth_src and (
+                                (hasattr(self.controller, 'is_gateway') and self.controller.is_gateway(eth_src))
+                                or eth_src.lower() in getattr(self.controller, 'discovered_gateways', {})):
                             profile.is_gateway = 1
                     except Exception:
                         pass
