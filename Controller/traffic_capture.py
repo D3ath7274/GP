@@ -486,6 +486,20 @@ class TrafficCapture:
         # FIX P12: Changed from counter (int) to set of flow keys
         self._flows_per_src = defaultdict(set)
 
+        # --- Feature-schema mode (v1 vs v2) ---
+        # The capture bug-fixes (reverse-flow directionality ratios + host-level
+        # port diversity) change MODEL-VISIBLE features (fwd_bwd_*_ratio,
+        # unique_dst_ports, well_known_port_ratio). The friend's v1 model
+        # (final_rf_model.joblib / full_ml_pipeline.joblib) was trained on the
+        # OLD behaviour, where backward traffic was always 0 (so fwd_bwd ratios
+        # equalled the raw forward count). Feeding it the corrected values makes
+        # it miss attacks. Default OFF = v1-compatible so the friend's model can
+        # be verified. Set env IPS_V2_FEATURES=1 when collecting data to RETRAIN
+        # a v2 model on the corrected, physically-meaningful features.
+        self._v2_features = os.environ.get('IPS_V2_FEATURES', '0') == '1'
+        self._log('info', "Feature schema mode: %s",
+                  "v2 (corrected)" if self._v2_features else "v1-compatible (legacy)")
+
     # ---- Logging helpers ----
 
     def _log(self, level, msg, *args):
@@ -1153,26 +1167,32 @@ class TrafficCapture:
         # Rationale IV: Attacks are asymmetric — attacker floods, victim silent.
         # Ratio-based features immune to TAP 2x amplification (Rationale II.B).
         # =====================================================================
-        # FIX(C): Reverse-direction traffic lives in the pair (dst, src, proto), which is
-        # a separate flow key. Look it up in this window's reverse_agg so the
-        # directionality/asymmetry features (Rationale IV) are actually populated
-        # instead of being structurally pinned to zero.
+        # FIX(C) [v2 only]: Reverse-direction traffic lives in the pair (dst, src,
+        # proto), a separate flow key. Look it up in reverse_agg so the
+        # directionality features (Rationale IV) are populated instead of pinned to 0.
+        # GATED: this changes fwd_bwd_*_ratio, which the v1 model relies on. In v1
+        # mode backward traffic stays 0 (the legacy behaviour the v1 model trained on).
         fwd_pkt_count = len(packets)
         fwd_bytes = total_bytes
-        rev = (reverse_agg or {}).get((dst_ip, src_ip, protocol), {})
-        fwd_pair = (reverse_agg or {}).get((src_ip, dst_ip, protocol), {})
-        bwd_pkt_count = rev.get('pkts', 0)
-        bwd_bytes = rev.get('bytes', 0)
-        fwd_pair_pkts = fwd_pair.get('pkts', fwd_pkt_count)
+        if self._v2_features:
+            rev = (reverse_agg or {}).get((dst_ip, src_ip, protocol), {})
+            fwd_pair = (reverse_agg or {}).get((src_ip, dst_ip, protocol), {})
+            bwd_pkt_count = rev.get('pkts', 0)
+            bwd_bytes = rev.get('bytes', 0)
+            fwd_pair_pkts = fwd_pair.get('pkts', fwd_pkt_count)
+        else:
+            rev = {}
+            bwd_pkt_count = 0
+            bwd_bytes = 0
+            fwd_pair_pkts = fwd_pkt_count
 
         fwd_bwd_pkt_ratio = round(_safe_div(fwd_pkt_count, bwd_pkt_count + 1), 4)
         fwd_bwd_bytes_ratio = round(_safe_div(fwd_bytes, bwd_bytes + 1), 4)
         fwd_avg_size = round(_safe_div(fwd_bytes, fwd_pkt_count), 2)
         bwd_avg_size = round(_safe_div(bwd_bytes, bwd_pkt_count), 2)
         # reply_rate: destination responsiveness = reverse pkts / forward pkts
-        # (Rationale IV.C). ~1.0 for healthy bidirectional traffic, ~0 for floods/scans
-        # hitting a silent or non-existent victim.
-        reply_rate = round(_safe_div(bwd_pkt_count, fwd_pair_pkts), 4)
+        # (Rationale IV.C). 0 in v1 mode (legacy), real value in v2 mode.
+        reply_rate = round(_safe_div(bwd_pkt_count, fwd_pair_pkts), 4) if self._v2_features else 0.0
 
         # =====================================================================
         # GROUP 3: TCP Session Completeness (4 features)
@@ -1240,13 +1260,18 @@ class TrafficCapture:
             top_dst_port = 0
             top_dst_port_ratio = 0.0
 
-        # FIX(B): Port-diversity is a HOST behaviour, not a single-flow property
-        # (Rationale IX). The flow key pins each flow to one dst_port, so per-flow spread
-        # is always 0. Use the source host's full set of destination ports this window.
-        host_port_set = (host_ports or {}).get(src_ip, set())
-        if not host_port_set and dst_port:
-            host_port_set = {dst_port}
-        unique_dst_list = sorted(p for p in host_port_set if p)
+        # FIX(B) [v2 only]: Port-diversity is a HOST behaviour, not a single-flow
+        # property (Rationale IX). The flow key pins each flow to one dst_port, so
+        # per-flow spread is always 0. In v2 use the source host's full set of dst
+        # ports this window. GATED: this changes unique_dst_ports / well_known_port_ratio,
+        # which the v1 model uses, so v1 mode keeps the legacy single-port behaviour.
+        if self._v2_features:
+            host_port_set = (host_ports or {}).get(src_ip, set())
+            if not host_port_set and dst_port:
+                host_port_set = {dst_port}
+            unique_dst_list = sorted(p for p in host_port_set if p)
+        else:
+            unique_dst_list = sorted(dst_ports_set)  # legacy: this flow's single dst_port
         host_unique_dst_ports = len(unique_dst_list)
 
         if len(unique_dst_list) >= 2:
@@ -1274,9 +1299,11 @@ class TrafficCapture:
         # =====================================================================
         # GROUP 8: Broadcast Context (per-flow flag)
         # =====================================================================
-        # FIX(B): use the flow's retained L2 destination MAC so real broadcasts
-        # (eth_dst = ff:ff:ff:ff:ff:ff, e.g. ARP requests) are actually flagged.
-        flow_eth_dst = flow_data.get('eth_dst', '')
+        # FIX(B) [v2 only]: use the flow's retained L2 destination MAC so real
+        # broadcasts (eth_dst = ff:ff:ff:ff:ff:ff, e.g. ARP requests) are flagged.
+        # is_broadcast_dst is dropped by the v1 pipeline, but gate it anyway to keep
+        # v1-mode datasets byte-faithful to training (where it was always 0).
+        flow_eth_dst = flow_data.get('eth_dst', '') if self._v2_features else ''
         is_broadcast_dst = 1 if _is_broadcast(dst_ip, flow_eth_dst) else 0
 
         # =====================================================================
@@ -1541,6 +1568,13 @@ class TrafficCapture:
         self._unblock_cooldowns[src_ip] = time.time() + 30
         self._log('info', f"  Cooldown set: {src_ip} immune to re-detection for 30s")
 
+    # The six canonical attack classes in our scheme. Snort alerts whose
+    # attack_type is not one of these are treated as signature noise for labelling.
+    CANONICAL_ATTACKS = {
+        'ICMP Flood', 'SYN Flood', 'UDP Flood', 'Port Scan',
+        'ARP Spoofing', 'Control Plane Saturation',
+    }
+
     @staticmethod
     def _attack_protocol_matches(attack_type, protocol):
         """Return True when a flow protocol is compatible with attack type."""
@@ -1601,7 +1635,24 @@ class TrafficCapture:
                 continue
             if str(a.get('sid', '')) in response_sids:
                 continue
+            alert_type = a.get('attack_type', '')
             alert_proto = str(a.get('proto', '')).upper()
+            # FIX: canonical-taxonomy guard. snort_monitor.classify_attack() falls
+            # back to the raw Snort message when no keyword matches, so generic
+            # signatures (e.g. "SNMP trap tcp", "BAD-TRAFFIC tcp port 0", "MISC ...")
+            # leak in as attack_type and pollute the labels (the SYN-flood session
+            # ended up mostly labelled "SNMP trap tcp"). Only accept Snort alerts
+            # that map to one of our six canonical classes; let the rate-counter /
+            # DAI tiers assign the canonical label otherwise.
+            if alert_type not in self.CANONICAL_ATTACKS:
+                continue
+            # FIX: protocol-aware label guard. Snort frequently reports proto='?'
+            # (see snort_monitor parse_alert_line), which previously bypassed the
+            # check below and let an ICMP-flood alert label the attacker's TCP/ARP
+            # background traffic as "ICMP Flood" (label-spread poisoning). Require
+            # the flow's protocol to be compatible with the alert's attack category.
+            if not self._attack_protocol_matches(alert_type, protocol):
+                continue
             if alert_proto and alert_proto != '?' and protocol and alert_proto != protocol.upper():
                 continue
             matching_alerts.append(a)
