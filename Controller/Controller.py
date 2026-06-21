@@ -292,7 +292,13 @@ class SimpleSwitch(app_manager.RyuApp):
                         # (production keeps attackers locked until admin UNBLOCK).
                         clear_ip = parts[2].strip() if len(parts) >= 3 and parts[2].strip() else None
                         if hasattr(self, 'traffic_capture') and self.traffic_capture:
-                            self.traffic_capture.clear_detection_state(clear_ip)
+                            # 30 s drain-suppression cooldown for a per-IP clear so the
+                            # post-ATTACK_STOP control-channel backlog cannot re-confirm
+                            # the released source (which would then mislabel its later
+                            # traffic for the rest of the session). No cooldown on a
+                            # full (no-IP) reset.
+                            self.traffic_capture.clear_detection_state(
+                                clear_ip, cooldown=30 if clear_ip else 0)
                     elif len(parts) >= 3 and parts[1] == 'UNBLOCK':
                         target_ip = parts[2].strip()
                         if hasattr(self, 'traffic_capture') and self.traffic_capture:
