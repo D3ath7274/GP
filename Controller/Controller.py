@@ -122,6 +122,11 @@ class SimpleSwitch(app_manager.RyuApp):
         # Explicit IoT device MAC -> type mapping (example):
         # {'00:11:22:33:44:55': 'home_sensor'}
         self.iot_devices = {}
+        # IoT devices registered explicitly by IP via REGISTER:IOT:<ip>:<type>.
+        # Keyed by IP because the UDP registration carries the device IP (not its
+        # MAC), and traffic_capture profiles devices by IP. Used to set
+        # is_registered_iot reliably even when the device's OUI is unknown.
+        self.iot_registered_ips = {}
         # IoT gateway mapping per switch datapath id: { dpid: {'port': <port_no>, 'mac': '<mac>'} }
         # Populate this mapping to route unknown IoT device traffic to a gateway port.
         self.iot_gateways = {}
@@ -400,7 +405,21 @@ class SimpleSwitch(app_manager.RyuApp):
                             else:
                                 self.logger.info("REGISTER:NAME received but no IP: %s", info)
                         elif type_str == 'IOT':
-                            self.logger.info("IoT registration via UDP from %s: %s", sender_ip, info)
+                            # New format: REGISTER:IOT:<ip>:<device_type>
+                            #   e.g. REGISTER:IOT:10.0.0.5:IOT:TempSensor
+                            # Register the device as IoT by IP so is_registered_iot
+                            # is set reliably regardless of its MAC OUI. Falls back
+                            # to log-only for the legacy (no-IP) form.
+                            first, sep, rest = info.partition(':')
+                            if sep and first.count('.') == 3:   # looks like an IPv4
+                                iot_ip = first.strip()
+                                iot_type = rest.strip() or 'IOT'
+                                self.iot_registered_ips[iot_ip] = iot_type
+                                self.logger.info("IoT registered by IP: %s → %s", iot_ip, iot_type)
+                            else:
+                                self.logger.info("IoT registration via UDP from %s: %s "
+                                                 "(no IP — is_registered_iot will not be set; "
+                                                 "use REGISTER:IOT:<ip>:<type>)", sender_ip, info)
                     except ValueError:
                         pass
 
