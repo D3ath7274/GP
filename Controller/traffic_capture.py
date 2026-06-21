@@ -940,9 +940,22 @@ class TrafficCapture:
             if key in detected_this_window and detected_this_window[key] is None:
                 detected_this_window[key] = flow_key[1]
 
+        # Throttle-resilient miss handling (was: hard reset on any miss).
+        # Low-cardinality floods (e.g. ICMP, single-port UDP) collapse to one
+        # MAC-flow that OVS offloads to the kernel datapath; the control channel
+        # then starves and a window can dip below threshold even though the flood
+        # is ongoing. A hard reset there made such attacks never reach the
+        # consecutive requirement ("detected once, never confirmed"). Tolerate up
+        # to MISS_TOLERANCE non-detecting windows before discarding progress — the
+        # multi-window "sustained" requirement is preserved, but a single throttle
+        # gap no longer wipes it.
+        MISS_TOLERANCE = 2
         for key in list(self._attack_confirmations.keys()):
             if key not in detected_this_window:
-                del self._attack_confirmations[key]
+                conf = self._attack_confirmations[key]
+                conf['misses'] = conf.get('misses', 0) + 1
+                if conf['misses'] > MISS_TOLERANCE:
+                    del self._attack_confirmations[key]
 
         for key, dst_ip in detected_this_window.items():
             src_ip, attack_type = key
@@ -962,6 +975,7 @@ class TrafficCapture:
             if key not in self._attack_confirmations:
                 self._attack_confirmations[key] = {
                     'consecutive': 1,
+                    'misses': 0,
                     'first_seen': time.time(),
                     'target': dst_ip,
                     'escalated': False,
@@ -976,6 +990,7 @@ class TrafficCapture:
                 )
             else:
                 conf = self._attack_confirmations[key]
+                conf['misses'] = 0          # detected again — clear the gap counter
                 conf['consecutive'] += 1
                 windows = conf['consecutive']
                 elapsed = time.time() - conf['first_seen']
@@ -1593,6 +1608,50 @@ class TrafficCapture:
         self._unblock_cooldowns[src_ip] = time.time() + 30
         self._log('info', f"  Cooldown set: {src_ip} immune to re-detection for 30s")
 
+    def clear_detection_state(self, src_ip=None):
+        """Release confirmed-attacker and in-progress suspicion state.
+
+        DATA-COLLECTION USE ONLY. The collection harness sends CONTROL:CLEAR[:ip]
+        between attacks (right after ATTACK_STOP) so a source that has stopped
+        attacking is no longer treated as a confirmed attacker — otherwise its
+        benign background traffic keeps inheriting the attack label for the rest
+        of the session (e.g. a confirmed SYN attacker's normal TCP, or a confirmed
+        ICMP attacker's keepalive pings), corrupting the dataset.
+
+        Unlike manual_unblock(), this sets NO re-detection cooldown, so the next
+        genuine attack from the same host is detected immediately. It does NOT
+        touch the DAI baseline or device profiles.
+
+        In PRODUCTION confirmed attackers stay locked in indefinitely (admin-only
+        unblock) — this method is not part of the live detection path; it only runs
+        when the collection harness explicitly asks for it.
+
+        Args:
+            src_ip: clear only this source; None clears ALL confirmed/suspicion state.
+        """
+        if src_ip:
+            released = 1 if src_ip in self._confirmed_attackers else 0
+            self._confirmed_attackers.pop(src_ip, None)
+            for k in [k for k in self._attack_confirmations if k[0] == src_ip]:
+                del self._attack_confirmations[k]
+            self._label_overrides.pop(src_ip, None)
+            self._logged_attackers = {t for t in self._logged_attackers if t[0] != src_ip}
+            with self._flow_lock:
+                self._host_icmp_count.pop(src_ip, None)
+                self._host_syn_count.pop(src_ip, None)
+                self._host_ack_count.pop(src_ip, None)
+                self._host_udp_count.pop(src_ip, None)
+                self._host_dst_ports.pop(src_ip, None)
+        else:
+            released = len(self._confirmed_attackers)
+            self._confirmed_attackers.clear()
+            self._attack_confirmations.clear()
+            self._label_overrides.clear()
+            self._logged_attackers.clear()
+        self._log('info',
+                  "[COLLECT] Detection state cleared for %s — %d confirmed attacker(s) released",
+                  src_ip or 'ALL', released)
+
     # The six canonical attack classes in our scheme. Snort alerts whose
     # attack_type is not one of these are treated as signature noise for labelling.
     CANONICAL_ATTACKS = {
@@ -1642,8 +1701,10 @@ class TrafficCapture:
             else:
                 del self._unblock_cooldowns[src_ip]  # Cooldown expired
 
-        if src_ip in self._confirmed_attackers:
-            confirmed_type = self._confirmed_attackers[src_ip]
+        # .get() (not 'in' + index): the collection harness can clear this dict
+        # from the UDP-listener thread between attacks, so avoid a TOCTOU KeyError.
+        confirmed_type = self._confirmed_attackers.get(src_ip)
+        if confirmed_type is not None:
             if self._attack_protocol_matches(confirmed_type, protocol):
                 return 2, confirmed_type, "none"
 
