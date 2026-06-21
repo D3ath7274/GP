@@ -290,17 +290,23 @@ def topology():
         print(f"*** [{host}] {kind} -> {target} for {duration}s (ATTACK_START sent)")
         node.cmd(cmd)
         _send_to_controller('ATTACK_STOP')
-        # Release this source's confirmed/suspicion state on the controller. The
-        # controller applies a short drain-suppression cooldown to the cleared IP so
-        # the post-ATTACK_STOP control-channel backlog (which keeps draining for a few
-        # seconds) cannot RE-CONFIRM the host — otherwise it would stay a confirmed
-        # attacker for the rest of the session and mislabel its later traffic (esp.
-        # victim RST/SYN-ACK back-scatter when targeted in a subsequent pair) as the
-        # attack. In production the controller keeps attackers locked in (admin-only
-        # UNBLOCK); this CLEAR is a data-collection action only.
+        # Let the controller flush + LABEL the attack's final window BEFORE we clear.
+        # The flush runs every ~5 s. A fast attack — an nmap port scan finishes in
+        # ~1-2 s — otherwise has its CLEAR + drain-cooldown applied before its window
+        # is ever scored, so the controller's cooldown gate labels the whole scan
+        # 'normal' (0 attack rows). Wait just over one flush window first. For floods
+        # this 7 s is high-rate drain that labels as real attack, so it costs nothing.
+        FLUSH_GRACE = 7
+        time.sleep(FLUSH_GRACE)
+        # Now release this source. The controller applies a short drain-suppression
+        # cooldown to the cleared IP so the remaining post-stop backlog cannot
+        # RE-CONFIRM the host — otherwise it would stay a confirmed attacker for the
+        # rest of the session and mislabel its later traffic (esp. victim RST/SYN-ACK
+        # back-scatter when targeted in a subsequent pair). In production the controller
+        # keeps attackers locked in (admin-only UNBLOCK); this CLEAR is collection-only.
         _send_to_controller(f'CONTROL:CLEAR:{host_ip}')
-        print(f"*** [{host}] {kind} done; released {host_ip}; settling {settle}s before next attack")
-        time.sleep(settle)
+        print(f"*** [{host}] {kind} done; released {host_ip}; settling before next attack")
+        time.sleep(max(0, settle - FLUSH_GRACE))
         print(f"*** [{host}] {kind} ready for next")
 
     def wait(net, seconds):
