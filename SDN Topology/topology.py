@@ -236,6 +236,70 @@ def topology():
     net.detect_on = detect_on
     net.detect_off = detect_off
 
+    # --- Attack Signalling (metadata + optional forced labels) ---
+    def attack_start(net, tool='hping3', intensity='flood'):
+        """Tell the controller an attack is starting (fills meta_attack_* columns).
+        Call right before launching an attack tool. Audit metadata only — it does
+        NOT change labels (labels come from Snort/DAI/rate-counters)."""
+        _send_to_controller(f'ATTACK_START:{tool}:{intensity}')
+        print(f"*** Attack metadata SET: tool={tool}, intensity={intensity}")
+
+    def attack_stop(net):
+        """Tell the controller the attack has stopped (clears meta_attack_*)."""
+        _send_to_controller('ATTACK_STOP')
+        print("*** Attack metadata CLEARED")
+
+    def label_attacker(net, ip, attack_type):
+        """Force every flow from ip to be labelled attack_type (ground-truth
+        injection for stealthy/sub-threshold attacks). NOTE: labels ALL protocols
+        from that IP, so only use it on a host that is sending just the attack.
+        Clear with attack_type='clear'."""
+        _send_to_controller(f'LABEL_OVERRIDE:{ip}:{attack_type}')
+        print(f"*** Label override: {ip} -> {attack_type}")
+
+    net.attack_start = attack_start
+    net.attack_stop = attack_stop
+    net.label_attacker = label_attacker
+
+    # --- One-shot timed attack (handles ATTACK_START -> run -> ATTACK_STOP -> settle) ---
+    def launch_attack(net, host, kind, target='10.0.0.4', duration=25, settle=15):
+        """Run ONE labelled attack from `host` with timing handled automatically:
+        send ATTACK_START, run the tool for `duration`s (timeout-bounded), send
+        ATTACK_STOP, then block `settle`s so the detector clears before the next.
+        kind in {icmp, syn, udp, cps, scan, arp}. Returns when fully done."""
+        node = net.getNodeByName(host)
+        if node is None:
+            print(f"*** launch_attack: unknown host '{host}'"); return
+        intf = node.defaultIntf()
+        intfname = intf.name if intf is not None else f"{host}-eth0"
+        specs = {
+            'icmp': ('hping3', 'icmp-flood', f'timeout {duration} hping3 --icmp --flood {target}'),
+            'syn':  ('hping3', 'syn-flood',  f'timeout {duration} hping3 -S --flood -p 80 {target}'),
+            'udp':  ('hping3', 'udp-flood',  f'timeout {duration} hping3 --udp --flood -p 53 {target}'),
+            'cps':  ('hping3', 'cps',        f'timeout {duration} hping3 --udp --flood -p ++1 {target}'),
+            'scan': ('nmap',   'port-scan',  f'timeout {duration} nmap -sS -p 1-1000 {target}'),
+            'arp':  ('arpspoof','arp-spoof', f'timeout {duration} arpspoof -i {intfname} -t {target} 10.0.0.3'),
+        }
+        if kind not in specs:
+            print(f"*** launch_attack: kind must be one of {list(specs)}"); return
+        tool, intensity, cmd = specs[kind]
+        _send_to_controller(f'ATTACK_START:{tool}:{intensity}')
+        print(f"*** [{host}] {kind} -> {target} for {duration}s (ATTACK_START sent)")
+        node.cmd(cmd)
+        _send_to_controller('ATTACK_STOP')
+        print(f"*** [{host}] {kind} done; settling {settle}s before next attack")
+        time.sleep(settle)
+        print(f"*** [{host}] {kind} ready for next")
+
+    def wait(net, seconds):
+        """Block the CLI for `seconds` (e.g. to let device baselines mature)."""
+        print(f"*** waiting {seconds}s (baseline maturing / settling) ...")
+        time.sleep(seconds)
+        print("*** wait complete")
+
+    net.launch_attack = launch_attack
+    net.wait = wait
+
     # --- Send hostname registrations to the controller ---
     # Sends REGISTER:NAME:hostname:ip directly to controller over physical network
     def _register_hostnames():
@@ -254,6 +318,7 @@ def topology():
 
     print("*** Registration: py net.register_iot_device(net, 'iot1', '10.0.0.5/24', '00:00...', 's1', 'IOT:Type')")
     print("*** Detection commands: py net.detect_on(net)  /  py net.detect_off(net)")
+    print("*** Attack signalling: py net.attack_start(net,'hping3','flood')  /  py net.attack_stop(net)")
     print("*** Running CLI")
     CLI(net)
     net.stop()
