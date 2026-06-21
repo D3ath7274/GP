@@ -1616,7 +1616,7 @@ class TrafficCapture:
         self._unblock_cooldowns[src_ip] = time.time() + 30
         self._log('info', f"  Cooldown set: {src_ip} immune to re-detection for 30s")
 
-    def clear_detection_state(self, src_ip=None):
+    def clear_detection_state(self, src_ip=None, cooldown=0):
         """Release confirmed-attacker and in-progress suspicion state.
 
         DATA-COLLECTION USE ONLY. The collection harness sends CONTROL:CLEAR[:ip]
@@ -1626,16 +1626,21 @@ class TrafficCapture:
         of the session (e.g. a confirmed SYN attacker's normal TCP, or a confirmed
         ICMP attacker's keepalive pings), corrupting the dataset.
 
-        Unlike manual_unblock(), this sets NO re-detection cooldown, so the next
-        genuine attack from the same host is detected immediately. It does NOT
-        touch the DAI baseline or device profiles.
-
-        In PRODUCTION confirmed attackers stay locked in indefinitely (admin-only
-        unblock) — this method is not part of the live detection path; it only runs
-        when the collection harness explicitly asks for it.
+        It does NOT touch the DAI baseline or device profiles. In PRODUCTION
+        confirmed attackers stay locked in indefinitely (admin-only unblock) — this
+        method is not part of the live detection path; it only runs when the
+        collection harness explicitly asks for it.
 
         Args:
             src_ip: clear only this source; None clears ALL confirmed/suspicion state.
+            cooldown: if >0 (per-IP only), suppress re-detection of src_ip for this
+                many seconds. CRITICAL for collection: after ATTACK_STOP the flood's
+                control-channel backlog keeps draining for several seconds, and the
+                rate counter + miss-tolerance decay would otherwise RE-CONFIRM the
+                host we just released — which then never gets cleared again and
+                mislabels its later traffic (esp. victim RST/SYN-ACK back-scatter when
+                it is targeted in a subsequent pair). The cooldown spans the drain and
+                auto-expires well before the host's next scheduled attack.
         """
         if src_ip:
             released = 1 if src_ip in self._confirmed_attackers else 0
@@ -1650,15 +1655,18 @@ class TrafficCapture:
                 self._host_ack_count.pop(src_ip, None)
                 self._host_udp_count.pop(src_ip, None)
                 self._host_dst_ports.pop(src_ip, None)
+            if cooldown > 0:
+                self._unblock_cooldowns[src_ip] = time.time() + cooldown
         else:
             released = len(self._confirmed_attackers)
             self._confirmed_attackers.clear()
             self._attack_confirmations.clear()
             self._label_overrides.clear()
             self._logged_attackers.clear()
+        cd_note = f", {cooldown}s drain-cooldown" if (src_ip and cooldown > 0) else ""
         self._log('info',
-                  "[COLLECT] Detection state cleared for %s — %d confirmed attacker(s) released",
-                  src_ip or 'ALL', released)
+                  "[COLLECT] Detection state cleared for %s — %d confirmed attacker(s) released%s",
+                  src_ip or 'ALL', released, cd_note)
 
     # The six canonical attack classes in our scheme. Snort alerts whose
     # attack_type is not one of these are treated as signature noise for labelling.
