@@ -77,18 +77,38 @@ def validate_schema(files):
         print(f"   Fix the schema or regenerate the mismatched session(s).")
         sys.exit(1)
 
-    # Validate against traffic_capture.py's ALL_COLUMNS if available
+    # HARD schema guard against traffic_capture.py's ALL_COLUMNS (102 columns).
+    # A stale/old-schema session (e.g. a leftover 50-column dataset.csv) must NOT
+    # enter the merge — it silently corrupts the master via column misalignment
+    # (attack_type ends up holding numeric feature values). Fail loudly.
     if ALL_COLUMNS is not None:
         if reference_schema != ALL_COLUMNS:
             missing_from_csv = set(ALL_COLUMNS) - set(reference_schema)
             extra_in_csv = set(reference_schema) - set(ALL_COLUMNS)
-            print(f"\n  ⚠ WARNING: CSV schema differs from traffic_capture.py ALL_COLUMNS")
+            print(f"\n  ❌ FATAL: schema does not match traffic_capture.py ALL_COLUMNS "
+                  f"({len(reference_schema)} cols vs expected {len(ALL_COLUMNS)}).")
             if missing_from_csv:
                 print(f"     Missing from CSV: {sorted(missing_from_csv)}")
             if extra_in_csv:
                 print(f"     Extra in CSV: {sorted(extra_in_csv)}")
-        else:
-            print(f"  ✅ Schema matches traffic_capture.py ALL_COLUMNS ({len(ALL_COLUMNS)} columns)")
+            if len(reference_schema) != len(ALL_COLUMNS):
+                print("     A wrong column COUNT usually means a stale/old-schema "
+                      "dataset.csv was captured into. Re-capture that session with the "
+                      "current traffic_capture.py (it now auto-rotates old files) and retry.")
+            sys.exit(1)
+        print(f"  ✅ Schema matches traffic_capture.py ALL_COLUMNS ({len(ALL_COLUMNS)} columns)")
+    else:
+        # Fallback when traffic_capture.py is not importable: enforce the known
+        # column count + presence of critical columns.
+        EXPECTED_COUNT = 102
+        critical = {'protocol', 'packets_per_second', 'attack_type', 'label', 'src_ip'}
+        missing_critical = critical - set(reference_schema)
+        if len(reference_schema) != EXPECTED_COUNT or missing_critical:
+            print(f"\n  ❌ FATAL: schema check failed (count={len(reference_schema)}, "
+                  f"expected {EXPECTED_COUNT}; missing critical cols: {sorted(missing_critical)}). "
+                  f"Likely a stale/old-schema session — re-capture and retry.")
+            sys.exit(1)
+        print(f"  ✅ Column count OK ({len(reference_schema)}) and critical columns present")
 
     print()
     return reference_schema
