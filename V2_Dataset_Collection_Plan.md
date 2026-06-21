@@ -86,107 +86,50 @@ python3 validate_dataset.py dataset_session1_normal.csv     # expect PASS (v2 fe
 
 ---
 
-## SESSIONS 2–7 — one attack type each (same recipe)
+## SESSIONS 2–7 — one attack type each (ONE command per session)
 
-Do the global setup, then the baseline + detection, then the six attacks
-back-to-back (no manual wait — each blocks ~40 s):
+Do the global setup, then baseline + detection, then a single
+`run_attack_session` call. It runs **8 diverse source→target attacks** (heavy /
+light / wired / IoT hosts, with lateral targets), with the **settle built in**, and
+a **longer duration for floods** to beat flow-collapse. It blocks the CLI until the
+whole session finishes.
 
 ```text
 mininet-wifi> py net.detect_off(net)                       # instant
 mininet-wifi> py net.start_background_traffic(net)         # instant
-mininet-wifi> py net.wait(net, 300)                        # BLOCKS 300 s (all devices mature: >=180s + >=20 flows)
+mininet-wifi> py net.wait(net, 300)                        # BLOCKS 300 s (devices mature)
 mininet-wifi> py net.detect_on(net)                        # instant
-mininet-wifi> py net.wait(net, 5)                          # BLOCKS 5 s (let DAI baseline freeze)
+mininet-wifi> py net.wait(net, 5)                          # BLOCKS 5 s (DAI baseline freeze)
+mininet-wifi> py net.run_attack_session(net, '<KIND>')     # BLOCKS the whole session (see table)
 ```
+Then `exit` → `Ctrl-C` → on the Controller VM, rename + validate:
 
-### Session 2 — ICMP Flood
-```text
-mininet-wifi> py net.launch_attack(net, 'sta1', 'icmp', '10.0.0.4')        # ~40s (blocks)
-mininet-wifi> py net.launch_attack(net, 'Cam',  'icmp', '10.0.0.4')        # ~40s (infected IoT)
-mininet-wifi> py net.launch_attack(net, 'TempSensor', 'icmp', '10.0.0.3')  # ~40s (lateral)
-mininet-wifi> py net.launch_attack(net, 'h1',   'icmp', '10.0.0.4')        # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta2', 'icmp', '10.0.0.6')        # ~40s (lateral to IoT)
-mininet-wifi> py net.launch_attack(net, 'sta1', 'icmp', '10.0.0.4')        # ~40s
-```
-`exit` → `Ctrl-C` → on the Controller VM:
-```bash
-mv dataset.csv dataset_session2_icmp.csv
-python3 validate_dataset.py dataset_session2_icmp.csv "ICMP Flood"          # must print PASS
-```
+| Session | one command | rename + validate |
+|---|---|---|
+| 2 ICMP | `py net.run_attack_session(net,'icmp')` | `mv dataset.csv dataset_session2_icmp.csv` · `python3 validate_dataset.py dataset_session2_icmp.csv "ICMP Flood"` |
+| 3 SYN | `py net.run_attack_session(net,'syn')` | `mv dataset.csv dataset_session3_syn.csv` · `python3 validate_dataset.py dataset_session3_syn.csv "SYN Flood"` |
+| 4 UDP | `py net.run_attack_session(net,'udp')` | `mv dataset.csv dataset_session4_udp.csv` · `python3 validate_dataset.py dataset_session4_udp.csv "UDP Flood"` |
+| 5 Port Scan | `py net.run_attack_session(net,'scan')` | `mv dataset.csv dataset_session5_portscan.csv` · `python3 validate_dataset.py dataset_session5_portscan.csv "Port Scan"` |
+| 6 ARP | `py net.run_attack_session(net,'arp')` | `mv dataset.csv dataset_session6_arpspoof.csv` · `python3 validate_dataset.py dataset_session6_arpspoof.csv "ARP Spoofing"` |
+| 7 CPS | `py net.run_attack_session(net,'cps')` | `mv dataset.csv dataset_session7_cps.csv` · `python3 validate_dataset.py dataset_session7_cps.csv "Control Plane Saturation"` |
 
-### Session 3 — SYN Flood
+**Auto durations:** floods (`icmp`/`syn`/`udp`) run **60 s** × 8 pairs (~10 min) to
+generate enough rows despite flow-collapse; `scan`/`cps`/`arp` run **25 s** × 8
+pairs (~5 min) since they're already row-heavy.
+
+**If a class is still thin** (validator NOTE `<200`), top it up without redoing the
+session — re-run with a longer duration and/or extra round, save as a `_b` file,
+and include BOTH files in the merge:
 ```text
-mininet-wifi> py net.launch_attack(net, 'sta1', 'syn', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'Cam',  'syn', '10.0.0.4')         # ~40s (infected IoT)
-mininet-wifi> py net.launch_attack(net, 'TempSensor', 'syn', '10.0.0.3')   # ~40s (lateral)
-mininet-wifi> py net.launch_attack(net, 'h1',   'syn', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta2', 'syn', '10.0.0.6')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta1', 'syn', '10.0.0.4')         # ~40s
+mininet-wifi> py net.run_attack_session(net, 'icmp', duration=90, rounds=2)
 ```
 ```bash
-mv dataset.csv dataset_session3_syn.csv
-python3 validate_dataset.py dataset_session3_syn.csv "SYN Flood"
+mv dataset.csv dataset_session2_icmp_b.csv
+python3 validate_dataset.py dataset_session2_icmp_b.csv "ICMP Flood"
 ```
 
-### Session 4 — UDP Flood
-```text
-mininet-wifi> py net.launch_attack(net, 'sta1', 'udp', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'Cam',  'udp', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'TempSensor', 'udp', '10.0.0.3')   # ~40s (lateral)
-mininet-wifi> py net.launch_attack(net, 'h1',   'udp', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta2', 'udp', '10.0.0.6')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta1', 'udp', '10.0.0.4')         # ~40s
-```
-```bash
-mv dataset.csv dataset_session4_udp.csv
-python3 validate_dataset.py dataset_session4_udp.csv "UDP Flood"
-```
-
-### Session 5 — Port Scan
-```text
-mininet-wifi> py net.launch_attack(net, 'sta1', 'scan', '10.0.0.4')        # ~40s
-mininet-wifi> py net.launch_attack(net, 'Cam',  'scan', '10.0.0.3')        # ~40s (infected IoT scans peer)
-mininet-wifi> py net.launch_attack(net, 'TempSensor', 'scan', '10.0.0.4')  # ~40s
-mininet-wifi> py net.launch_attack(net, 'h1',   'scan', '10.0.0.6')        # ~40s (lateral to IoT)
-mininet-wifi> py net.launch_attack(net, 'sta2', 'scan', '10.0.0.4')        # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta1', 'scan', '10.0.0.3')        # ~40s
-```
-```bash
-mv dataset.csv dataset_session5_portscan.csv
-python3 validate_dataset.py dataset_session5_portscan.csv "Port Scan"
-```
-
-### Session 6 — ARP Spoofing
-```text
-mininet-wifi> py net.launch_attack(net, 'sta1', 'arp', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'Cam',  'arp', '10.0.0.4')         # ~40s (infected IoT)
-mininet-wifi> py net.launch_attack(net, 'TempSensor', 'arp', '10.0.0.4')   # ~40s
-mininet-wifi> py net.launch_attack(net, 'h1',   'arp', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta2', 'arp', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta1', 'arp', '10.0.0.4')         # ~40s
-```
-```bash
-mv dataset.csv dataset_session6_arpspoof.csv
-python3 validate_dataset.py dataset_session6_arpspoof.csv "ARP Spoofing"
-```
-
-### Session 7 — Control Plane Saturation
-```text
-mininet-wifi> py net.launch_attack(net, 'sta1', 'cps', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'Cam',  'cps', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'TempSensor', 'cps', '10.0.0.3')   # ~40s (lateral)
-mininet-wifi> py net.launch_attack(net, 'h1',   'cps', '10.0.0.4')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta2', 'cps', '10.0.0.6')         # ~40s
-mininet-wifi> py net.launch_attack(net, 'sta1', 'cps', '10.0.0.4')         # ~40s
-```
-```bash
-mv dataset.csv dataset_session7_cps.csv
-python3 validate_dataset.py dataset_session7_cps.csv "Control Plane Saturation"
-```
-
-> Watch the controller log: each attack should print the Snort/DAI alert and
-> `ATTACK CONFIRMED <type>`. If `validate_dataset.py` reports the class is thin
-> (<200 rows) or from <2 sources, re-run that one session before merging.
+> Watch the controller log: each attack prints the Snort/DAI alert and
+> `ATTACK CONFIRMED <type>`.
 
 ---
 
@@ -241,11 +184,13 @@ Then proceed to **Pipeline Retrain.md**.
 |---|---|
 | setup (`mn -c` + topology + register + pingall) | ~1–2 min |
 | baseline maturation (`wait 300`; 600 for S1) | 5 min (10 for S1) |
-| 6 attacks (`launch_attack` ×6, ~40 s each, back-to-back) | ~4 min |
+| `run_attack_session` — 8 attacks (floods 60 s each / scan,cps,arp 25 s each) | ~10 min (flood) / ~5 min (other) |
 | stop + rename + validate | ~1 min |
-| **per attack session** | **~11–12 min** |
+| **per flood session (icmp/syn/udp)** | **~17 min** |
+| **per scan/arp/cps session** | **~12 min** |
 
-Whole collection (1 normal + 6 attack) ≈ **80–90 minutes**.
+Whole collection (1 normal + 6 attack) ≈ **1.5–2 hours** (the longer floods buy
+the extra rows).
 
 ---
 
@@ -255,7 +200,7 @@ Whole collection (1 normal + 6 attack) ≈ **80–90 minutes**.
 - [ ] `sudo mn -c` → topology up → IoT registered (log: `IoT registration via UDP`) → `pingall` OK
 - [ ] `detect_off` → `start_background_traffic` → `wait 300` (600 for S1)
 - [ ] `detect_on` → `wait 5`  (skip for the normal session)
-- [ ] 6 `launch_attack` calls back-to-back (no manual wait); log shows `ATTACK CONFIRMED <type>` each
+- [ ] `py net.run_attack_session(net,'<kind>')` (one command; blocks till done); log shows `ATTACK CONFIRMED <type>`
 - [ ] `exit` → `Ctrl-C` → `mv dataset.csv dataset_sessionN_<type>.csv`
 - [ ] `python3 validate_dataset.py dataset_sessionN_<type>.csv "<Type>"` → **PASS**
 - [ ] after all 7: `dataset_merge.py` → `validate_dataset.py dataset_v2_master.csv` → **PASS** → retrain

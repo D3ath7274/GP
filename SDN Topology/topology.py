@@ -299,8 +299,54 @@ def topology():
         time.sleep(seconds)
         print("*** wait complete")
 
+    # --- Whole-session attack automation (one command per session) ---
+    # Default attacker->target pairs: diverse profiles (heavy/light/IoT) with
+    # lateral targets (internal hosts, not just the server). Each pair becomes a
+    # timed launch_attack with the settle in between.
+    _SESSION_PAIRS = [
+        ('sta1', '10.0.0.4'),         # heavy user -> server
+        ('sta2', '10.0.0.4'),         # light user -> server
+        ('h1',   '10.0.0.4'),         # wired host -> server
+        ('Cam',  '10.0.0.4'),         # infected IoT -> server
+        ('TempSensor', '10.0.0.3'),   # infected IoT -> lateral (internal host)
+        ('sta1', '10.0.0.6'),         # lateral to IoT camera
+        ('Cam',  '10.0.0.3'),         # infected IoT -> lateral
+        ('h1',   '10.0.0.5'),         # lateral to IoT sensor
+    ]
+
+    def run_attack_session(net, kind, duration=None, settle=15, rounds=1, pairs=None):
+        """Run a FULL labelled attack session for `kind` in ONE command.
+
+        Runs several attacker->target pairs (diverse profiles incl. IoT, with
+        lateral targets), each via launch_attack (timed: run + settle). Volumetric
+        floods (icmp/syn/udp) default to a LONGER duration to beat the
+        flow-collapse effect (a flood is ~1 flow/window, so longer run = more rows).
+        Scans/CPS are already row-heavy, so they use the shorter default.
+
+        kind in {icmp, syn, udp, cps, scan, arp}.
+        Overrides: duration=<s>, settle=<s>, rounds=<n>, pairs=[('host','ip'),...].
+        BLOCKS the CLI until the whole session finishes.
+        """
+        flood = kind in ('icmp', 'syn', 'udp')
+        if duration is None:
+            duration = 60 if flood else 25
+        plist = pairs if pairs is not None else _SESSION_PAIRS
+        total = len(plist) * rounds
+        est_min = total * (duration + settle) / 60.0
+        print(f"*** {kind.upper()} SESSION: {total} attacks x {duration}s run + {settle}s settle "
+              f"(~{est_min:.0f} min). This BLOCKS the CLI until done — let it run.")
+        n = 0
+        for _ in range(rounds):
+            for host, target in plist:
+                n += 1
+                print(f"*** [{n}/{total}] {kind} {host} -> {target}")
+                launch_attack(net, host, kind, target, duration=duration, settle=settle)
+        print(f"*** {kind.upper()} SESSION complete ({total} attacks). "
+              f"Now: exit -> Ctrl-C -> rename dataset.csv -> validate_dataset.py")
+
     net.launch_attack = launch_attack
     net.wait = wait
+    net.run_attack_session = run_attack_session
 
     # --- Send hostname registrations to the controller ---
     # Sends REGISTER:NAME:hostname:ip directly to controller over physical network
@@ -321,6 +367,7 @@ def topology():
     print("*** Registration: py net.register_iot_device(net, 'iot1', '10.0.0.5/24', '00:00...', 's1', 'IOT:Type')")
     print("*** Detection commands: py net.detect_on(net)  /  py net.detect_off(net)")
     print("*** Attack signalling: py net.attack_start(net,'hping3','flood')  /  py net.attack_stop(net)")
+    print("*** One-command attack session: py net.run_attack_session(net,'icmp')  (kinds: icmp syn udp cps scan arp)")
     print("*** Running CLI")
     CLI(net)
     net.stop()
