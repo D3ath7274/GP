@@ -1024,6 +1024,14 @@ class TrafficCapture:
         for flow_key, flow_data, pps, bps, avg_size in flow_metadata:
             src_ip = flow_key[0]
             inherited = window_attackers.get(src_ip)
+            # Protocol-consistency guard: an attacker's label is tracked per-host,
+            # but it must only spread to flows whose protocol matches the attack
+            # category. Without this, an active/confirmed SYN attacker's ICMP/ARP/
+            # UDP flows inherit "SYN Flood" (measured: 101 ICMP + 51 ARP + 7 UDP
+            # mislabels in one SYN session). Mismatched-protocol flows fall back to
+            # independent scoring (normal unless they trip their own detector).
+            if inherited and not self._attack_protocol_matches(inherited[1], flow_key[3]):
+                inherited = None
             row = self._build_flow_row(
                 flow_key, flow_data, network_ctx, alerts,
                 pps, bps, avg_size,
