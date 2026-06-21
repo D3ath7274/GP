@@ -97,6 +97,62 @@ def main():
                 issues.append('no IoT rows have is_registered_iot=1 — register TempSensor/Cam '
                               'before collecting (and confirm REGISTER:IOT reached the controller)')
 
+    # --- BLEED CHECK: attack rows whose protocol/rate contradicts the label ---
+    # Catches the three labeling bugs (sticky _confirmed_attackers, throttle reset,
+    # protocol-blind inheritance): an attack label landing on benign or wrong-protocol
+    # traffic. A real volumetric flood has matching protocol AND a flood-rate signal;
+    # a port scan fans out across many dst ports. Rows that wear an attack label
+    # without those signals are mislabeled (bleed).
+    ATTACK_PROTO = {
+        'SYN Flood': 'TCP', 'Port Scan': 'TCP',
+        'ICMP Flood': 'ICMP',
+        'UDP Flood': 'UDP', 'Control Plane Saturation': 'UDP',
+        'ARP Spoofing': 'ARP',
+    }
+    has_proto = 'protocol' in cols
+    proto_mismatch = Counter()
+    rate_bleed = Counter()
+    for r in rows:
+        a = r.get('attack_type', 'normal')
+        if a not in ATTACK_PROTO:
+            continue
+        # 1. protocol contradiction — definite mislabel (e.g. an ICMP/ARP flow
+        #    wearing a "SYN Flood" label from per-host inheritance)
+        if has_proto and r.get('protocol') and r['protocol'] != ATTACK_PROTO[a]:
+            proto_mismatch[a] += 1
+            continue
+        # 2. rate contradiction — benign traffic wearing a flood/scan label
+        if a == 'SYN Flood':
+            if _f(r.get('syn_count')) < 50:
+                rate_bleed[a] += 1
+        elif a in ('ICMP Flood', 'UDP Flood', 'Control Plane Saturation'):
+            if _f(r.get('packets_per_second')) < 50:
+                rate_bleed[a] += 1
+        elif a == 'Port Scan':
+            if _f(r.get('unique_dst_ports')) < 20:
+                rate_bleed[a] += 1
+        # ARP Spoofing: rate is not meaningful (DAI/binding-based) — protocol check only
+
+    print('label-integrity (bleed) check:')
+    if not proto_mismatch and not rate_bleed:
+        print('   no protocol/rate contradictions in attack rows')
+    for a, c in proto_mismatch.most_common():
+        print(f'   PROTO MISMATCH: {c} {a!r} rows are not {ATTACK_PROTO[a]} (label inheritance bleed)')
+    for a, c in rate_bleed.most_common():
+        tot = at.get(a, 0)
+        pct = 100 * c / tot if tot else 0
+        print(f'   RATE BLEED: {c}/{tot} ({pct:.1f}%) {a!r} rows have no flood/scan-rate signal')
+    # Any protocol mismatch is a definite bug. Rate bleed above a small tolerance
+    # (>10% of a class) means benign traffic was mislabeled — recapture needed.
+    if sum(proto_mismatch.values()):
+        issues.append(f'{sum(proto_mismatch.values())} attack rows have a protocol that contradicts '
+                      f'their label (inheritance bleed) — recapture on the patched controller')
+    for a, c in rate_bleed.items():
+        tot = at.get(a, 0)
+        if tot and (c / tot) > 0.10:
+            issues.append(f'{a}: {c}/{tot} ({100*c/tot:.0f}%) rows lack a flood/scan-rate signal '
+                          f'(benign traffic mislabeled) — recapture on the patched controller')
+
     # --- NaN / inf in numeric columns ---
     string_cols = {'timestamp', 'src_ip', 'dst_ip', 'protocol', 'attack_type', 'snort_sid',
                    'meta_src_mac_oui', 'meta_device_name', 'meta_attack_tool',
