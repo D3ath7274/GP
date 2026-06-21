@@ -45,6 +45,14 @@ On the **Controller VM** (fresh `dataset.csv` each session):
 cd <repo>/Controller
 IPS_V2_FEATURES=1 ryu-manager Controller.py        # log MUST say: Feature schema mode: v2 (corrected)
 ```
+
+> **The controller now auto-rotates any existing `dataset.csv` aside on startup**
+> (to `dataset.csv.bak-<timestamp>`) so each run writes a fresh, correct-schema
+> file — this prevents the append-corruption that happens when a run writes into a
+> leftover/old-schema `dataset.csv`. The log prints `… rotated to …` when it does.
+> Periodically clean the `*.bak-*` files. (If you ever see a capture validate with
+> `cols=50` and float values in `attack_type`, that's stale-append corruption —
+> delete the file and re-run.)
 On the **Topology VM**:
 ```bash
 sudo mn -c                 # ~5 s  — clean stale state

@@ -574,6 +574,24 @@ class TrafficCapture:
         """Start the background flush thread."""
         if self._running:
             return
+
+        # Start every capture run with a FRESH file. The CSV is opened in append
+        # mode, so writing into a pre-existing dataset.csv (especially one from an
+        # older column schema) silently corrupts the dataset: a stale header makes
+        # every new row misalign, and per-run headers add duplicate header rows.
+        # Rotate any existing file aside (non-destructive) so each run is clean.
+        if os.path.exists(self.output_path):
+            backup = f"{self.output_path}.bak-{int(time.time())}"
+            try:
+                os.replace(self.output_path, backup)
+                self._log('warning',
+                          "Existing %s rotated to %s — starting a fresh capture file",
+                          self.output_path, backup)
+            except OSError as e:
+                self._log('error', "Could not rotate existing %s (%s); "
+                                   "DELETE it manually before collecting", self.output_path, e)
+        self._csv_initialized = False
+
         self._running = True
         self._window_start = time.time()
         self._flush_thread = threading.Thread(
