@@ -290,14 +290,14 @@ def topology():
         print(f"*** [{host}] {kind} -> {target} for {duration}s (ATTACK_START sent)")
         node.cmd(cmd)
         _send_to_controller('ATTACK_STOP')
-        # Release this source's confirmed/suspicion state on the controller BEFORE
-        # settling. Otherwise the host stays a "confirmed attacker" indefinitely and
-        # its benign background during settle (and for the rest of the session) is
-        # mislabelled as the attack — dataset corruption. The attack's own rows were
-        # already labelled per-window during the run, so nothing real is lost; the
-        # rate counter still labels any high-rate drain correctly. In production the
-        # controller keeps attackers locked in (admin-only UNBLOCK); this CLEAR is a
-        # data-collection action only.
+        # Release this source's confirmed/suspicion state on the controller. The
+        # controller applies a short drain-suppression cooldown to the cleared IP so
+        # the post-ATTACK_STOP control-channel backlog (which keeps draining for a few
+        # seconds) cannot RE-CONFIRM the host — otherwise it would stay a confirmed
+        # attacker for the rest of the session and mislabel its later traffic (esp.
+        # victim RST/SYN-ACK back-scatter when targeted in a subsequent pair) as the
+        # attack. In production the controller keeps attackers locked in (admin-only
+        # UNBLOCK); this CLEAR is a data-collection action only.
         _send_to_controller(f'CONTROL:CLEAR:{host_ip}')
         print(f"*** [{host}] {kind} done; released {host_ip}; settling {settle}s before next attack")
         time.sleep(settle)
