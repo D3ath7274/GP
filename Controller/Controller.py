@@ -374,6 +374,22 @@ class SimpleSwitch(app_manager.RyuApp):
                                 )
                             else:
                                 self.logger.warning("ML engine not loaded")
+                        elif ml_cmd == 'FLAG' and len(parts) >= 4:
+                            # CONTROL:ML:FLAG:<thr> — tune the flag (evidence) threshold live
+                            try:
+                                self._ml_flag_threshold = float(parts[3])
+                                self.logger.warning("ML flag threshold set to %.2f",
+                                                    self._ml_flag_threshold)
+                            except ValueError:
+                                pass
+                        elif ml_cmd == 'BLOCK' and len(parts) >= 4:
+                            # CONTROL:ML:BLOCK:<thr> — tune the block threshold live
+                            try:
+                                self._ml_block_threshold = float(parts[3])
+                                self.logger.warning("ML block threshold set to %.2f",
+                                                    self._ml_block_threshold)
+                            except ValueError:
+                                pass
 
                 elif message.startswith("LABEL_OVERRIDE:"):
                     # Format: LABEL_OVERRIDE:ip:attack_type

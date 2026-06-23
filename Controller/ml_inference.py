@@ -1,38 +1,35 @@
 """
-SDN IPS — ML Inference Engine (Random Forest, manual-preprocessing contract)
-============================================================================
-Loads the Random Forest model trained in `ML model/RF_model_Notebook.ipynb` and
-reproduces its EXACT preprocessing chain at inference time, per flow row:
+SDN IPS — ML Inference Engine (Random Forest)
+=============================================
+Loads the Random Forest trained in `ML model/RF_model_Notebook.ipynb` and serves
+per-flow predictions to the controller. Supports two model artifacts:
 
-    raw 102-col flow row (dict, as traffic_capture produces)
-      -> drop identifiers/leakage (drop-set-1) + meta_* + label/attack_type
-      -> pd.get_dummies(protocol)
-      -> reindex to the 86 'encoded_columns'   (fixes single-row one-hot, fills 0,
-                                                 forces the exact column ORDER)
-      -> StandardScaler.transform              (the scaler fit in the notebook)
-      -> select the 66 'final_columns'         (x_standrized_v2)
-      -> RandomForestClassifier.predict        -> attack-type STRING
+  1. rf_pipeline.joblib  (PREFERRED) — an end-to-end sklearn Pipeline
+        [ RFPreprocessor -> RandomForestClassifier ]
+     where RFPreprocessor reproduces the notebook's manual chain (drop ids/meta ->
+     get_dummies(protocol) -> reindex to 86 encoded cols -> StandardScaler ->
+     select the 66 final cols). Inference is just pipeline.predict(raw_row_df).
 
-Model + scaler + column orders are bundled by the notebook's save cell into
-`ml_models/rf_model.joblib`:
-    { 'rf', 'scaler', 'encoded_columns', 'final_columns', 'classes', 'sklearn_version' }
+  2. rf_model.joblib  (FALLBACK) — the earlier bundle
+        { rf, scaler, encoded_columns, final_columns, classes, sklearn_version }
+     for which this engine replicates the chain manually.
 
-Label convention (project scheme): 0 = normal, 2 = attack (the RF shares the
-behavioral-attack label 2). `attack_type` names the specific class.
+Either way the model predicts the attack-type STRING; label = 0 normal / 2 attack
+(project scheme: 0 normal, 1 Snort, 2 behavioral/RF attack). attack_type names the
+specific class.
 
-Interface is unchanged so Controller.py / traffic_capture need no signature edits:
+Interface (unchanged — Controller.py / traffic_capture need no edits):
     engine = MLInferenceEngine(model_dir, logger=...)
     engine.is_loaded
     engine.predict(flow_dict)              -> (label, attack_type, confidence)
     engine.predict_batch([flow_dict, ...]) -> [(label, attack_type, confidence), ...]
     engine.get_stats()
 
-All public methods are exception-safe: on any error they return safe defaults
-(0, 'normal', 0.0) so the controller never crashes due to ML issues.
+All public methods are exception-safe: on any error they return (0, 'normal', 0.0).
 
 Runtime deps: scikit-learn (MATCHING the notebook's version — joblib pickles are
-version-sensitive), numpy, pandas, joblib. Python >= 3.9. imbalanced-learn is NOT
-needed (SMOTE was train-only; the saved object is a plain RandomForestClassifier).
+version-sensitive), numpy, pandas, joblib, Python >= 3.9. imbalanced-learn is NOT
+needed (SMOTE was train-only).
 """
 
 import os
@@ -42,6 +39,7 @@ try:
     import numpy as np
     import joblib
     import pandas as pd
+    from sklearn.base import BaseEstimator, TransformerMixin
     _ML_DEPS_OK = True
     _ML_DEPS_ERR = None
 except ImportError as _e:  # pragma: no cover
@@ -49,12 +47,10 @@ except ImportError as _e:  # pragma: no cover
     _ML_DEPS_ERR = _e
     np = None
 
-MODEL_FILENAME = "rf_model.joblib"
+PIPELINE_FILENAME = "rf_pipeline.joblib"
+BUNDLE_FILENAME = "rf_model.joblib"
 
-# drop-set-1 from the notebook (CELL 3) + the targets. meta_* are dropped
-# dynamically by prefix. Anything not in 'encoded_columns' is dropped anyway by
-# the reindex, but we strip the obvious non-features first so get_dummies only
-# ever sees the single categorical column ('protocol').
+# drop-set-1 from the notebook (CELL 3) + the targets. meta_* dropped by prefix.
 DROP_INITIAL = [
     'timestamp', 'src_ip', 'dst_ip', 'src_port', 'dst_port', 'top_dst_port',
     'snort_sid', 'active_snort_alerts', 'distinct_alert_types',
@@ -64,17 +60,55 @@ DROP_INITIAL = [
 ATTACK_LABEL = 2  # project label scheme: 0 normal, 1 Snort, 2 behavioral/RF attack
 
 
+# ---------------------------------------------------------------------------
+# RFPreprocessor — reproduces the notebook's manual preprocessing as a single
+# transformer. It is the first step of rf_pipeline.joblib. Because the pipeline
+# was pickled from the notebook's __main__, pickle resolves this class as
+# __main__.RFPreprocessor; defining it here and registering it into __main__
+# lets the pipeline load inside the controller. (Only when sklearn is available.)
+# ---------------------------------------------------------------------------
+if _ML_DEPS_OK:
+    class RFPreprocessor(BaseEstimator, TransformerMixin):
+        def __init__(self, drop_initial=None, encoded_columns=None,
+                     final_columns=None, scaler=None):
+            self.drop_initial = drop_initial or []
+            self.encoded_columns = encoded_columns or []
+            self.final_columns = final_columns or []
+            self.scaler = scaler
+
+        def fit(self, X, y=None):
+            return self
+
+        def transform(self, X):
+            df = (X if isinstance(X, pd.DataFrame) else pd.DataFrame(X)).copy()
+            drop = [c for c in self.drop_initial if c in df.columns]
+            drop += [c for c in df.columns if str(c).startswith('meta_')]
+            df = df.drop(columns=drop, errors='ignore')
+            df = pd.get_dummies(df, prefix='protocol')
+            df = df.reindex(columns=self.encoded_columns, fill_value=0)
+            df = df.apply(pd.to_numeric, errors='coerce').fillna(0.0)
+            scaled = pd.DataFrame(self.scaler.transform(df), columns=self.encoded_columns)
+            return scaled[self.final_columns].values
+
+    import __main__ as _main
+    if not hasattr(_main, "RFPreprocessor"):
+        _main.RFPreprocessor = RFPreprocessor
+
+
 class MLInferenceEngine:
-    """Loads rf_model.joblib and provides per-flow attack-type predictions."""
+    """Serves RF predictions from rf_pipeline.joblib (preferred) or rf_model.joblib."""
 
     def __init__(self, model_dir, logger=None):
         self._logger = logger
         self._model_dir = model_dir
         self.is_loaded = False
+        self._mode = None              # 'pipeline' | 'bundle'
+        self._pipeline = None
+        # bundle-mode state
         self._rf = None
         self._scaler = None
-        self._encoded_columns = None   # 86, scaler input order
-        self._final_columns = None     # 66, rf input order
+        self._encoded_columns = None
+        self._final_columns = None
         self._classes = None
 
         self._total_predictions = 0
@@ -92,67 +126,81 @@ class MLInferenceEngine:
     def _load(self):
         if not _ML_DEPS_OK:
             self._log('warning',
-                      "ML dependencies missing (%s) — inference disabled (fine for dataset "
-                      "collection). To run ML: Python>=3.9 then "
-                      "pip install scikit-learn pandas numpy joblib (match the notebook's sklearn).",
+                      "ML dependencies missing (%s) — inference disabled (fine for collection). "
+                      "Need Python>=3.9 + scikit-learn (match the notebook's version), pandas, numpy, joblib.",
                       _ML_DEPS_ERR)
             return
 
-        path = os.path.join(self._model_dir, MODEL_FILENAME)
-        if not os.path.exists(path):
-            self._log('warning',
-                      "ML model not found: %s — inference disabled. Place %s "
-                      "(produced by the RF notebook save cell) in this directory.",
-                      path, MODEL_FILENAME)
-            return
+        pipe_path = os.path.join(self._model_dir, PIPELINE_FILENAME)
+        bundle_path = os.path.join(self._model_dir, BUNDLE_FILENAME)
 
-        try:
-            art = joblib.load(path)
-            self._rf = art['rf']
-            self._scaler = art['scaler']
-            self._encoded_columns = list(art['encoded_columns'])
-            self._final_columns = list(art['final_columns'])
-            self._classes = list(art.get('classes', getattr(self._rf, 'classes_', [])))
-            self.is_loaded = True
-            self._log('info',
-                      "ML engine loaded RF: %s (%d encoded -> %d final cols, %d classes)",
-                      path, len(self._encoded_columns), len(self._final_columns),
-                      len(self._classes))
-            self._log('info', "Attack classes: %s",
-                      [c for c in self._classes if c != 'normal'])
-            saved_ver = art.get('sklearn_version')
-            if saved_ver:
-                try:
-                    import sklearn
-                    if saved_ver != sklearn.__version__:
-                        self._log('warning',
-                                  "sklearn version mismatch: model trained on %s, runtime is %s "
-                                  "— pickle load may be unstable / predictions may drift. "
-                                  "Pin scikit-learn==%s.",
-                                  saved_ver, sklearn.__version__, saved_ver)
-                except Exception:
-                    pass
-        except ModuleNotFoundError as e:
-            self._log('error', "Failed to load RF model (%s). Missing dependency.", e)
-        except Exception as e:
-            self._log('error', "Failed to load RF model: %s", e)
+        # 1) preferred: end-to-end pipeline
+        if os.path.exists(pipe_path):
+            try:
+                self._pipeline = joblib.load(pipe_path)
+                self._classes = list(getattr(self._pipeline, 'classes_', []))
+                self._mode = 'pipeline'
+                self.is_loaded = True
+                self._log('info', "ML engine loaded end-to-end pipeline: %s (%d classes)",
+                          pipe_path, len(self._classes))
+                self._log('info', "Attack classes: %s",
+                          [c for c in self._classes if c != 'normal'])
+                return
+            except Exception as e:
+                self._log('error', "Failed to load %s (%s) — trying bundle fallback.",
+                          pipe_path, e)
 
-    # -- preprocessing: replicate the notebook chain exactly -----------------
-    def _preprocess(self, flow_dicts):
+        # 2) fallback: bundle + manual chain
+        if os.path.exists(bundle_path):
+            try:
+                art = joblib.load(bundle_path)
+                self._rf = art['rf']
+                self._scaler = art['scaler']
+                self._encoded_columns = list(art['encoded_columns'])
+                self._final_columns = list(art['final_columns'])
+                self._classes = list(art.get('classes', getattr(self._rf, 'classes_', [])))
+                self._mode = 'bundle'
+                self.is_loaded = True
+                self._log('info', "ML engine loaded bundle: %s (%d->%d cols, %d classes)",
+                          bundle_path, len(self._encoded_columns),
+                          len(self._final_columns), len(self._classes))
+                return
+            except Exception as e:
+                self._log('error', "Failed to load bundle %s: %s", bundle_path, e)
+
+        self._log('warning',
+                  "No ML model found in %s (looked for %s, then %s) — inference disabled.",
+                  self._model_dir, PIPELINE_FILENAME, BUNDLE_FILENAME)
+
+    # bundle-mode preprocessing (pipeline mode does this inside RFPreprocessor)
+    def _preprocess_bundle(self, flow_dicts):
         df = pd.DataFrame(list(flow_dicts))
         drop = [c for c in DROP_INITIAL if c in df.columns]
         drop += [c for c in df.columns if str(c).startswith('meta_')]
         df = df.drop(columns=drop, errors='ignore')
-        # one-hot 'protocol' (the only categorical column left), exactly like CELL 11
         df = pd.get_dummies(df, prefix='protocol')
-        # align to the EXACT 86 training columns: adds missing protocol dummies as 0,
-        # drops anything unexpected, and forces the column ORDER the scaler was fit on
         df = df.reindex(columns=self._encoded_columns, fill_value=0)
-        # defensive numeric coercion, then standardize, then pick the 66 final columns
         df = df.apply(pd.to_numeric, errors='coerce').fillna(0.0)
-        scaled = self._scaler.transform(df)
-        scaled = pd.DataFrame(scaled, columns=self._encoded_columns)
+        scaled = pd.DataFrame(self._scaler.transform(df), columns=self._encoded_columns)
         return scaled[self._final_columns]
+
+    def _infer(self, flow_dicts):
+        """Return (preds, probas) for a list of flow dicts, using whichever model loaded."""
+        if self._mode == 'pipeline':
+            X = pd.DataFrame(list(flow_dicts))
+            preds = self._pipeline.predict(X)
+            try:
+                probas = self._pipeline.predict_proba(X)
+            except Exception:
+                probas = None
+        else:
+            X = self._preprocess_bundle(flow_dicts)
+            preds = self._rf.predict(X)
+            try:
+                probas = self._rf.predict_proba(X)
+            except Exception:
+                probas = None
+        return preds, probas
 
     def _result(self, attack_type, proba_row):
         attack_type = str(attack_type)
@@ -161,18 +209,13 @@ class MLInferenceEngine:
         return label, attack_type, confidence
 
     def predict(self, flow_dict):
-        """Single flow row -> (label, attack_type, confidence). Safe on error."""
         if not self.is_loaded:
             return 0, 'normal', 0.0
         try:
             start = time.time()
-            X = self._preprocess([flow_dict])
-            pred = self._rf.predict(X)[0]
-            try:
-                proba = self._rf.predict_proba(X)[0]
-            except Exception:
-                proba = None
-            label, attack_type, confidence = self._result(pred, proba)
+            preds, probas = self._infer([flow_dict])
+            proba_row = probas[0] if probas is not None else None
+            label, attack_type, confidence = self._result(preds[0], proba_row)
 
             self._total_predictions += 1
             self._total_inference_time_ms += (time.time() - start) * 1000
@@ -184,18 +227,15 @@ class MLInferenceEngine:
             return 0, 'normal', 0.0
 
     def predict_batch(self, flow_dicts):
-        """List of flow rows -> list of (label, attack_type, confidence)."""
         if not self.is_loaded or not flow_dicts:
             return [(0, 'normal', 0.0)] * len(flow_dicts)
         try:
             start = time.time()
-            X = self._preprocess(flow_dicts)
-            preds = self._rf.predict(X)
-            try:
-                probas = self._rf.predict_proba(X)
-            except Exception:
-                probas = [None] * len(preds)
-            results = [self._result(p, pr) for p, pr in zip(preds, probas)]
+            preds, probas = self._infer(flow_dicts)
+            results = []
+            for i, p in enumerate(preds):
+                proba_row = probas[i] if probas is not None else None
+                results.append(self._result(p, proba_row))
 
             self._total_predictions += len(results)
             self._total_attacks += sum(1 for r in results if r[0] > 0)
@@ -209,9 +249,9 @@ class MLInferenceEngine:
         avg_ms = self._total_inference_time_ms / max(self._total_predictions, 1)
         return {
             'is_loaded': self.is_loaded,
+            'mode': self._mode,
             'total_predictions': self._total_predictions,
             'total_attacks_detected': self._total_attacks,
             'avg_inference_ms': round(avg_ms, 3),
-            'total_inference_time_ms': round(self._total_inference_time_ms, 1),
             'attack_classes': [c for c in (self._classes or []) if c != 'normal'],
         }
