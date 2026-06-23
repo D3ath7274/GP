@@ -171,7 +171,12 @@ class SimpleSwitch(app_manager.RyuApp):
         #   OBSERVE   — ML predicts + logs, NO blocking (verify accuracy first)
         #   AUTHORIZE — ML predicts + blocks via OpenFlow DROP if confidence ≥ threshold
         self._ml_mode = 'OFF'  # Start in OFF mode; switch via CONTROL:ML:OBSERVE/AUTHORIZE
-        self._ml_confidence_threshold = 0.80  # Calibrate on t530 in Phase 5
+        # Two-band confidence policy (RF):
+        #   conf >= block threshold  -> attack; AUTHORIZE blocks (single window)
+        #   flag <= conf < block     -> flag + capture evidence (.pcap/csv/txt), no block
+        #   conf < flag threshold    -> no action
+        self._ml_block_threshold = 0.90   # set via CONTROL:ML:AUTHORIZE:<thr>
+        self._ml_flag_threshold = 0.80
         ml_model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
         if os.path.isdir(ml_model_dir):
             self._ml_engine = MLInferenceEngine(ml_model_dir, logger=self.logger)
@@ -179,7 +184,7 @@ class SimpleSwitch(app_manager.RyuApp):
             self._ml_engine = None
             self.logger.warning(
                 "ml_models/ directory not found at %s — ML inference disabled. "
-                "Place full_ml_pipeline.joblib in this directory to enable it.", ml_model_dir
+                "Place rf_model.joblib in this directory to enable it.", ml_model_dir
             )
 
         self.logger.info(
@@ -343,7 +348,7 @@ class SimpleSwitch(app_manager.RyuApp):
                             self._ml_mode = 'AUTHORIZE'
                             if len(parts) >= 4:
                                 try:
-                                    self._ml_confidence_threshold = float(parts[3])
+                                    self._ml_block_threshold = float(parts[3])
                                 except ValueError:
                                     pass
                             self.logger.warning(
@@ -354,7 +359,7 @@ class SimpleSwitch(app_manager.RyuApp):
                                 "║  Confidence threshold: %-33s ║\n"
                                 "║  ⚠  AI is now authorized to block network devices.      ║\n"
                                 "╚══════════════════════════════════════════════════════════╝",
-                                f"{self._ml_confidence_threshold:.2f}"
+                                f"{self._ml_block_threshold:.2f}"
                             )
                         elif ml_cmd == 'STATS':
                             # CONTROL:ML:STATS — print inference statistics
@@ -690,7 +695,7 @@ class SimpleSwitch(app_manager.RyuApp):
         if hasattr(self, 'traffic_capture') and self.traffic_capture:
             # Filter out non-IP/ARP traffic if desired, or keep all
             if packet_info['protocol'] != 'OTHER':
-                self.traffic_capture.record_packet(packet_info)
+                self.traffic_capture.record_packet(packet_info, raw_data=msg.data)
 
 
 
