@@ -1115,40 +1115,51 @@ class TrafficCapture:
                     continue
                 src_ip = row.get('src_ip', '?')
                 dst_ip = row.get('dst_ip', '?')
+                band = ('BLOCK' if ml_conf >= block_thr
+                        else 'FLAG' if ml_conf >= flag_thr else 'below-thresh')
+
+                # OBSERVE: surface EVERY non-normal verdict + confidence, regardless
+                # of band (incl. below the flag threshold), so the model can be
+                # judged before authorizing blocking.
+                if ml_mode == 'OBSERVE':
+                    self._log('info',
+                        "[ML-OBSERVE] %s → %s  verdict=%s  conf=%.2f  band=%s",
+                        src_ip, dst_ip, ml_type, ml_conf, band)
 
                 if ml_conf >= block_thr:
                     # --- BLOCK band ---
                     row['label'] = 2          # attack label (project scheme)
                     row['attack_type'] = ml_type
-                    self._log('warning',
-                        "[ML] ATTACK (block band) %s → %s  type=%s conf=%.2f mode=%s",
-                        src_ip, dst_ip, ml_type, ml_conf, ml_mode)
-                    if (ml_mode == 'AUTHORIZE' and
-                            src_ip not in ml_blocked_this_window and
-                            src_ip not in self._confirmed_attackers):
-                        attacker_mac = self._ip_to_mac.get(src_ip, '')
-                        if attacker_mac and self.controller:
-                            try:
-                                self.controller.block_attacker(
-                                    src_ip=src_ip,
-                                    src_mac=attacker_mac,
-                                    attack_type=ml_type,
-                                    timeout=30,
-                                    detection_time=time.time(),
-                                    target_ip=dst_ip,
-                                    reason=f'ml-{ml_conf:.2f}'
-                                )
-                                ml_blocked_this_window.add(src_ip)
-                            except Exception as e:
-                                self._log('error', "ML block_attacker failed: %s", e)
+                    if ml_mode == 'AUTHORIZE':
+                        self._log('warning',
+                            "[ML] ATTACK (block) %s → %s  type=%s conf=%.2f — blocking",
+                            src_ip, dst_ip, ml_type, ml_conf)
+                        if (src_ip not in ml_blocked_this_window and
+                                src_ip not in self._confirmed_attackers):
+                            attacker_mac = self._ip_to_mac.get(src_ip, '')
+                            if attacker_mac and self.controller:
+                                try:
+                                    self.controller.block_attacker(
+                                        src_ip=src_ip,
+                                        src_mac=attacker_mac,
+                                        attack_type=ml_type,
+                                        timeout=30,
+                                        detection_time=time.time(),
+                                        target_ip=dst_ip,
+                                        reason=f'ml-{ml_conf:.2f}'
+                                    )
+                                    ml_blocked_this_window.add(src_ip)
+                                except Exception as e:
+                                    self._log('error', "ML block_attacker failed: %s", e)
 
                 elif ml_conf >= flag_thr:
-                    # --- FLAG band: capture evidence, do NOT block ---
-                    self._log('warning',
-                        "[ML] FLAGGED (no block) %s → %s  type=%s conf=%.2f — evidence captured",
-                        src_ip, dst_ip, ml_type, ml_conf)
+                    # --- FLAG band: capture evidence, never block ---
+                    if ml_mode == 'AUTHORIZE':
+                        self._log('warning',
+                            "[ML] FLAGGED (no block) %s → %s  type=%s conf=%.2f — evidence captured",
+                            src_ip, dst_ip, ml_type, ml_conf)
                     self._capture_evidence(row, ml_type, ml_conf, flag_thr, block_thr)
-                # else conf < flag_thr: ignore
+                # else conf < flag_thr: ignore (OBSERVE already surfaced it above)
 
         # Drop the raw-frame evidence buffer for this window (bounded memory).
         if self._raw_frames:
