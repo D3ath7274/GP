@@ -386,6 +386,16 @@ class TrafficCapture:
         })
         self._flow_lock = threading.Lock()
 
+        # --- ML evidence capture (best-effort .pcap of a flagged source) ---
+        # When the RF flags a flow in the 0.80-0.90 "suspect" band (no block), we
+        # dump that source's recent raw frames to a .pcap plus its features to
+        # flagged.csv and a line to ml_flags.txt. Frames are buffered per src_ip
+        # only while ML is active, capped, and cleared every window.
+        self._ml_pcap_enabled = True
+        self._raw_frames = defaultdict(lambda: deque(maxlen=500))  # src_ip -> [(ts, raw_bytes)]
+        self._flagged_dir = os.path.join(
+            os.path.dirname(os.path.abspath(self.output_path)) or '.', 'flagged')
+
         # --- Device profiles ---
         self._devices = {}  # ip -> DeviceProfile
         self._device_lock = threading.Lock()
@@ -613,9 +623,13 @@ class TrafficCapture:
         self._log('info', "Traffic capture stopped. Total rows written: %d",
                   self._rows_written)
 
-    def record_packet(self, pkt_info):
+    def record_packet(self, pkt_info, raw_data=None):
         """
         Record a single packet from a packet_in event.
+
+        raw_data (optional): the raw Ethernet frame bytes (msg.data). Buffered
+        per-source for best-effort ML evidence .pcap export — only while ML is
+        active, so dataset-collection runs pay no cost.
 
         pkt_info dict should contain:
             src_ip, dst_ip, src_port, dst_port, protocol,
@@ -676,6 +690,13 @@ class TrafficCapture:
             flow['last_seen'] = now
             flow['eth_dst'] = eth_dst  # FIX(B): retain L2 dst for broadcast detection
             flow['packets'].append((packet_size, tcp_flags, src_port, now))
+
+            # Buffer the raw frame for best-effort ML evidence pcap (only while ML
+            # detection is active; bounded per-source; cleared each window).
+            if (raw_data is not None and self._ml_pcap_enabled and src_ip
+                    and self.controller is not None
+                    and getattr(self.controller, '_ml_mode', 'OFF') != 'OFF'):
+                self._raw_frames[src_ip].append((now, raw_data))
 
             # Update network-wide counters
             self._net_src_ips[src_ip] += 1
@@ -1057,27 +1078,31 @@ class TrafficCapture:
                 profile.reset_recent()
 
         # =====================================================================
-        # ML Tier 4: Per-Flow ML Inference (if mode is OBSERVE or AUTHORIZE)
+        # ML Tier 4: Per-Flow RF Inference (mode OBSERVE or AUTHORIZE)
         # =====================================================================
-        # Runs AFTER row building so existing rate counter labels are preserved.
-        # ML can upgrade label=0 (normal) to label=3 (ML-detected) if confident.
-        # In OBSERVE mode: log predictions only, do not block.
-        # In AUTHORIZE mode: log + install OpenFlow DROP rule via block_attacker().
+        # Runs AFTER row building, only on rows not already flagged by earlier
+        # tiers (label==0). Two confidence bands (thresholds set on the controller):
+        #   conf >= block_threshold (0.90) -> ATTACK (label 2); AUTHORIZE installs an
+        #                                     OpenFlow DROP on this SINGLE window.
+        #   flag_threshold (0.80) <= conf < block -> FLAG: best-effort evidence
+        #                                     (.pcap + flagged.csv + ml_flags.txt),
+        #                                     NO block.
+        #   conf < flag_threshold          -> no action.
+        # Blocking is done ONLY by ML (RF) / AE — the rate-counter tier only labels.
         # =====================================================================
         if (rows and self.controller and
-                hasattr(self.controller, '_ml_mode') and
-                self.controller._ml_mode in ('OBSERVE', 'AUTHORIZE') and
-                hasattr(self.controller, '_ml_engine') and
-                self.controller._ml_engine and
+                getattr(self.controller, '_ml_mode', 'OFF') in ('OBSERVE', 'AUTHORIZE') and
+                getattr(self.controller, '_ml_engine', None) and
                 self.controller._ml_engine.is_loaded):
 
             ml_mode = self.controller._ml_mode
-            ml_threshold = getattr(self.controller, '_ml_confidence_threshold', 0.80)
+            block_thr = getattr(self.controller, '_ml_block_threshold', 0.90)
+            flag_thr = getattr(self.controller, '_ml_flag_threshold', 0.80)
             ml_engine = self.controller._ml_engine
             ml_blocked_this_window = set()  # Avoid duplicate blocks per IP per window
 
             for row in rows:
-                # Skip rows already labeled as attacks by rate counters
+                # Skip rows already labeled as attacks by Snort / rate counters
                 if str(row.get('label', '0')) != '0':
                     continue
 
@@ -1086,21 +1111,18 @@ class TrafficCapture:
                 except Exception:
                     continue
 
-                if ml_label > 0 and ml_conf >= ml_threshold:
-                    src_ip = row.get('src_ip', '?')
-                    dst_ip = row.get('dst_ip', '?')
+                if ml_label == 0 or ml_type == 'normal':
+                    continue
+                src_ip = row.get('src_ip', '?')
+                dst_ip = row.get('dst_ip', '?')
 
-                    # Update the row with ML prediction
-                    row['label'] = 3  # 3 = ML-detected (distinct from 2=rate counter)
+                if ml_conf >= block_thr:
+                    # --- BLOCK band ---
+                    row['label'] = 2          # attack label (project scheme)
                     row['attack_type'] = ml_type
-
-                    # Log the detection
                     self._log('warning',
-                        "[ML] %s detected: %s → %s (confidence: %.2f, type: %s, mode: %s)",
-                        "ATTACK", src_ip, dst_ip, ml_conf, ml_type, ml_mode
-                    )
-
-                    # In AUTHORIZE mode: block the attacker via OpenFlow DROP
+                        "[ML] ATTACK (block band) %s → %s  type=%s conf=%.2f mode=%s",
+                        src_ip, dst_ip, ml_type, ml_conf, ml_mode)
                     if (ml_mode == 'AUTHORIZE' and
                             src_ip not in ml_blocked_this_window and
                             src_ip not in self._confirmed_attackers):
@@ -1119,6 +1141,19 @@ class TrafficCapture:
                                 ml_blocked_this_window.add(src_ip)
                             except Exception as e:
                                 self._log('error', "ML block_attacker failed: %s", e)
+
+                elif ml_conf >= flag_thr:
+                    # --- FLAG band: capture evidence, do NOT block ---
+                    self._log('warning',
+                        "[ML] FLAGGED (no block) %s → %s  type=%s conf=%.2f — evidence captured",
+                        src_ip, dst_ip, ml_type, ml_conf)
+                    self._capture_evidence(row, ml_type, ml_conf, flag_thr, block_thr)
+                # else conf < flag_thr: ignore
+
+        # Drop the raw-frame evidence buffer for this window (bounded memory).
+        if self._raw_frames:
+            with self._flow_lock:
+                self._raw_frames.clear()
 
         # Write to CSV
         if rows:
@@ -1667,6 +1702,75 @@ class TrafficCapture:
         self._log('info',
                   "[COLLECT] Detection state cleared for %s — %d confirmed attacker(s) released%s",
                   src_ip or 'ALL', released, cd_note)
+
+    # ---- ML flag-band evidence capture (best-effort) -----------------------
+    @staticmethod
+    def _write_pcap(path, frames):
+        """Write (ts, raw_ethernet_bytes) tuples to a libpcap file (LINKTYPE_ETHERNET)."""
+        import struct
+        with open(path, 'wb') as f:
+            # global header: magic, ver 2.4, thiszone, sigfigs, snaplen, network=1 (Ethernet)
+            f.write(struct.pack('<IHHiIII', 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1))
+            for ts, data in frames:
+                if not data:
+                    continue
+                sec = int(ts)
+                usec = int((ts - sec) * 1_000_000)
+                f.write(struct.pack('<IIII', sec, usec, len(data), len(data)))
+                f.write(data)
+
+    def _capture_evidence(self, row, pred_type, confidence, flag_thr, block_thr):
+        """For a FLAG-band detection (no block): dump the source's recent frames to
+        a .pcap (best-effort), append features to flagged.csv, and log a report line
+        to ml_flags.txt. Never raises — evidence capture must not disrupt detection."""
+        try:
+            os.makedirs(self._flagged_dir, exist_ok=True)
+            src_ip = str(row.get('src_ip', 'unknown'))
+            dst_ip = str(row.get('dst_ip', '?'))
+            proto = str(row.get('protocol', '?'))
+            ts = int(time.time())
+            safe_type = str(pred_type).replace(' ', '_').replace('/', '_')
+
+            # 1) .pcap of the source's recent raw frames (best-effort)
+            if self._ml_pcap_enabled:
+                try:
+                    with self._flow_lock:
+                        frames = list(self._raw_frames.get(src_ip, []))
+                    if frames:
+                        pcap_path = os.path.join(self._flagged_dir,
+                                                 f"{ts}_{src_ip}_{safe_type}.pcap")
+                        self._write_pcap(pcap_path, frames)
+                except Exception as e:
+                    self._log('warning', "[ML-FLAG] pcap capture failed (best-effort): %s", e)
+
+            # 2) flagged.csv — the flow's full feature row + ML verdict
+            try:
+                rec = dict(row)
+                rec['ml_predicted_type'] = pred_type
+                rec['ml_confidence'] = round(float(confidence), 4)
+                csv_path = os.path.join(self._flagged_dir, 'flagged.csv')
+                new_file = not os.path.exists(csv_path)
+                with open(csv_path, 'a', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=list(rec.keys()))
+                    if new_file:
+                        writer.writeheader()
+                    writer.writerow(rec)
+            except Exception as e:
+                self._log('warning', "[ML-FLAG] flagged.csv write failed: %s", e)
+
+            # 3) ml_flags.txt — human-readable report
+            try:
+                txt_path = os.path.join(self._flagged_dir, 'ml_flags.txt')
+                with open(txt_path, 'a') as f:
+                    f.write(
+                        f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] FLAGGED (no block)  "
+                        f"src={src_ip} dst={dst_ip} proto={proto}  "
+                        f"predicted={pred_type}  confidence={float(confidence):.3f}  "
+                        f"band=[{flag_thr:.2f},{block_thr:.2f})\n")
+            except Exception as e:
+                self._log('warning', "[ML-FLAG] ml_flags.txt write failed: %s", e)
+        except Exception as e:
+            self._log('error', "[ML-FLAG] evidence capture error: %s", e)
 
     # The six canonical attack classes in our scheme. Snort alerts whose
     # attack_type is not one of these are treated as signature noise for labelling.
