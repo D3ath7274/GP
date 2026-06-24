@@ -177,6 +177,9 @@ class SimpleSwitch(app_manager.RyuApp):
         #   conf < flag threshold    -> no action
         self._ml_block_threshold = 0.90   # set via CONTROL:ML:AUTHORIZE:<thr>
         self._ml_flag_threshold = 0.80
+        # src_ip -> expiry; dedups the instant Snort-alert blocker (Snort fires
+        # per-packet, so block a source at most once per DROP-timeout window).
+        self._snort_blocked = {}
         ml_model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
         if os.path.isdir(ml_model_dir):
             self._ml_engine = MLInferenceEngine(ml_model_dir, logger=self.logger)
@@ -236,6 +239,32 @@ class SimpleSwitch(app_manager.RyuApp):
         # Forward alert to traffic capture for labeling anomalous flows
         if hasattr(self, 'traffic_capture') and self.traffic_capture:
             self.traffic_capture.record_alert(alert)
+
+            # Fast-tier mitigation: INSTANT block on a CANONICAL Snort alert in
+            # AUTHORIZE mode. Snort fires sub-second on the packet stream — the only
+            # truly real-time tier. Guards: only canonical attack classes (filters
+            # BAD-TRAFFIC/MISC/SNMP noise and victim-response SIDs), and at most once
+            # per source per DROP-timeout window (Snort fires per-packet).
+            if getattr(self, '_ml_mode', 'OFF') == 'AUTHORIZE':
+                atype = alert.get('attack_type', '')
+                src = alert.get('src_ip', '')
+                if src and atype in getattr(self.traffic_capture, 'CANONICAL_ATTACKS', set()):
+                    now = time.time()
+                    if now >= self._snort_blocked.get(src, 0):
+                        mac = self.traffic_capture._ip_to_mac.get(src, '')
+                        if mac:
+                            try:
+                                self.block_attacker(
+                                    src_ip=src, src_mac=mac, attack_type=atype,
+                                    timeout=30, detection_time=now,
+                                    target_ip=alert.get('dst_ip', ''),
+                                    reason=f"snort-{alert.get('sid', '?')}")
+                                self._snort_blocked[src] = now + 30
+                                self.logger.warning(
+                                    "[SNORT] BLOCKED %s (%s) — instant signature match",
+                                    src, atype)
+                            except Exception as e:
+                                self.logger.error("Snort block_attacker failed: %s", e)
 
     def close(self):
         """Clean up: stop Snort, traffic mirror, and UDP listener when the controller shuts down."""
@@ -304,6 +333,37 @@ class SimpleSwitch(app_manager.RyuApp):
                             # full (no-IP) reset.
                             self.traffic_capture.clear_detection_state(
                                 clear_ip, cooldown=30 if clear_ip else 0)
+                    elif len(parts) >= 3 and parts[1] == 'ROTATE':
+                        # CONTROL:ROTATE:<filename>[:<ExpectedAttackType>]
+                        # Save the current dataset.csv under <filename>, start a fresh
+                        # file, then best-effort validate it and log the verdict. Used
+                        # by the automated collection harness between sessions.
+                        # Filenames starting with '_' are discards (no validation).
+                        fname = parts[2].strip()
+                        expect = parts[3].strip() if len(parts) >= 4 else ''
+                        if hasattr(self, 'traffic_capture') and self.traffic_capture and fname:
+                            saved = self.traffic_capture.rotate(fname)
+                            if saved >= 0 and not fname.startswith('_'):
+                                try:
+                                    import subprocess
+                                    here = os.path.dirname(os.path.abspath(__file__))
+                                    cmd = ['python3', os.path.join(here, 'validate_dataset.py'), fname]
+                                    if expect:
+                                        cmd.append(expect)
+                                    # inherit the process cwd (where dataset.csv / the
+                                    # rotated session files live)
+                                    r = subprocess.run(cmd, capture_output=True,
+                                                       text=True, timeout=180)
+                                    verdict = 'PASS ✅' if r.returncode == 0 else 'ISSUES ❌'
+                                    self.logger.warning("[COLLECT] %s validation → %s", fname, verdict)
+                                    for ln in r.stdout.splitlines():
+                                        if any(k in ln for k in ('RESULT', 'rows=', 'launched from',
+                                                                  'RATE BLEED', 'PROTO MISMATCH',
+                                                                  'NOTE:', '  - ')):
+                                            self.logger.info("    %s", ln.rstrip())
+                                except Exception as e:
+                                    self.logger.error("[COLLECT] validation failed for %s: %s",
+                                                      fname, e)
                     elif len(parts) >= 3 and parts[1] == 'UNBLOCK':
                         target_ip = parts[2].strip()
                         if hasattr(self, 'traffic_capture') and self.traffic_capture:
