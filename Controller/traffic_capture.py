@@ -623,6 +623,27 @@ class TrafficCapture:
         self._log('info', "Traffic capture stopped. Total rows written: %d",
                   self._rows_written)
 
+    def rotate(self, new_name):
+        """Save the current dataset.csv under new_name and start a fresh capture
+        file. Used by the automated collection harness between sessions. The
+        in-flight window's rows may land in either file — benign during the
+        inter-session settle. Returns the rows saved, or -1 on failure."""
+        saved = self._rows_written
+        try:
+            if os.path.exists(self.output_path):
+                os.replace(self.output_path, new_name)
+                self._log('warning', "[COLLECT] session saved: %s (%d rows)", new_name, saved)
+            else:
+                self._log('warning', "[COLLECT] rotate: %s did not exist (0 rows)",
+                          self.output_path)
+                saved = 0
+        except OSError as e:
+            self._log('error', "[COLLECT] rotate to %s failed: %s", new_name, e)
+            return -1
+        self._csv_initialized = False
+        self._rows_written = 0
+        return saved
+
     def record_packet(self, pkt_info, raw_data=None):
         """
         Record a single packet from a packet_in event.
@@ -1034,6 +1055,26 @@ class TrafficCapture:
                         f"    Evidence: {windows} consecutive windows in {elapsed:.0f}s\n"
                         f"    Action  : Host represents a persistent threat. Label locked-in indefinitely.\n"
                     )
+
+                    # Fast-tier mitigation: in AUTHORIZE mode the rate-counter
+                    # confirmation now BLOCKS (previously only the ML tier did).
+                    # Principled fast blocker — correct source + canonical class,
+                    # low FP, and it honours the consecutive-window requirement.
+                    if (self.controller is not None and
+                            getattr(self.controller, '_ml_mode', 'OFF') == 'AUTHORIZE'):
+                        attacker_mac = self._ip_to_mac.get(src_ip, '')
+                        if attacker_mac:
+                            try:
+                                self.controller.block_attacker(
+                                    src_ip=src_ip, src_mac=attacker_mac,
+                                    attack_type=attack_type, timeout=30,
+                                    detection_time=now, target_ip=dst_ip,
+                                    reason=f'rate-counter-{windows}w')
+                                self._log('warning',
+                                    "[RATE] BLOCKED %s (%s) — confirmed over %d windows",
+                                    src_ip, attack_type, windows)
+                            except Exception as e:
+                                self._log('error', "rate-counter block_attacker failed: %s", e)
 
                 else:
                     self._log('info',
