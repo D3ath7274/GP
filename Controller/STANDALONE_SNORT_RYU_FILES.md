@@ -20,6 +20,12 @@ Do not use these older/team-integrated Snort files for the standalone VM flow:
 - `snort_setup.sh`
 - `SNORT_IDS_README.md`
 
-Those files belong to the teammates' integrated ML/dataset controller path and
-may start Snort with `/etc/snort/snort.lua` plus `alert_fast`, not this
-standalone `alert_json` flow.
+Those files belong to the teammates' integrated ML/dataset controller path. As of
+the schema upgrade, that path now drives Snort 3 with the **same**
+`/etc/snort/sdn_ips.lua` + `sdn_ips_local.rules` and parses **`alert_json`** — the
+difference is that the team path adds ML/dataset capture and the UDP 9999 control
+channel, and blocks in-process via `Controller.py` (OpenFlow DROP) instead of the
+standalone `snort_ryu_bridge.py` + `snort_alert_reader.py` (REST/iptables). Run one
+flow or the other, not both against the same alert file. (`snort_setup.sh` installs
+the legacy Snort 2.x ruleset and is superseded by
+`scripts/install_snort3_ips_config.sh` for detection rules.)

@@ -34,10 +34,13 @@ BRIDGE_URL = "http://127.0.0.1:9000/block"
 
 BLOCKING_SIDS = {
     1000001: "ICMP Flood",
-    1000002: "TCP Port Scan",
-    1000003: "SSH Brute Force",
-    1000004: "UDP Flood",
-    1000005: "Ryu REST API TCP Flood",
+    1000002: "SYN Flood",
+    1000003: "UDP Flood",
+    1000004: "Control Plane Saturation",
+    # Port Scan (port_scan inspector, GID 122) and ARP Spoofing (arp_spoof
+    # inspector, GID 112) are detected by inspectors, not local-rule SIDs; this
+    # reader keys on local SIDs only. Add 1000005 here if you enable the
+    # rule-based Port Scan fallback in sdn_ips_local.rules.
 }
 
 SUPPRESSED_DISPLAY_SIDS = {

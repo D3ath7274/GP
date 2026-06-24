@@ -79,11 +79,13 @@ class SimpleSwitch(app_manager.RyuApp):
         )
         mirror_ok = self.traffic_mirror.start()
 
-        # Snort monitors both: physical (192.168.1.x) + TAP (mirrored 10.0.0.x)
+        # Snort monitors both: physical (192.168.1.x) + TAP (mirrored 10.0.0.x).
+        # Uses the curated Snort 3 config (sdn_ips.lua) + alert_json schema; install
+        # it once with: sudo ./scripts/install_snort3_ips_config.sh
         self.snort_manager = SnortManager(
             interfaces=[self._physical_interface, self._tap_name] if mirror_ok
                        else [self._physical_interface],
-            config_path='/etc/snort/snort.lua',
+            config_path='/etc/snort/sdn_ips.lua',
             log_dir='/var/log/snort',
             logger=self.logger,
             on_alert=self._handle_snort_alert
@@ -93,7 +95,8 @@ class SimpleSwitch(app_manager.RyuApp):
             self.snort_manager.start_monitoring()
         else:
             self.logger.error(
-                "Snort IDS failed to start! Run snort_setup.sh first. "
+                "Snort IDS failed to start! Install the curated config first: "
+                "sudo ./scripts/install_snort3_ips_config.sh. "
                 "Controller will continue without IDS."
             )
 

@@ -102,8 +102,9 @@ For the existing team controller with ML/dataset capture:
 
 ```bash
 cd /path/to/GP/Controller
-sudo ./snort_setup.sh ens33 "10.0.0.0/24,192.168.1.0/24"
-sudo ryu-manager Controller.py
+# one-time: install the curated Snort 3 config + rules (requires Snort 3)
+sudo ./scripts/install_snort3_ips_config.sh
+sudo IPS_V2_FEATURES=1 ryu-manager Controller.py
 ```
 
 Then start the topology:
@@ -113,7 +114,13 @@ cd /path/to/GP/SDN\ Topology
 sudo python3 topology.py
 ```
 
-This mode starts its own Snort process and tails `alert_fast` through `snort_monitor.py`. Do not also run the standalone `snort_alert_reader.py` against the same alerts unless you intentionally want both blocking paths active.
+This mode now launches Snort 3 itself (per monitored interface) using the **same**
+curated `/etc/snort/sdn_ips.lua` + `sdn_ips_local.rules` as the standalone flow, and
+`snort_monitor.py` tails the structured **`alert_json`** output (replacing the old
+Snort 2.x `snort.conf` + `alert_fast` path). Blocking is done in-process by
+`Controller.py` (OpenFlow DROP via `block_attacker`), so do **not** also run the
+standalone `snort_ryu_bridge.py` / `snort_alert_reader.py` against the same alerts
+unless you intentionally want both blocking paths active.
 
 ## Troubleshooting
 
