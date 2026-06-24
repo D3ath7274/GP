@@ -360,9 +360,62 @@ def topology():
         print(f"*** {kind.upper()} SESSION complete ({total} attacks). "
               f"Now: exit -> Ctrl-C -> rename dataset.csv -> validate_dataset.py")
 
+    def run_full_collection(net, normal_secs=600, baseline_secs=300):
+        """FULLY AUTOMATED 7-session capture in ONE command. Walk away (~1.5-2 h).
+
+        Runs: 1 normal session + 6 attack sessions (icmp, syn, udp, scan, arp, cps).
+        Between sessions it tells the controller to SAVE the session's dataset.csv
+        under its own filename and auto-VALIDATE it (watch the controller log for
+        'PASS'/'ISSUES' per session). Detection is ON only during attacks (labels,
+        no block); ML blocking is forced OFF for the whole run. Each session's
+        attack uses run_attack_session (8 diverse source->target pairs).
+
+        After it finishes, merge the 7 files on the controller:
+          python3 dataset_merge.py dataset_session1_normal.csv ... \\
+                  dataset_session7_cps.csv --output dataset_v2_master_new.csv
+        """
+        attack_sessions = [
+            ('icmp', 'dataset_session2_icmp.csv',     'ICMP Flood'),
+            ('syn',  'dataset_session3_syn.csv',      'SYN Flood'),
+            ('udp',  'dataset_session4_udp.csv',      'UDP Flood'),
+            ('scan', 'dataset_session5_portscan.csv', 'Port Scan'),
+            ('arp',  'dataset_session6_arpspoof.csv', 'ARP Spoofing'),
+            ('cps',  'dataset_session7_cps.csv',      'Control Plane Saturation'),
+        ]
+        print("*** FULL COLLECTION — 7 sessions, FULLY AUTOMATED. Walk away (~1.5-2 h).")
+        _send_to_controller('CONTROL:ML:OFF')          # never block during collection
+        start_background_traffic(net)
+        # discard pre-collection traffic (setup/pingall) so session 1 starts clean
+        detect_off(net)
+        _send_to_controller('CONTROL:ROTATE:_discard.csv')
+        wait(net, 3)
+
+        # --- Session 1: NORMAL (background only) ---
+        print(f"*** [1/7] NORMAL — {normal_secs}s of pure background")
+        wait(net, normal_secs)
+        _send_to_controller('CONTROL:ROTATE:dataset_session1_normal.csv')
+        wait(net, 5)
+
+        # --- Sessions 2-7: one attack type each ---
+        for i, (kind, fname, expect) in enumerate(attack_sessions, start=2):
+            print(f"*** [{i}/7] {expect} — baseline {baseline_secs}s, then attack")
+            detect_off(net)
+            wait(net, baseline_secs)                    # mature device baselines
+            detect_on(net)
+            wait(net, 5)                                # DAI baseline freeze
+            run_attack_session(net, kind)               # 8 diverse pairs (blocks)
+            detect_off(net)
+            _send_to_controller(f'CONTROL:ROTATE:{fname}:{expect}')
+            wait(net, 5)
+
+        print("*** FULL COLLECTION complete — 7 sessions saved + validated on the controller.")
+        print("*** Review the controller log for each session's PASS/ISSUES, then merge with "
+              "dataset_merge.py and append to dataset_v2_master.csv.")
+
     net.launch_attack = launch_attack
     net.wait = wait
     net.run_attack_session = run_attack_session
+    net.run_full_collection = run_full_collection
 
     # --- Send hostname registrations to the controller ---
     # Sends REGISTER:NAME:hostname:ip directly to controller over physical network
@@ -384,6 +437,7 @@ def topology():
     print("*** Detection commands: py net.detect_on(net)  /  py net.detect_off(net)")
     print("*** Attack signalling: py net.attack_start(net,'hping3','flood')  /  py net.attack_stop(net)")
     print("*** One-command attack session: py net.run_attack_session(net,'icmp')  (kinds: icmp syn udp cps scan arp)")
+    print("*** FULLY AUTOMATED 7-session capture: py net.run_full_collection(net)  (walk away ~1.5-2 h; auto-saves + validates each)")
     print("*** Running CLI")
     CLI(net)
     net.stop()
