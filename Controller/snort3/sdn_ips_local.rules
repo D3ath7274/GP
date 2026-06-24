@@ -1,0 +1,20 @@
+# OLD/BASIC-TEST VERSION: internal-only ICMP flood rule. Disabled because it misses external attackers mirrored to br-snort.
+# alert icmp $HOME_NET any -> $HOME_NET any (msg:"SDN IPS ICMP Flood"; itype:8; detection_filter:track by_src, count 100, seconds 1; classtype:attempted-dos; sid:1000001; rev:1;)
+# OLD/INTEGRATION-DRAFT VERSION: SDN-prefixed ICMP rule. Disabled to match the working VM local.rules exactly.
+# alert icmp any any -> any any (msg:"SDN IPS ICMP Flood"; itype:8; detection_filter:track by_src, count 10, seconds 5; classtype:attempted-dos; sid:1000001; rev:2;)
+# OLD/INTEGRATION-DRAFT VERSION: HOME_NET-scoped scan rule. Disabled to match the working VM local.rules exactly.
+# alert tcp $HOME_NET any -> $HOME_NET any (msg:"SDN IPS TCP Port Scan"; flags:S; detection_filter:track by_src, count 30, seconds 5; classtype:network-scan; sid:1000002; rev:1;)
+# OLD/INTEGRATION-DRAFT VERSION: HOME_NET-scoped SSH rule. Disabled to match the working VM local.rules exactly.
+# alert tcp $HOME_NET any -> $HOME_NET 22 (msg:"SDN IPS SSH Brute Force"; flags:S; detection_filter:track by_src, count 8, seconds 20; classtype:attempted-recon; sid:1000003; rev:1;)
+# OLD/INTEGRATION-DRAFT VERSION: high-threshold UDP rule. Disabled to match the working VM local.rules exactly.
+# alert udp $HOME_NET any -> $HOME_NET any (msg:"SDN IPS UDP Flood"; detection_filter:track by_src, count 150, seconds 1; classtype:attempted-dos; sid:1000004; rev:1;)
+# OLD/INTEGRATION-DRAFT VERSION: HOME_NET-scoped Ryu REST rule. Disabled to match the working VM local.rules exactly.
+# alert tcp any any -> $HOME_NET 8080 (msg:"SDN IPS Ryu REST API TCP Flood"; flags:S; detection_filter:track by_src, count 40, seconds 5; classtype:attempted-dos; sid:1000005; rev:1;)
+
+alert icmp any any -> any any (msg:"ICMP Flood"; itype:8; detection_filter:track by_src, count 10, seconds 5; sid:1000001; rev:2;)
+alert tcp any any -> any any (msg:"TCP Port Scan"; flags:S; detection_filter:track by_src, count 20, seconds 10; sid:1000002; rev:2;)
+alert tcp any any -> any 22 (msg:"SSH Brute Force"; flags:S; detection_filter:track by_src, count 5, seconds 60; sid:1000003; rev:2;)
+# OLD/WORKING-DRAFT VERSION: broad UDP flood rule. Disabled because the active VM rule targets DNS/53.
+# alert udp any any -> any any (msg:"UDP Flood"; detection_filter:track by_src, count 20, seconds 5; sid:1000004; rev:1;)
+alert udp any any -> any 53 (msg:"UDP Flood"; detection_filter:track by_src, count 20, seconds 5; sid:1000004; rev:1;)
+alert tcp any any -> any 8080 (msg:"Ryu REST API TCP Flood"; flags:S; detection_filter:track by_src, count 20, seconds 5; sid:1000005; rev:1;)

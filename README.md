@@ -90,6 +90,82 @@ c0 = net.addController('c0', controller=RemoteController,
 
 ## Usage
 
+There are two supported run modes:
+
+- **Team integrated mode**: `Controller/Controller.py` starts Snort monitoring,
+  TAP mirroring, traffic capture, ML inference hooks, and dataset generation.
+- **Standalone Snort/Ryu IPS mode**: `Controller/ryu_ips_app.py`,
+  `snort_ryu_bridge.py`, and `snort_alert_reader.py` run as separate processes
+  and use Snort 3 JSON alerts to push REST block commands into Ryu.
+
+Use only one active blocking path at a time unless you are intentionally testing
+both. The existing ML/dataset files and topology remain unchanged.
+
+See `docs/SNORT_RYU_INTEGRATION.md` for the standalone Snort 3 + Ryu startup
+order and verification commands.
+See `Controller/STANDALONE_SNORT_RYU_FILES.md` for the exact standalone files.
+
+### Standalone Snort 3 + Ryu IPS Startup Order
+
+1. Start topology on the Topology VM:
+
+```bash
+cd /path/to/GP/SDN\ Topology
+sudo python3 topology.py
+```
+
+2. Start Ryu controller on the Controller VM:
+
+```bash
+cd /path/to/GP/Controller
+./scripts/start_snort_ryu_ips.sh
+```
+
+3. Start the Snort-to-Ryu bridge:
+
+```bash
+cd /path/to/GP/Controller
+python3 snort_ryu_bridge.py
+```
+
+4. Start the Snort alert reader:
+
+```bash
+cd /path/to/GP/Controller
+sudo python3 snort_alert_reader.py
+```
+
+5. Install and start Snort 3 JSON alerting:
+
+```bash
+cd /path/to/GP/Controller
+sudo ./scripts/install_snort3_ips_config.sh
+sudo snort -c /etc/snort/sdn_ips.lua -T
+sudo SNORT_IFACE=br-snort ./scripts/start_snort3_json.sh
+```
+
+The standalone config installs to `/etc/snort/sdn_ips.lua` and loads
+`/etc/snort/rules/sdn_ips_local.rules`. Do not update only
+`/etc/snort/rules/local.rules` for this mode unless you also change
+`sdn_ips.lua` to include it.
+
+6. Verify:
+
+```bash
+cd /path/to/GP/Controller
+./scripts/verify_snort_ryu_ips.sh
+tail -f /var/log/snort/alert_json.txt
+```
+
+If VXLAN mirroring is needed first:
+
+```bash
+cd /path/to/GP/Controller
+sudo LOCAL_IP=<controller-vm-ip> REMOTE_IP=<topology-vm-ip> ./scripts/setup_vxlan_br_snort.sh
+```
+
+### Team Integrated Controller Mode
+
 ### Step 1: Start the Controller
 
 On the **Controller VM**:
@@ -241,13 +317,20 @@ A secondary Z-score behavioral analysis (threshold 8.0) catches attacks that sta
 GP/
 ├── Controller/
 │   ├── Controller.py          # Ryu SDN controller (main)
+│   ├── ryu_ips_app.py         # Standalone Snort/Ryu IPS controller
+│   ├── snort_ryu_bridge.py    # JSON alert bridge to Ryu REST API
+│   ├── snort_alert_reader.py  # Snort 3 alert_json reader/blocker
 │   ├── traffic_capture.py     # Behavioral analysis + dataset generation
 │   ├── traffic_mirror.py      # TAP interface for Snort
 │   ├── snort_monitor.py       # Snort process management + alert parsing
 │   ├── snort_setup.sh         # Automated Snort installation
+│   ├── snort3/                # Standalone Snort 3 local rules/config
+│   ├── scripts/               # Setup/start/verification helper scripts
 │   └── SNORT_IDS_README.md    # Snort-specific documentation
 ├── SDN Topology/
 │   └── topology .py           # Mininet-wifi network topology
+├── docs/
+│   └── SNORT_RYU_INTEGRATION.md
 ├── progression up till now.md # Technical changelog
 └── README.md                  # This file
 ```
@@ -263,3 +346,6 @@ GP/
 | `pingall` triggers false alerts | Should not happen — ICMP threshold is 100/window, `pingall` sends ~5 |
 | ARP spoof not detected | Ensure the real device has sent traffic first (binding must exist) |
 | Hostname shows as `Host 10.0.0.X` | Topology hostname registration may not have reached the controller — check network connectivity |
+| External ICMP reaches `br-snort` but no SID 1000001 alert | Verify `/etc/snort/sdn_ips.lua` includes `/etc/snort/rules/sdn_ips_local.rules` and that SID 1000001 is `alert icmp any any -> any any (msg:"ICMP Flood"; itype:8; detection_filter:track by_src, count 10, seconds 5; sid:1000001; rev:2;)` |
+| Snort alerts but the target still receives external packets | Run `snort_alert_reader.py` with sudo and verify the working reader added a DROP rule: `sudo iptables -S INPUT | grep <ip>` |
+| Snort shows SID 6 `(ipv4) IPv4 datagram length > captured length` | Disable offloads on the capture path with `sudo ./scripts/disable_capture_offloads.sh br-snort vxlan-snort <physical-nic>` and start Snort with `SNORT_SNAPLEN=65535` |
