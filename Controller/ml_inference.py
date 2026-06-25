@@ -34,6 +34,15 @@ needed (SMOTE was train-only).
 
 import os
 import time
+import warnings
+
+# Silence sklearn's per-predict "X does not have valid feature names" UserWarning.
+# It is benign (predictions are identical — verify_inference.py = 100%), but with
+# detection OFF the RF scores every flow, so during a flood it fires thousands of
+# times and floods the controller log, burying the [ML-OBSERVE] output. The
+# RFPreprocessor below also returns a named DataFrame to address the root cause;
+# this filter is the belt-and-suspenders guarantee.
+warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
 try:
     import numpy as np

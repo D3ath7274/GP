@@ -42,7 +42,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snort_monitor import SnortManager
 from traffic_mirror import TrafficMirror
 from traffic_capture import TrafficCapture  # Added
-from ml_inference import MLInferenceEngine  # ML Inference Engine
+from ml_inference import MLInferenceEngine  # ML Inference Engine (RF, Tier 3)
+from ae_inference import AEInferenceEngine  # Autoencoder anomaly engine (Tier 4)
 
 
 # =============================================================================
@@ -180,14 +181,22 @@ class SimpleSwitch(app_manager.RyuApp):
         #   conf < flag threshold    -> no action
         self._ml_block_threshold = 0.90   # set via CONTROL:ML:AUTHORIZE:<thr>
         self._ml_flag_threshold = 0.80
+        # Autoencoder (Tier 4) confidence bands — runs CONCURRENTLY with the RF.
+        #   conf >= ae_block -> anomaly (block in AUTHORIZE); ae_flag <= conf < ae_block -> flag
+        #   conf < ae_flag   -> silent.  (AE blocks lower than RF: it is the zero-day net.)
+        self._ae_block_threshold = 0.73
+        self._ae_flag_threshold = 0.60
         # src_ip -> expiry; dedups the instant Snort-alert blocker (Snort fires
         # per-packet, so block a source at most once per DROP-timeout window).
         self._snort_blocked = {}
         ml_model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
         if os.path.isdir(ml_model_dir):
             self._ml_engine = MLInferenceEngine(ml_model_dir, logger=self.logger)
+            # AE (Tier 4): loads ae_bundle.joblib if present, else disables gracefully.
+            self._ae_engine = AEInferenceEngine(ml_model_dir, logger=self.logger)
         else:
             self._ml_engine = None
+            self._ae_engine = None
             self.logger.warning(
                 "ml_models/ directory not found at %s — ML inference disabled. "
                 "Place rf_model.joblib in this directory to enable it.", ml_model_dir

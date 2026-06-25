@@ -36,16 +36,24 @@ sudo IPS_V2_FEATURES=1 ryu-manager Controller.py
 ```
 **GATE:** log shows `ML engine loaded … pipeline` (the deployed `rf_pipeline.joblib`).
 
-## Step 3 — Enable detection + observe mode (safe: no blocking)
+## Step 3 — DETECT OFF + ML OBSERVE (let the model classify on its own)
 
 Send over UDP 9999 (from VM2, or your control script):
 ```
-CONTROL:DETECT:ON
+CONTROL:DETECT:OFF
 CONTROL:ML:OBSERVE
 CONTROL:ML:FLAG:0.60
 CONTROL:ML:BLOCK:0.80
 ```
-**GATE:** controller confirms `ML MODE: OBSERVE` and the new flag/block thresholds.
+**Why DETECT OFF:** the RF/AE hook only scores rows still at `label == 0`. With
+`DETECT ON`, the rate-counter / DAI / Snort tiers label the obvious floods first and the
+ML hook *skips* them ("shadowing") — you would only see the model's opinion on leftovers.
+With `DETECT OFF`, every flow stays `label == 0`, so the model classifies **all** of them
+on its own. The ML hook is gated by `ML mode`, not by DETECT, so it still runs.
+**GATE:** controller confirms `ML MODE: OBSERVE` and the flag/block thresholds.
+
+> Run `DETECT ON + ML OBSERVE` only when you want to test the **layered, as-deployed**
+> behaviour (Snort/rate first, ML on survivors) — not the model's standalone accuracy.
 
 ## Step 4 — Drive live attacks
 
@@ -95,6 +103,6 @@ When the Keras AE is wired in (runs **concurrently** with the RF on the same win
 ---
 
 ## At-a-glance order
-1 set 60% floor (FLAG 0.60 / BLOCK 0.80 + OBSERVE gate) → 2 controller up → 3 DETECT ON +
+1 set 60% floor (FLAG 0.60 / BLOCK 0.80 + OBSERVE gate) → 2 controller up → 3 DETECT OFF +
 OBSERVE → 4 run attacks → 5 read conf, tally bands → 6 (opt) AUTHORIZE block check →
 7 record RF result → 8 add AE (same floor, 73% block) and repeat.
