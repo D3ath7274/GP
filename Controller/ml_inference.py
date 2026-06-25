@@ -88,7 +88,11 @@ if _ML_DEPS_OK:
             df = df.reindex(columns=self.encoded_columns, fill_value=0)
             df = df.apply(pd.to_numeric, errors='coerce').fillna(0.0)
             scaled = pd.DataFrame(self.scaler.transform(df), columns=self.encoded_columns)
-            return scaled[self.final_columns].values
+            # Return a DataFrame (not .values): the RF was fitted on a named DataFrame
+            # whose columns are exactly final_columns, so handing it names — instead of a
+            # bare array — silences sklearn's "X does not have valid feature names"
+            # warning without changing predictions (same columns, same order).
+            return scaled[self.final_columns]
 
     import __main__ as _main
     if not hasattr(_main, "RFPreprocessor"):
