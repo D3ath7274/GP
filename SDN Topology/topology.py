@@ -464,6 +464,76 @@ def topology():
                   % (kind.upper(), rotate_as))
         print('*** TOP-UP %s complete.' % kind.upper())
 
+    def run_full_topup(net, duration=180, baseline_secs=180, classes=None):
+        """ONE-COMMAND automated TOP-UP of the row-thin attack classes. Walk away.
+
+        Runs, back-to-back, a high-yield `run_topup_session` per class (each = every
+        source floods all other hosts concurrently -> ~5x rows), saving + auto-validating
+        each on the controller. Detection is ON only to LABEL (ML forced OFF, no blocks).
+
+        Defaults to the thin classes: udp (re-collect, was ISSUES), icmp, syn, arp(longer).
+        Override e.g. classes=[('udp','dataset_session4_udp.csv'),('scan','dataset_topup_scan.csv')].
+
+          py net.run_full_topup(net)           # ~1-1.5 h, walk away
+          py net.run_full_topup(net, duration=120)   # quicker / fewer rows
+        """
+        sessions = classes if classes is not None else [
+            ('udp',  'dataset_session4_udp.csv'),   # re-collect (previously ISSUES)
+            ('icmp', 'dataset_topup_icmp.csv'),
+            ('syn',  'dataset_topup_syn.csv'),
+            ('arp',  'dataset_topup_arp.csv'),
+        ]
+        est = sum((300 if k == 'arp' else duration) for k, _ in sessions)
+        print('*** FULL TOP-UP — %d thin-class sessions, FULLY AUTOMATED. Walk away (~%d min).'
+              % (len(sessions), int(len(sessions) * (baseline_secs + 30) / 60 + est * 6 / 60)))
+        _send_to_controller('CONTROL:ML:OFF')          # never block during collection
+        start_background_traffic(net)
+        wait(net, baseline_secs)                       # initial warm-up so device baselines mature
+        for i, (kind, fname) in enumerate(sessions, start=1):
+            dur = 300 if kind == 'arp' else duration   # ARP is low-volume -> run it longer
+            print('*** [%d/%d] TOP-UP %s -> %s' % (i, len(sessions), kind.upper(), fname))
+            run_topup_session(net, kind, duration=dur, baseline_secs=baseline_secs,
+                              rotate_as=fname)
+        print('*** FULL TOP-UP complete — review the controller log for each PASS/ISSUES, '
+              'then merge with dataset_merge.py into the v3 master.')
+
+    def run_full_collection_hy(net, normal_secs=600, duration=180, baseline_secs=180):
+        """ONE-COMMAND HIGH-YIELD full collection: 1 normal + 6 attack sessions
+        (icmp, syn, udp, scan, arp, cps), each using the concurrent multi-target floods
+        (~5x rows on the thin flood classes), each saved + auto-validated on the
+        controller. Detection ON only LABELS (ML forced OFF, no blocks). Walk away.
+
+        This is the all-types version of run_full_topup; use it for a fresh full dataset
+        you will MERGE into the existing master. Merge the 7 files afterwards.
+
+          py net.run_full_collection_hy(net)                  # ~2-2.5 h
+          py net.run_full_collection_hy(net, duration=120)    # quicker / fewer rows
+        """
+        _send_to_controller('CONTROL:ML:OFF')          # never block during collection
+        start_background_traffic(net)
+        detect_off(net)
+        _send_to_controller('CONTROL:ROTATE:_discard.csv')   # drop setup/pingall noise
+        wait(net, 3)
+
+        print('*** [1/7] NORMAL — %ds of pure background' % normal_secs)
+        wait(net, normal_secs)
+        _send_to_controller('CONTROL:ROTATE:dataset_session1_normal.csv')
+        wait(net, 5)
+
+        attacks = [('icmp', 'dataset_session2_icmp.csv'),
+                   ('syn',  'dataset_session3_syn.csv'),
+                   ('udp',  'dataset_session4_udp.csv'),
+                   ('scan', 'dataset_session5_portscan.csv'),
+                   ('arp',  'dataset_session6_arpspoof.csv'),
+                   ('cps',  'dataset_session7_cps.csv')]
+        for i, (kind, fname) in enumerate(attacks, start=2):
+            dur = 300 if kind == 'arp' else duration   # ARP is low-volume -> run longer
+            print('*** [%d/7] %s -> %s' % (i, kind.upper(), fname))
+            run_topup_session(net, kind, duration=dur, baseline_secs=baseline_secs,
+                              rotate_as=fname)
+        print('*** FULL HIGH-YIELD COLLECTION complete — 7 sessions saved + validated. '
+              'Merge into the bigger master with dataset_merge.py.')
+
     def run_full_collection(net, normal_secs=600, baseline_secs=300):
         """FULLY AUTOMATED 7-session capture in ONE command. Walk away (~1.5-2 h).
 
@@ -521,6 +591,8 @@ def topology():
     net.wait = wait
     net.run_attack_session = run_attack_session
     net.run_topup_session = run_topup_session
+    net.run_full_topup = run_full_topup
+    net.run_full_collection_hy = run_full_collection_hy
     net.run_full_collection = run_full_collection
 
     # --- Send hostname registrations to the controller ---
@@ -543,8 +615,10 @@ def topology():
     print("*** Detection commands: py net.detect_on(net)  /  py net.detect_off(net)")
     print("*** Attack signalling: py net.attack_start(net,'hping3','flood')  /  py net.attack_stop(net)")
     print("*** One-command attack session: py net.run_attack_session(net,'icmp')  (kinds: icmp syn udp cps scan arp)")
-    print("*** HIGH-YIELD top-up (more attack rows fast): py net.run_topup_session(net,'syn',rotate_as='dataset_topup_syn.csv')")
-    print("*** FULLY AUTOMATED 7-session capture: py net.run_full_collection(net)  (walk away ~1.5-2 h; auto-saves + validates each)")
+    print("*** HIGH-YIELD top-up (one class): py net.run_topup_session(net,'syn',rotate_as='dataset_topup_syn.csv')")
+    print("*** ONE-COMMAND AUTOMATED TOP-UP (thin classes): py net.run_full_topup(net)  (walk away; auto-saves + validates each)")
+    print("*** HIGH-YIELD full collection (all types, good row counts): py net.run_full_collection_hy(net)  (walk away; auto-saves + validates each)")
+    print("*** FULLY AUTOMATED 7-session capture (sequential): py net.run_full_collection(net)  (walk away ~1.5-2 h; auto-saves + validates each)")
     print("*** Running CLI")
     CLI(net)
     net.stop()
