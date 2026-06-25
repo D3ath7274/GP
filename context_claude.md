@@ -14,20 +14,29 @@ re-onboarding (human or AI). Last updated alongside the autoencoder Tier-4 integ
   devices, malware spread, post-breach lateral movement.
 
 ## 2. Testbed / architecture (two VMs on one LAN)
-- **VM2 — Topology (~192.168.1.26):** Mininet-WiFi (`SDN Topology/topology.py`), Open
+**STATIC IPs (install runbook `SDN_IPS_Snort_Installation_Runbook.pdf`):** controller VM
+= **192.168.1.200**, mininet VM = **192.168.1.201**, external test machine = 192.168.1.202.
+`topology.py` `CONTROLLER_IP` defaults to `192.168.1.200` (override via env `CONTROLLER_IP`).
+- **VM2 — Topology (192.168.1.201):** Mininet-WiFi (`SDN Topology/topology.py`), Open
   vSwitch `s1`, access point `ap1`. Hosts: `sta1` 10.0.0.1, `sta2` 10.0.0.2 (Wi-Fi,
   MACs 42:00:00:00:00:00 / :01:00), `h1` 10.0.0.3, `h2` 10.0.0.4 (wired; **h2 = HTTP +
   iperf server**), IoT `TempSensor` 10.0.0.5, `Cam` 10.0.0.6 (registered by IP).
-- **VM1 — Controller (~192.168.1.19):** Ryu (`Controller/Controller.py`, **OpenFlow
-  1.0**), Snort, `traffic_capture.py`, `ml_inference.py` (RF), `ae_inference.py` (AE),
-  `TrafficMirror` → `snort_tap`.
+- **VM1 — Controller (192.168.1.200):** Ryu (`Controller/Controller.py` or
+  `Controller_main_Claude.py`, **OpenFlow 1.0**), Snort 3, `traffic_capture.py`,
+  `ml_inference.py` (RF), `ae_inference.py` (AE).
 - **Channels:** OpenFlow **TCP 6633** (control plane); out-of-band **UDP 9999**
   (REGISTER / CONTROL / ATTACK_START-STOP).
-- **Mirror:** every data-plane packet → `OFPP_CONTROLLER` (max_len 0xffff) → injected
-  into TAP `snort_tap`; Snort watches **ens33** (physical 192.168.1.x) + **snort_tap**
-  (mirrored 10.0.0.x). The Mininet TAP path **doubles** raw packet/byte counts (ratio/
-  entropy features are immune; raw PPS is ~2×).
-- (Friend's separate standalone flow uses a VXLAN `br-snort` mirror — see §10.)
+- **Two Snort mirror paths (choose one):**
+  1. **OpenFlow TAP (default in code):** every data-plane packet → `OFPP_CONTROLLER`
+     (max_len 0xffff) → injected into TAP `snort_tap`; Snort watches `ens33` + `snort_tap`.
+     The TAP path **doubles** raw packet/byte counts (ratios/entropy immune; raw PPS ~2×).
+  2. **Permanent VXLAN `br-snort` bridge (install runbook, now the deployed path):** the
+     mininet VM's OVS mirrors `s1` (VXLAN key 100) + `ap1` (key 101) to the controller's
+     `br-snort`; the controller `tc`-mirrors `ens33` ingress into `br-snort` too. Made
+     permanent via systemd: `br-snort.service` (controller) + `mininet-snort-mirror.service`
+     (mininet VM). Snort then watches `ens33` + `br-snort`. Select it on the merged
+     controller with env `SNORT_IFACES=ens33,br-snort` + `IPS_NO_TAP=1`.
+     **This bridge must be replicated on the HP t530 (see `t530_bridge_setup.md`).**
 
 ## 3. Detection tiers — "block if ANY tier fires"
 | Tier | Catches | File / artifact | Runtime deps | Bands |
