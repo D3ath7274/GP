@@ -34,6 +34,15 @@ needed (SMOTE was train-only).
 
 import os
 import time
+import warnings
+
+# Silence sklearn's per-predict "X does not have valid feature names" UserWarning.
+# It is benign (predictions are identical — verify_inference.py = 100%), but with
+# detection OFF the RF scores every flow, so during a flood it fires thousands of
+# times and floods the controller log, burying the [ML-OBSERVE] output. The
+# RFPreprocessor below also returns a named DataFrame to address the root cause;
+# this filter is the belt-and-suspenders guarantee.
+warnings.filterwarnings("ignore", message="X does not have valid feature names")
 
 try:
     import numpy as np
@@ -88,7 +97,11 @@ if _ML_DEPS_OK:
             df = df.reindex(columns=self.encoded_columns, fill_value=0)
             df = df.apply(pd.to_numeric, errors='coerce').fillna(0.0)
             scaled = pd.DataFrame(self.scaler.transform(df), columns=self.encoded_columns)
-            return scaled[self.final_columns].values
+            # Return a DataFrame (not .values): the RF was fitted on a named DataFrame
+            # whose columns are exactly final_columns, so handing it names — instead of a
+            # bare array — silences sklearn's "X does not have valid feature names"
+            # warning without changing predictions (same columns, same order).
+            return scaled[self.final_columns]
 
     import __main__ as _main
     if not hasattr(_main, "RFPreprocessor"):

@@ -45,6 +45,18 @@ from traffic_capture import TrafficCapture  # Added
 from ml_inference import MLInferenceEngine  # ML Inference Engine (RF, Tier 3)
 from ae_inference import AEInferenceEngine  # Autoencoder anomaly engine (Tier 4)
 
+# REST API (merged from ryu_ips_app.py) — exposes /ips/block etc. on :8080 so an
+# external Snort flow (snort_alert_reader.py -> snort_ryu_bridge.py) can push IP
+# blocks while the team Snort/rate/RF/AE tiers run at the same time.
+import json
+import ipaddress
+import socket as _socket_lib
+import struct as _struct_lib
+from ryu.app.wsgi import ControllerBase, WSGIApplication, route
+from webob import Response
+
+IPS_INSTANCE_NAME = 'controller_main_ips'
+
 
 # =============================================================================
 # COLLECTION_MODE: Set to True during dataset collection.
@@ -59,12 +71,24 @@ COLLECTION_MODE = True
 
 class SimpleSwitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_0.OFP_VERSION]
+    # WSGI context (merged from ryu_ips_app.py): ryu-manager starts the REST
+    # server on :8080 and passes the wsgi app in kwargs.
+    _CONTEXTS = {'wsgi': WSGIApplication}
 
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self._datapaths = {}   # dpid -> datapath (for sending flow mods outside packet_in)
         self._blocked_ips = {} # ip -> {'mac':, 'until':, 'attack_type':}
+        # REST-API blocks (merged from ryu_ips_app.py), tracked separately from the
+        # MAC-based tier blocks above. The WSGI REST server runs on :8080.
+        self._rest_blocked_ips = {}  # ip -> {'reason':, 'mode': 'mac'|'ip', ...}
+        _wsgi = kwargs.get('wsgi')
+        if _wsgi is not None:
+            _wsgi.register(IPSRestController, {IPS_INSTANCE_NAME: self})
+            self.logger.info(
+                "REST IPS API on :8080  (POST /ips/block, DELETE /ips/block/<ip>, "
+                "GET /ips/blocked, /ips/switches, /ips/status)")
 
         # ===================================================================
         # Traffic Mirroring: All data-plane traffic (10.0.0.x + 192.168.1.x)
@@ -536,6 +560,96 @@ class SimpleSwitch(app_manager.RyuApp):
                 break  # Socket closed
             except Exception as e:
                 self.logger.error("UDP listener error: %s", e)
+
+    # ===================================================================
+    # REST API block helpers (merged from ryu_ips_app.py)
+    # ===================================================================
+    # External tools (the friend's snort_alert_reader.py -> snort_ryu_bridge.py,
+    # or any HTTP client) POST {"src_ip": ...} to /ips/block. We resolve the MAC
+    # and reuse the proven MAC-based block_attacker() (OpenFlow 1.0 dl_src DROP);
+    # if the MAC is unknown we fall back to an IP-based (nw_src) OF 1.0 DROP.
+    # These run ALONGSIDE the controller's own Snort/rate/RF/AE tiers.
+    @staticmethod
+    def _ip_to_int(ip_str):
+        return _struct_lib.unpack('!I', _socket_lib.inet_aton(ip_str))[0]
+
+    def _resolve_mac(self, ip):
+        """Best-effort IP -> MAC from the controller's learned mappings."""
+        mac = ''
+        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+            mac = getattr(self.traffic_capture, '_ip_to_mac', {}).get(ip, '')
+        if not mac and ip in self._arp_bindings:
+            mac = self._arp_bindings[ip].get('mac', '')
+        return mac
+
+    def rest_block_ip(self, src_ip, reason='', idle_timeout=0, hard_timeout=600):
+        """Block a source IP via the REST API. Returns a JSON-able dict."""
+        try:
+            ipaddress.ip_address(src_ip)
+        except ValueError:
+            return {'status': 'error', 'message': f'Invalid IP: {src_ip}'}
+        if not self._datapaths:
+            return {'status': 'error', 'message': 'No switches connected'}
+
+        mac = self._resolve_mac(src_ip)
+        if mac:
+            try:
+                self.block_attacker(
+                    src_ip=src_ip, src_mac=mac, attack_type='REST/Snort',
+                    timeout=hard_timeout or 600, detection_time=time.time(),
+                    target_ip='', reason=reason or 'rest-api')
+                self._rest_blocked_ips[src_ip] = {'reason': reason, 'mac': mac, 'mode': 'mac'}
+                return {'status': 'blocked', 'src_ip': src_ip, 'mac': mac,
+                        'mode': 'mac', 'reason': reason}
+            except Exception as e:
+                return {'status': 'error', 'message': str(e)}
+
+        # MAC unknown -> IP-based OF 1.0 DROP (dl_type=IP, nw_src=<ip>)
+        pushed = []
+        for dpid, datapath in self._datapaths.items():
+            ofproto = datapath.ofproto
+            parser = datapath.ofproto_parser
+            match = parser.OFPMatch(dl_type=0x0800, nw_src=self._ip_to_int(src_ip))
+            mod = parser.OFPFlowMod(
+                datapath=datapath, match=match, cookie=0,
+                command=ofproto.OFPFC_ADD, idle_timeout=idle_timeout,
+                hard_timeout=hard_timeout, priority=64000,
+                flags=ofproto.OFPFF_SEND_FLOW_REM, actions=[])  # [] = DROP
+            datapath.send_msg(mod)
+            pushed.append(str(dpid))
+        self._rest_blocked_ips[src_ip] = {'reason': reason, 'mode': 'ip', 'switches': pushed}
+        self.logger.warning("[REST-IPS] DROP %s (IP-match) on %d switch(es) | %s",
+                            src_ip, len(pushed), reason)
+        return {'status': 'blocked', 'src_ip': src_ip, 'mode': 'ip',
+                'reason': reason, 'switches': pushed}
+
+    def rest_unblock_ip(self, src_ip):
+        """Remove a REST/tier block for src_ip (both MAC- and IP-based DROPs)."""
+        info = self._rest_blocked_ips.pop(src_ip, None)
+        # MAC-based unblock (deletes the dl_src DROP installed by block_attacker)
+        if hasattr(self, 'traffic_capture') and self.traffic_capture:
+            try:
+                self.traffic_capture.manual_unblock(src_ip)
+            except Exception:
+                pass
+        self._blocked_ips.pop(src_ip, None)
+        # IP-based DROP cleanup (fallback rules)
+        for dpid, datapath in self._datapaths.items():
+            ofproto = datapath.ofproto
+            parser = datapath.ofproto_parser
+            match = parser.OFPMatch(dl_type=0x0800, nw_src=self._ip_to_int(src_ip))
+            mod = parser.OFPFlowMod(
+                datapath=datapath, match=match, cookie=0,
+                command=ofproto.OFPFC_DELETE, out_port=ofproto.OFPP_NONE, priority=64000)
+            datapath.send_msg(mod)
+        self.logger.info("[REST-IPS] Unblocked %s", src_ip)
+        return {'status': 'unblocked' if info else 'cleared', 'src_ip': src_ip}
+
+    def get_blocked_list(self):
+        """All currently blocked sources (REST + tier)."""
+        out = [{'ip': ip, 'kind': 'rest', **info} for ip, info in self._rest_blocked_ips.items()]
+        out += [{'ip': ip, 'kind': 'tier', **info} for ip, info in self._blocked_ips.items()]
+        return out
 
     # ===================================================================
     # Attacker Blocking (OpenFlow DROP Rule)
@@ -1054,3 +1168,62 @@ class SimpleSwitch(app_manager.RyuApp):
             self.logger.info("port modified %s", port_no)
         else:
             self.logger.info("Illeagal port state %s %s", port_no, reason)
+
+
+# =============================================================================
+# REST controller (merged from ryu_ips_app.py). Same routes/JSON as the friend's
+# standalone IPS, so snort_ryu_bridge.py (RYU_API_URL=http://127.0.0.1:8080/ips/block)
+# works unchanged against this combined controller.
+# =============================================================================
+class IPSRestController(ControllerBase):
+
+    def __init__(self, req, link, data, **config):
+        super(IPSRestController, self).__init__(req, link, data, **config)
+        self.app = data[IPS_INSTANCE_NAME]
+
+    @route('ips', '/ips/block', methods=['POST'])
+    def block_ip(self, req, **kwargs):
+        try:
+            body = req.json if req.body else {}
+        except Exception:
+            return self._json({'status': 'error', 'message': 'Invalid JSON'}, 400)
+        src_ip = body.get('src_ip', '')
+        reason = body.get('reason', 'Snort alert')
+        try:
+            idle = int(body.get('idle_timeout', 0))
+            hard = int(body.get('hard_timeout', 600))
+        except (TypeError, ValueError):
+            idle, hard = 0, 600
+        if not src_ip:
+            return self._json({'status': 'error', 'message': 'src_ip required'}, 400)
+        result = self.app.rest_block_ip(src_ip, reason, idle, hard)
+        code = 200 if result.get('status') == 'blocked' else 500
+        return self._json(result, code)
+
+    @route('ips', '/ips/block/{src_ip}', methods=['DELETE'])
+    def unblock_ip(self, req, src_ip, **kwargs):
+        return self._json(self.app.rest_unblock_ip(src_ip))
+
+    @route('ips', '/ips/blocked', methods=['GET'])
+    def list_blocked(self, req, **kwargs):
+        return self._json({'blocked': self.app.get_blocked_list()})
+
+    @route('ips', '/ips/switches', methods=['GET'])
+    def list_switches(self, req, **kwargs):
+        switches = [{'dpid': str(d)} for d in self.app._datapaths]
+        return self._json({'switches': switches, 'count': len(switches)})
+
+    @route('ips', '/ips/status', methods=['GET'])
+    def status(self, req, **kwargs):
+        return self._json({
+            'status': 'running',
+            'switches': len(self.app._datapaths),
+            'detection_enabled': self.app._detection_enabled,
+            'ml_mode': self.app._ml_mode,
+            'rest_blocked': len(self.app._rest_blocked_ips),
+            'tier_blocked': len(self.app._blocked_ips),
+        })
+
+    def _json(self, data, status=200):
+        return Response(content_type='application/json',
+                        body=json.dumps(data).encode('utf-8'), status=status)

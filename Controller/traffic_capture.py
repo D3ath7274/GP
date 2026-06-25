@@ -1202,6 +1202,69 @@ class TrafficCapture:
                     self._capture_evidence(row, ml_type, ml_conf, flag_thr, block_thr)
                 # else conf < flag_thr: ignore (OBSERVE already surfaced it above)
 
+        # =====================================================================
+        # AE Tier 4: Per-Flow Autoencoder anomaly scoring (CONCURRENT with the RF)
+        # =====================================================================
+        # Scores EVERY window row with its own opinion, independent of the RF.
+        # confidence = normalised reconstruction error. Bands (set on controller):
+        #   conf >= ae_block (0.73) -> anomaly; AUTHORIZE installs an OpenFlow DROP.
+        #   ae_flag (0.60) <= conf < ae_block -> flag + alert (no block).
+        #   conf < ae_flag -> SILENT (so normal traffic does not flood the log).
+        # The AE has no attack-type; it labels 'Anomaly (AE)' (unknown / zero-day).
+        # Disabled automatically when ae_bundle.joblib is absent (engine not loaded).
+        # =====================================================================
+        if (rows and self.controller and
+                getattr(self.controller, '_ml_mode', 'OFF') in ('OBSERVE', 'AUTHORIZE') and
+                getattr(self.controller, '_ae_engine', None) and
+                self.controller._ae_engine.is_loaded):
+
+            ae_mode = self.controller._ml_mode
+            ae_block_thr = getattr(self.controller, '_ae_block_threshold', 0.73)
+            ae_flag_thr = getattr(self.controller, '_ae_flag_threshold', 0.60)
+            ae_engine = self.controller._ae_engine
+            ae_blocked_this_window = set()
+
+            for row in rows:
+                try:
+                    is_anom, ae_conf, ae_err = ae_engine.score(row)
+                except Exception:
+                    continue
+                if ae_conf < ae_flag_thr:
+                    continue                       # silent: well-reconstructed (normal) window
+                src_ip = row.get('src_ip', '?')
+                dst_ip = row.get('dst_ip', '?')
+                band = 'BLOCK' if ae_conf >= ae_block_thr else 'FLAG'
+
+                if ae_mode == 'OBSERVE':
+                    self._log('info',
+                        "[AE-OBSERVE] %s → %s  anomaly conf=%.2f  err=%.4f  band=%s",
+                        src_ip, dst_ip, ae_conf, ae_err, band)
+
+                if ae_conf >= ae_block_thr:
+                    if str(row.get('label', '0')) == '0':   # don't overwrite RF/rate label
+                        row['label'] = 2
+                        row['attack_type'] = 'Anomaly (AE)'
+                    if ae_mode == 'AUTHORIZE':
+                        self._log('warning',
+                            "[AE] ANOMALY (block) %s → %s  conf=%.2f — blocking (zero-day net)",
+                            src_ip, dst_ip, ae_conf)
+                        if (src_ip not in ae_blocked_this_window and
+                                src_ip not in self._confirmed_attackers):
+                            attacker_mac = self._ip_to_mac.get(src_ip, '')
+                            if attacker_mac and self.controller:
+                                try:
+                                    self.controller.block_attacker(
+                                        src_ip=src_ip, src_mac=attacker_mac,
+                                        attack_type='Anomaly (AE)', timeout=30,
+                                        detection_time=time.time(), target_ip=dst_ip,
+                                        reason=f'ae-{ae_conf:.2f}')
+                                    ae_blocked_this_window.add(src_ip)
+                                except Exception as e:
+                                    self._log('error', "AE block_attacker failed: %s", e)
+                elif ae_mode == 'AUTHORIZE':
+                    self._log('warning',
+                        "[AE] FLAGGED (no block) %s → %s  conf=%.2f", src_ip, dst_ip, ae_conf)
+
         # Drop the raw-frame evidence buffer for this window (bounded memory).
         if self._raw_frames:
             with self._flow_lock:
