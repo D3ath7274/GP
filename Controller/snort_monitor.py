@@ -19,6 +19,7 @@ import threading
 import time
 import re
 import os
+import json
 import signal
 from collections import deque
 from datetime import datetime
@@ -45,6 +46,7 @@ ATTACK_CLASSIFICATIONS = {
     # --- Port Scan (Attack Type 2) ---
     'port scan': 'Port Scan',
     'portscan': 'Port Scan',
+    'portsweep': 'Port Scan',
     'nmap': 'Port Scan',
     'scan attempt': 'Port Scan',
     'reconnaissance': 'Port Scan',
@@ -56,6 +58,10 @@ ATTACK_CLASSIFICATIONS = {
     'smurf': 'ICMP Flood',
 
     # --- ARP Spoofing (Attack Type 4) ---
+    # 'arp cache overwrite' / 'arp mismatch' are the Snort 3 arp_spoof inspector
+    # (GID 112) built-in messages; map them to the canonical class too.
+    'arp cache overwrite': 'ARP Spoofing',
+    'arp mismatch': 'ARP Spoofing',
     'arp spoof': 'ARP Spoofing',
     'arp poisoning': 'ARP Spoofing',
     'arp': 'ARP Spoofing',
@@ -63,6 +69,12 @@ ATTACK_CLASSIFICATIONS = {
     # --- UDP Flood (Attack Type 5) ---
     'udp flood': 'UDP Flood',
     'dns amplification': 'UDP Flood',
+
+    # --- Control Plane Saturation (Attack Type 6) ---
+    # CPS = hping3 --udp --flood -p ++1 (incrementing dst ports). Mapped from the
+    # SID 1000006 rule message so it lands as a canonical class (see _compute_label).
+    'control plane saturation': 'Control Plane Saturation',
+    'control plane': 'Control Plane Saturation',
 
     # --- Other (still useful for Snort signature matching) ---
     'sql injection': 'SQL Injection',
@@ -228,6 +240,85 @@ def parse_alert_line(line):
 
 
 # =============================================================================
+# Alert JSON Parser (Snort 3 alert_json — the curated sdn_ips.lua schema)
+# =============================================================================
+# Each line is one JSON object. Fields emitted by Controller/snort3/sdn_ips.lua:
+#   timestamp pkt_num proto src_ap dst_ap src_addr src_port dst_addr dst_port
+#   rule sid msg priority action
+# This parser returns the SAME dict shape as parse_alert_line() so every
+# downstream consumer (_handle_snort_alert, traffic_capture._compute_label,
+# the CSV snort_sid/active_snort_alerts columns) is unchanged.
+# =============================================================================
+
+def _json_endpoint(alert, side):
+    """Resolve (ip, port) for 'src'/'dst' from addr/port or an 'addr:port' ap field."""
+    ip = alert.get(f'{side}_addr') or alert.get(f'{side}_ip')
+    port = alert.get(f'{side}_port')
+    if not ip:
+        ap = alert.get(f'{side}_ap')
+        if ap:
+            ap = str(ap).strip()
+            if ap.startswith('['):              # IPv6 [addr]:port
+                end = ap.rfind(']')
+                ip = ap[1:end] if end > 0 else ap
+                if end > 0 and len(ap) > end + 2 and not port:
+                    port = ap[end + 2:]
+            elif ':' in ap:                      # IPv4 addr:port
+                left, _, right = ap.rpartition(':')
+                ip = left or ap
+                port = port or right
+            else:
+                ip = ap
+    ip = str(ip) if ip not in (None, '') else '?'
+    port = str(port) if port not in (None, '') else '?'
+    return ip, port
+
+
+def parse_alert_json_line(line):
+    """Parse one Snort 3 alert_json line into the common alert dict (or None)."""
+    if not line:
+        return None
+    line = line.strip()
+    if not line.startswith('{'):
+        return None
+    try:
+        j = json.loads(line)
+    except (ValueError, TypeError):
+        return None
+
+    # SID/GID/REV: prefer explicit fields, else split a "gid:sid:rev" rule string.
+    gid, sid, rev = j.get('gid'), j.get('sid'), j.get('rev')
+    if sid in (None, '') and j.get('rule'):
+        parts = str(j.get('rule')).split(':')
+        if len(parts) >= 3:
+            gid, sid, rev = parts[0], parts[1], parts[2]
+        elif len(parts) == 2:
+            gid, sid = parts[0], parts[1]
+        elif len(parts) == 1:
+            sid = parts[0]
+
+    src_ip, src_port = _json_endpoint(j, 'src')
+    dst_ip, dst_port = _json_endpoint(j, 'dst')
+    msg = j.get('msg') or j.get('message') or ''
+
+    d = {
+        'timestamp': str(j.get('timestamp') or ''),
+        'gid': str(gid) if gid not in (None, '') else '?',
+        'sid': str(sid) if sid not in (None, '') else '?',
+        'rev': str(rev) if rev not in (None, '') else '?',
+        'msg': msg,
+        'classification': str(j.get('class') or j.get('classification') or ''),
+        'priority': str(j.get('priority') or '?'),
+        'proto': str(j.get('proto') or '?'),
+        'src_ip': src_ip, 'src_port': src_port,
+        'dst_ip': dst_ip, 'dst_port': dst_port,
+        'raw': line,
+    }
+    d['attack_type'] = classify_attack(msg)
+    return d
+
+
+# =============================================================================
 # SnortManager Class
 # =============================================================================
 
@@ -251,7 +342,7 @@ class SnortManager:
         max_alerts (int): Max number of recent alerts to keep in memory
     """
 
-    def __init__(self, interface='ens33', interfaces=None, config_path='/etc/snort/snort.lua',
+    def __init__(self, interface='ens33', interfaces=None, config_path='/etc/snort/sdn_ips.lua',
                  log_dir='/var/log/snort', logger=None, on_alert=None,
                  max_alerts=1000):
         # Support single interface or multiple (for physical + TAP mirror)
@@ -263,6 +354,10 @@ class SnortManager:
         self.config_path = config_path
         self.log_dir = log_dir
         self.alert_file = os.path.join(log_dir, 'alert_fast.txt')
+        # Alert output format the tailer should parse: 'json' (Snort 3 alert_json,
+        # the curated sdn_ips.lua schema) or 'fast' (Snort 2.x alert_fast fallback).
+        # Set authoritatively by start_snort() once the Snort version is known.
+        self._alert_format = 'fast'
         self.logger = logger
         self.on_alert = on_alert
         self.max_alerts = max_alerts
@@ -280,7 +375,13 @@ class SnortManager:
         # It fires during hping3 --icmp floods, and the protocol reclassifier
         # (_protocol_aware_reclassify) converts "Port Scan" → "ICMP Flood".
         # Alert dedup (30s window) prevents log flooding.
+        # NOTE: with the curated Snort 3 ruleset (sdn_ips_local.rules, SIDs
+        # 1000001-1000006), the noisy Snort 2.x community SIDs below no longer
+        # fire at all — they are kept only so the 2.x fallback path stays quiet.
+        # CRITICAL: 1000001 is the curated **ICMP Flood** rule, so it must NOT be
+        # dropped here (it was a probe/test SID under the old community ruleset).
         self._blocked_sids = {
+            6,               # Snort 3 decoder: IPv4 datagram length > captured length (mirror/offload noise)
             527,             # BAD-TRAFFIC same SRC/DST (TAP mirror artifact)
             366, 384, 408,   # ICMP PING, ICMP Echo Reply (normal pingall)
             399,             # ICMP Destination Unreachable Host Unreachable
@@ -294,7 +395,6 @@ class SnortManager:
             2100366,         # GPL PING
             2101390,         # GPL ICMP Echo Reply
             2101424,         # GPL DNS request
-            1000001,         # Often used for custom probe/test rules
         }
 
         # Alert deduplication: suppress repeated alerts per SOURCE DEVICE
@@ -373,19 +473,24 @@ class SnortManager:
                 )
                 return False
             self._alert_filename = 'alert'
+            self._alert_format = 'fast'
             # No -D for Snort 2 to catch startup errors
             snort_args = ['-A', 'fast', '-q']
         else:
+            # Snort 3: drive the curated config (sdn_ips.lua) and consume its
+            # structured alert_json output (the schema from sdn_ips_local.rules).
             config_path = self.config_path
-            self._alert_filename = 'alert_fast.txt'
+            self._alert_filename = 'alert_json.txt'
+            self._alert_format = 'json'
             # No -D for Snort 3 to catch startup errors
-            snort_args = ['-A', 'alert_fast', '-q']
+            snort_args = ['-A', 'alert_json', '-q']
             if snort_ver == 3:
                 snort_args.append('--warn-all')
 
         if not os.path.exists(config_path):
             self._log_error(
-                "Snort config not found at %s. Run snort_setup.sh first!", config_path
+                "Snort config not found at %s. Install the curated Snort 3 config "
+                "first: sudo ./scripts/install_snort3_ips_config.sh", config_path
             )
             return False
 
@@ -540,7 +645,10 @@ class SnortManager:
 
     def _process_alert_line(self, line):
         """Parse an alert line, deduplicate, and invoke the callback."""
-        alert = parse_alert_line(line)
+        if getattr(self, '_alert_format', 'fast') == 'json':
+            alert = parse_alert_json_line(line)
+        else:
+            alert = parse_alert_line(line)
         if not alert:
             return
 

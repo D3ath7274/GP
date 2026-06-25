@@ -360,6 +360,110 @@ def topology():
         print(f"*** {kind.upper()} SESSION complete ({total} attacks). "
               f"Now: exit -> Ctrl-C -> rename dataset.csv -> validate_dataset.py")
 
+    # --- High-yield TOP-UP collection (concurrent multi-target floods) ---
+    # The thin classes (ICMP/SYN/UDP/ARP) are thin because a flood from one src
+    # to one dst is a SINGLE flow key -> ONE row per 5 s window (flow collapse).
+    # Row count scales with (concurrent flow keys) x (windows), NOT packet volume.
+    # So each source floods ALL other hosts CONCURRENTLY (5 flow keys/source) for
+    # a longer duration -> ~5x the rows. One source at a time keeps per-attacker
+    # labels clean (the label-integrity invariant). Per-host CPU caps total pps,
+    # so the controller load is ~the same as the old 1:1 floods — just more flows.
+    _ALL_IPS = ['10.0.0.1', '10.0.0.2', '10.0.0.3',
+                '10.0.0.4', '10.0.0.5', '10.0.0.6']
+    _ATTACK_META = {
+        'icmp': ('hping3',   'icmp-flood', 'ICMP Flood'),
+        'syn':  ('hping3',   'syn-flood',  'SYN Flood'),
+        'udp':  ('hping3',   'udp-flood',  'UDP Flood'),
+        'cps':  ('hping3',   'cps',        'Control Plane Saturation'),
+        'scan': ('nmap',     'port-scan',  'Port Scan'),
+        'arp':  ('arpspoof', 'arp-spoof',  'ARP Spoofing'),
+    }
+
+    def _attack_cmd(kind, target, intfname, duration, rate):
+        """One timeout-bounded attack command against a single target. rate='flood'
+        -> hping3 --flood; else an inter-packet gap in microseconds (rate=200 ->
+        -i u200 ~ 5000 pps) to bound load while staying above detection thresholds."""
+        rl = '--flood' if rate == 'flood' else '-i u%d' % int(rate)
+        return {
+            'icmp': 'timeout %d hping3 --icmp %s %s' % (duration, rl, target),
+            'syn':  'timeout %d hping3 -S %s -p 80 %s' % (duration, rl, target),
+            'udp':  'timeout %d hping3 --udp %s -p 53 %s' % (duration, rl, target),
+            'cps':  'timeout %d hping3 --udp %s -p ++1 %s' % (duration, rl, target),
+            'scan': 'timeout %d nmap -sS -p 1-1000 %s' % (duration, target),
+            'arp':  'timeout %d arpspoof -i %s -t %s 10.0.0.3' % (duration, intfname, target),
+        }.get(kind)
+
+    def launch_attack_multi(net, host, kind, duration=180, settle=15, rate='flood'):
+        """One source attacks ALL other hosts concurrently for `duration`s, then
+        ATTACK_STOP -> 7s flush-grace -> CONTROL:CLEAR this source -> settle."""
+        node = net.getNodeByName(host)
+        if node is None:
+            print('*** launch_attack_multi: unknown host %s' % host); return
+        if kind not in _ATTACK_META:
+            print('*** launch_attack_multi: bad kind %s' % kind); return
+        intf = node.defaultIntf()
+        intfname = intf.name if intf is not None else '%s-eth0' % host
+        tool, intensity, _ = _ATTACK_META[kind]
+        host_ip = node.IP()
+        targets = [ip for ip in _ALL_IPS if ip != host_ip]
+        _send_to_controller('ATTACK_START:%s:%s' % (tool, intensity))
+        print('*** [%s] %s -> %s concurrently for %ss (ATTACK_START sent)'
+              % (host, kind, targets, duration))
+        for t in targets:
+            cmd = _attack_cmd(kind, t, intfname, duration, rate)
+            if cmd:
+                node.cmd(cmd + ' >/dev/null 2>&1 &')
+        time.sleep(duration + 2)                       # tools self-terminate via `timeout`
+        node.cmd('pkill -f %s 2>/dev/null' % tool)     # kill any straggler (sequential -> safe)
+        _send_to_controller('ATTACK_STOP')
+        time.sleep(7)                                  # flush-grace: label the final window before CLEAR
+        _send_to_controller('CONTROL:CLEAR:%s' % host_ip)
+        print('*** [%s] %s done; released %s; settling' % (host, kind, host_ip))
+        time.sleep(max(0, settle - 7))
+
+    def _bump_conntrack():
+        """The floods overflow nf_conntrack (dmesg: 'table full, dropping packet'),
+        silently dropping attack traffic. Raise the limit for the collection run."""
+        import subprocess
+        for key in ('net.netfilter.nf_conntrack_max=1048576',
+                    'net.nf_conntrack_max=1048576'):
+            try:
+                subprocess.run(['sysctl', '-w', key], capture_output=True, timeout=5)
+            except Exception:
+                pass
+
+    def run_topup_session(net, kind, duration=180, settle=15, baseline_secs=180,
+                          rate='flood', sources=None, rotate_as=None):
+        """High-yield single-class TOP-UP. Each source floods all other hosts
+        concurrently (~5 flow keys/source) -> ~5x the rows of the old 1:1 pairs.
+        Approx rows ~= 5 x (duration/5) x len(sources): duration=180 + 6 sources
+        ~= 1000+ attack rows in ~20 min. kind in icmp/syn/udp/cps/scan/arp.
+
+        Saves + auto-validates on the controller when rotate_as is given:
+          py net.run_topup_session(net, 'syn', rotate_as='dataset_topup_syn.csv')
+        """
+        _bump_conntrack()
+        srcs = sources if sources is not None else ['sta1', 'sta2', 'h1', 'h2',
+                                                    'TempSensor', 'Cam']
+        expect = _ATTACK_META[kind][2]
+        rows_est = 5 * (duration // 5) * len(srcs)
+        print('*** TOP-UP %s: %d sources x 5 targets x %ss (~%d attack rows, ~%d min). '
+              'BLOCKS the CLI — let it run.'
+              % (kind.upper(), len(srcs), duration, rows_est,
+                 int(len(srcs) * (duration + settle) / 60)))
+        detect_off(net)
+        wait(net, baseline_secs)             # mature device baselines
+        detect_on(net)
+        wait(net, 5)                         # DAI baseline freeze
+        for s in srcs:
+            launch_attack_multi(net, s, kind, duration=duration, settle=settle, rate=rate)
+        detect_off(net)
+        if rotate_as:
+            _send_to_controller('CONTROL:ROTATE:%s:%s' % (rotate_as, expect))
+            print('*** TOP-UP %s saved as %s — watch the controller log for PASS/ISSUES'
+                  % (kind.upper(), rotate_as))
+        print('*** TOP-UP %s complete.' % kind.upper())
+
     def run_full_collection(net, normal_secs=600, baseline_secs=300):
         """FULLY AUTOMATED 7-session capture in ONE command. Walk away (~1.5-2 h).
 
@@ -413,8 +517,10 @@ def topology():
               "dataset_merge.py and append to dataset_v2_master.csv.")
 
     net.launch_attack = launch_attack
+    net.launch_attack_multi = launch_attack_multi
     net.wait = wait
     net.run_attack_session = run_attack_session
+    net.run_topup_session = run_topup_session
     net.run_full_collection = run_full_collection
 
     # --- Send hostname registrations to the controller ---
@@ -437,6 +543,7 @@ def topology():
     print("*** Detection commands: py net.detect_on(net)  /  py net.detect_off(net)")
     print("*** Attack signalling: py net.attack_start(net,'hping3','flood')  /  py net.attack_stop(net)")
     print("*** One-command attack session: py net.run_attack_session(net,'icmp')  (kinds: icmp syn udp cps scan arp)")
+    print("*** HIGH-YIELD top-up (more attack rows fast): py net.run_topup_session(net,'syn',rotate_as='dataset_topup_syn.csv')")
     print("*** FULLY AUTOMATED 7-session capture: py net.run_full_collection(net)  (walk away ~1.5-2 h; auto-saves + validates each)")
     print("*** Running CLI")
     CLI(net)

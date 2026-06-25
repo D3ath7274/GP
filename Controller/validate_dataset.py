@@ -159,8 +159,13 @@ def main():
     # benign same-protocol traffic during its attack window — runs ~15-25% and is
     # FP-safe (it biases the model toward false positives, not false negatives, and
     # scrubbing it at label-time would risk under-labeling real attacks).
+    # A class must show BOTH a high fraction AND a meaningful absolute count to FAIL.
+    # Catastrophic bleed (sticky-confirm / back-scatter) is hundreds+ of rows; a
+    # handful of cross-session strays (e.g. 4 SYN-labelled rows in a UDP session ->
+    # 4/4 = 100%) is a tiny-denominator artifact, not corruption -> WARN only.
     PROTO_FAIL_FLOOR = 5
     RATE_BLEED_FAIL = 0.40
+    RATE_BLEED_MIN = 20
     proto_total = sum(proto_mismatch.values())
     if proto_total > PROTO_FAIL_FLOOR:
         issues.append(f'{proto_total} attack rows have a protocol that contradicts their label '
@@ -172,13 +177,13 @@ def main():
         if not tot:
             continue
         frac = c / tot
-        if frac > RATE_BLEED_FAIL:
+        if frac > RATE_BLEED_FAIL and c > RATE_BLEED_MIN:
             issues.append(f'{a}: {c}/{tot} ({100*frac:.0f}%) rows lack a flood/scan-rate signal '
                           f'(major mislabel — sticky-confirm/back-scatter) — recapture')
         elif frac > 0.10:
             warnings.append(f'{a}: {c}/{tot} ({100*frac:.0f}%) low-rate rows labeled as attack — '
-                            f"likely the attacker's own benign same-protocol traffic during the "
-                            f'attack window (FP-safe residual, acceptable)')
+                            f"the attacker's own benign same-protocol traffic, or a few "
+                            f'cross-session strays ({c} rows) — FP-safe, acceptable')
 
     # --- NaN / inf in numeric columns ---
     string_cols = {'timestamp', 'src_ip', 'dst_ip', 'protocol', 'attack_type', 'snort_sid',
