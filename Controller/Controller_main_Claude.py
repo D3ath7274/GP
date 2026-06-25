@@ -95,21 +95,37 @@ class SimpleSwitch(app_manager.RyuApp):
         # is mirrored to the controller via OpenFlow and injected into a TAP
         # so Snort can detect malicious behavior. Prepares for ML anomaly detection.
         # ===================================================================
-        self._physical_interface = 'ens33'
+        self._physical_interface = os.environ.get('SNORT_PHYS_IFACE', 'ens33')
         self._tap_name = 'snort_tap'
 
-        self.traffic_mirror = TrafficMirror(
-            tap_name=self._tap_name,
-            logger=self.logger
-        )
-        mirror_ok = self.traffic_mirror.start()
+        # Two mirror options for feeding Snort:
+        #   (a) OpenFlow TAP (default): packets are injected into snort_tap here.
+        #   (b) VXLAN br-snort bridge (install runbook): OVS mirrors s1/ap1 over VXLAN
+        #       to the controller's br-snort; the TAP is then redundant.
+        # Pick (b) on the static-IP / t530 deployment with:
+        #   SNORT_IFACES=ens33,br-snort  IPS_NO_TAP=1
+        # SNORT_IFACES overrides the monitored interface list; IPS_NO_TAP=1 disables
+        # the in-process TAP mirror (avoids double-feeding Snort). Defaults preserve
+        # the original TAP behavior.
+        _use_tap = os.environ.get('IPS_NO_TAP', '0') != '1'
+        _ifaces_env = os.environ.get('SNORT_IFACES', '').strip()
+        if _use_tap:
+            self.traffic_mirror = TrafficMirror(tap_name=self._tap_name, logger=self.logger)
+            mirror_ok = self.traffic_mirror.start()
+        else:
+            self.traffic_mirror = None
+            mirror_ok = False
 
-        # Snort monitors both: physical (192.168.1.x) + TAP (mirrored 10.0.0.x).
-        # Uses the curated Snort 3 config (sdn_ips.lua) + alert_json schema; install
-        # it once with: sudo ./scripts/install_snort3_ips_config.sh
+        if _ifaces_env:
+            snort_ifaces = [s.strip() for s in _ifaces_env.split(',') if s.strip()]
+        else:
+            snort_ifaces = ([self._physical_interface, self._tap_name] if mirror_ok
+                            else [self._physical_interface])
+
+        # Snort 3 (sdn_ips.lua + alert_json). With the VXLAN bridge, br-snort carries
+        # the mirrored 10.0.0.x data plane; otherwise snort_tap does (via OpenFlow).
         self.snort_manager = SnortManager(
-            interfaces=[self._physical_interface, self._tap_name] if mirror_ok
-                       else [self._physical_interface],
+            interfaces=snort_ifaces,
             config_path='/etc/snort/sdn_ips.lua',
             log_dir='/var/log/snort',
             logger=self.logger,

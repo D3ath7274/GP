@@ -5,8 +5,11 @@ import time
 import threading
 import socket as _socket
 
-# Controller physical IP (used for direct UDP commands)
-CONTROLLER_IP = '192.168.1.19'
+# Controller physical IP (used for direct UDP commands).
+# Static lab default per the install runbook: controller VM = .200, mininet VM = .201.
+# Override with the env var CONTROLLER_IP when deploying on the t530 / a different LAN.
+import os as _os
+CONTROLLER_IP = _os.environ.get('CONTROLLER_IP', '192.168.1.200')
 CONTROLLER_CMD_PORT = 9999
 
 def _send_to_controller(msg):
