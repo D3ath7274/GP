@@ -622,6 +622,39 @@ def topology():
     print("*** ONE-COMMAND AUTOMATED TOP-UP (thin classes): py net.run_full_topup(net)  (walk away; auto-saves + validates each)")
     print("*** HIGH-YIELD full collection (all types, good row counts): py net.run_full_collection_hy(net)  (walk away; auto-saves + validates each)")
     print("*** FULLY AUTOMATED 7-session capture (sequential): py net.run_full_collection(net)  (walk away ~1.5-2 h; auto-saves + validates each)")
+
+    # --- HANDS-FREE recollection: AUTO_COLLECT=1 runs the whole high-yield capture
+    #     unattended (no CLI typing) so you can work on the t530 in parallel.
+    #     Env knobs (all optional):
+    #       AUTO_COLLECT=1            enable the hook (default off -> normal CLI)
+    #       AUTO_COLLECT_MODE=full    'full' = run_full_collection_hy (all 7, default)
+    #                                 'topup' = run_full_topup (thin classes only)
+    #       AUTO_COLLECT_DURATION=180 per-attack flood seconds
+    #       AUTO_COLLECT_NORMAL=600   normal-session seconds (full mode only)
+    #       AUTO_REGISTER_IOT=1       auto-register TempSensor+Cam (the 5th/6th flood
+    #                                 sources -> ~50% more attack rows). Default on.
+    if _os.environ.get('AUTO_COLLECT', '0') == '1':
+        _mode = _os.environ.get('AUTO_COLLECT_MODE', 'full').strip().lower()
+        _dur = int(_os.environ.get('AUTO_COLLECT_DURATION', '180'))
+        _normal = int(_os.environ.get('AUTO_COLLECT_NORMAL', '600'))
+        if _os.environ.get('AUTO_REGISTER_IOT', '1') == '1':
+            print("*** AUTO_COLLECT: registering IoT sources TempSensor + Cam (richer rows)")
+            net.register_iot_device(net, 'TempSensor', '10.0.0.5/24',
+                                    '00:00:00:00:00:05', 's1', 'IOT:TempSensor')
+            net.register_iot_device(net, 'Cam', '10.0.0.6/24',
+                                    '00:00:00:00:00:06', 's1', 'IOT:Camera')
+            time.sleep(10)   # let the links come up + registrations reach the controller
+        print("*** AUTO_COLLECT: starting UNATTENDED %s collection (walk away) ***" % _mode)
+        try:
+            if _mode == 'topup':
+                net.run_full_topup(net, duration=_dur)
+            else:
+                net.run_full_collection_hy(net, normal_secs=_normal, duration=_dur)
+            print("*** AUTO_COLLECT: DONE — review the controller log for per-session "
+                  "PASS/ISSUES, then merge with dataset_merge.py. Dropping to CLI. ***")
+        except Exception as _e:
+            print("*** AUTO_COLLECT: aborted with error: %s — dropping to CLI ***" % _e)
+
     print("*** Running CLI")
     CLI(net)
     net.stop()
