@@ -286,16 +286,23 @@ def parse_alert_json_line(line):
     except (ValueError, TypeError):
         return None
 
-    # SID/GID/REV: prefer explicit fields, else split a "gid:sid:rev" rule string.
+    # SID/GID/REV: prefer explicit fields, else fill any MISSING piece from the
+    # "gid:sid:rev" rule string. alert_json commonly emits `rule` + `sid` but NOT a
+    # separate `gid` field, so we must parse `rule` even when `sid` is already set —
+    # otherwise gid stays '?' (breaking (gid,sid) suppression + the CSV gid column).
     gid, sid, rev = j.get('gid'), j.get('sid'), j.get('rev')
-    if sid in (None, '') and j.get('rule'):
+    if j.get('rule'):
         parts = str(j.get('rule')).split(':')
-        if len(parts) >= 3:
-            gid, sid, rev = parts[0], parts[1], parts[2]
-        elif len(parts) == 2:
-            gid, sid = parts[0], parts[1]
-        elif len(parts) == 1:
-            sid = parts[0]
+        if len(parts) == 1:
+            if sid in (None, ''):
+                sid = parts[0]
+        else:
+            if gid in (None, ''):
+                gid = parts[0]
+            if sid in (None, ''):
+                sid = parts[1]
+            if len(parts) >= 3 and rev in (None, ''):
+                rev = parts[2]
 
     src_ip, src_port = _json_endpoint(j, 'src')
     dst_ip, dst_port = _json_endpoint(j, 'dst')
@@ -395,6 +402,23 @@ class SnortManager:
             2100366,         # GPL PING
             2101390,         # GPL ICMP Echo Reply
             2101424,         # GPL DNS request
+        }
+
+        # Precise (GID, SID) suppression — surgical so we don't drop unrelated
+        # builtins that happen to reuse a low SID (many GIDs have a SID 1 / SID 4).
+        # These three are confirmed environment noise in this lab, not the 6
+        # curated attacks (whose rules are SIDs 1000001-1000006):
+        #   129:4   stream_tcp "TCP timestamp outside PAWS window" — mirror reorders
+        #           normal iperf/http (br-snort + ens33 see duplicate/out-of-order segs)
+        #   116:414 decoder "IPv4 packet to broadcast dest" — physical-LAN broadcast
+        #           (e.g. 192.168.1.x discovery), nothing to do with the SDN data plane
+        #   112:1   arp_spoof inspector — gratuitous/unsolicited ARP noise. Real ARP
+        #           spoofing is still caught by DAI (Tier 2, independent of Snort), and
+        #           a genuine cache-overwrite fires a different arp_spoof SID.
+        self._blocked_gid_sids = {
+            ('129', '4'),
+            ('116', '414'),
+            ('112', '1'),
         }
 
         # Alert deduplication: suppress repeated alerts per SOURCE DEVICE
@@ -653,6 +677,7 @@ class SnortManager:
             return
 
         sid = alert.get('sid', '?')
+        gid = alert.get('gid', '?')
         try:
             sid_int = int(sid)
         except (ValueError, TypeError):
@@ -661,6 +686,9 @@ class SnortManager:
         # Hard blocklist: fully drop known false-positive SIDs.
         # They never reach storage, callback, or the CSV labeler.
         if sid_int in self._blocked_sids:
+            return
+        # Precise (GID, SID) suppression for noise events that reuse a common SID.
+        if (str(gid), str(sid)) in self._blocked_gid_sids:
             return
 
         # Protocol-aware reclassification: fix ICMP alerts being
