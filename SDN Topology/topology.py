@@ -446,6 +446,15 @@ def topology():
           py net.run_topup_session(net, 'syn', rotate_as='dataset_topup_syn.csv')
         """
         _bump_conntrack()
+        # Wipe any confirmed-attacker / suspicion state left by the PREVIOUS session
+        # (global CONTROL:CLEAR = no IP -> full reset, no cooldown). Without this, a
+        # prior session's confirmed attacker (esp. the SYN session) keeps stamping its
+        # benign same-protocol background traffic with that label in THIS session ->
+        # the validator's "sticky-confirm" RATE BLEED (e.g. 100% SYN-Flood rows in a
+        # UDP/scan/ARP session). The per-source clears after each attack don't cross
+        # session boundaries, so reset globally at the session start.
+        _send_to_controller('CONTROL:CLEAR')
+        time.sleep(1)
         srcs = sources if sources is not None else ['sta1', 'sta2', 'h1', 'h2',
                                                     'TempSensor', 'Cam']
         expect = _ATTACK_META[kind][2]

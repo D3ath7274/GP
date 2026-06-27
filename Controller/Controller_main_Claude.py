@@ -1240,6 +1240,66 @@ class IPSRestController(ControllerBase):
             'tier_blocked': len(self.app._blocked_ips),
         })
 
+    @route('ips', '/ips/metrics', methods=['GET'])
+    def metrics(self, req, **kwargs):
+        """Aggregate state for the dashboard (read-only)."""
+        app = self.app
+        sm = getattr(app, 'snort_manager', None)
+        tc = getattr(app, 'traffic_capture', None)
+        last60 = 0
+        if sm:
+            try:
+                import datetime as _dt
+                cutoff = _dt.datetime.now() - _dt.timedelta(seconds=60)
+                for a in sm.get_recent_alerts(200):
+                    ts = a.get('detected_at', '')
+                    if ts and _dt.datetime.fromisoformat(ts) >= cutoff:
+                        last60 += 1
+            except Exception:
+                last60 = 0
+        return self._json({
+            'snort_running': bool(sm and getattr(sm, '_snort_processes', None)),
+            'rf_loaded': bool(getattr(getattr(app, '_ml_engine', None), 'is_loaded', False)),
+            'ae_loaded': bool(getattr(getattr(app, '_ae_engine', None), 'is_loaded', False)),
+            'detection_enabled': app._detection_enabled,
+            'ml_mode': app._ml_mode,
+            'alerts_total': sm.get_alert_count() if sm else 0,
+            'alerts_last_60s': last60,
+            'confirmed_attackers': len(getattr(tc, '_confirmed_attackers', {}) or {}),
+            'by_attack': sm.get_alerts_by_type() if sm else {},
+            'by_tier': {
+                'snort': sm.get_alert_count() if sm else 0,
+                'rate_dai': len(getattr(tc, '_confirmed_attackers', {}) or {}),
+            },
+            'switches': len(app._datapaths),
+            'rest_blocked': len(app._rest_blocked_ips),
+            'tier_blocked': len(app._blocked_ips),
+        })
+
+    @route('ips', '/ips/alerts', methods=['GET'])
+    def alerts(self, req, **kwargs):
+        """Recent Snort alerts for the dashboard timeline (read-only)."""
+        sm = getattr(self.app, 'snort_manager', None)
+        raw = sm.get_recent_alerts(50) if sm else []
+        out = [{'time': a.get('detected_at', ''), 'src_ip': a.get('src_ip'),
+                'dst_ip': a.get('dst_ip'), 'attack_type': a.get('attack_type'),
+                'tier': 'snort', 'sid': a.get('sid'),
+                'confidence': a.get('confidence')} for a in raw]
+        return self._json({'alerts': out})
+
+    @route('ips', '/', methods=['GET'])
+    def dashboard(self, req, **kwargs):
+        """Serve the dashboard same-origin (no CORS): http://<controller>:<wsapi-port>/."""
+        import os as _os
+        path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                             '..', 'Dashboard', 'index.html')
+        try:
+            with open(path, 'rb') as f:
+                return Response(content_type='text/html', body=f.read())
+        except Exception:
+            return self._json({'status': 'error',
+                               'message': 'Dashboard/index.html not found'}, 404)
+
     def _json(self, data, status=200):
         return Response(content_type='application/json',
                         body=json.dumps(data).encode('utf-8'), status=status)

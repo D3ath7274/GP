@@ -1,0 +1,211 @@
+<!--
+  SDN-IPS Dashboard — single-file, vanilla JS + inline SVG, no CDN/framework.
+  Polls the controller's REST API on :8080. Works today against the existing
+  endpoints (/ips/status, /ips/blocked, /ips/switches); the richer panels light up
+  once you add /ips/metrics and /ips/alerts (see Dashboard/README.md).
+  Set API_BASE below if not served same-origin from the controller.
+-->
+<meta charset="utf-8">
+<title>SDN-IPS Dashboard</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --line:#222a35; --txt:#c9d4e1; --muted:#7d8aa0;
+    --green:#2ea043; --amber:#d29922; --red:#da3633; --blue:#388bfd;
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);
+    font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:10px 16px;
+    background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  .pill{padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;
+    border:1px solid var(--line)}
+  .ok{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)}
+  .bg-ok{background:rgba(46,160,67,.15)} .bg-warn{background:rgba(210,153,34,.15)}
+  .bg-bad{background:rgba(218,54,51,.18)}
+  .grid{display:grid;gap:12px;padding:16px;
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .card h2{margin:0 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);font-weight:600}
+  .big{font-size:30px;font-weight:700;line-height:1}
+  .sub{color:var(--muted);font-size:12px;margin-top:4px}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .tile{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
+  .tile .n{font-size:22px;font-weight:700} .tile .l{font-size:11px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase}
+  button{background:#21262d;color:var(--txt);border:1px solid var(--line);
+    border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px}
+  button:hover{border-color:var(--blue)}
+  .feed{max-height:260px;overflow:auto;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  .feed div{padding:2px 0;border-bottom:1px solid #1a212b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .span2{grid-column:span 2} .muted{color:var(--muted)} .dot{font-size:10px}
+  .barlbl{font-size:11px;fill:var(--muted)} .barval{font-size:11px;fill:var(--txt)}
+</style>
+
+<header>
+  <h1>🛡️ SDN-IPS Dashboard</h1>
+  <span id="conn" class="pill bg-bad bad">● connecting…</span>
+  <span id="mode" class="pill">DETECT — · ML —</span>
+  <span class="pill"><span class="muted">switches</span> <b id="sw">—</b></span>
+  <span style="margin-left:auto" class="muted" id="updated">—</span>
+</header>
+
+<div class="grid">
+  <!-- Threat summary -->
+  <div class="card">
+    <h2>Threat level</h2>
+    <div class="big" id="threat">—</div>
+    <div class="sub"><b id="attackers">0</b> active attackers · <b id="blocked">0</b> blocked ·
+      <b id="a60">0</b> alerts/60s</div>
+  </div>
+
+  <!-- Per-tier -->
+  <div class="card span2">
+    <h2>Detection tiers (alive = contributing)</h2>
+    <div class="tiles">
+      <div class="tile"><div class="n" id="t-snort">—</div><div class="l">Snort 3 alerts/min</div></div>
+      <div class="tile"><div class="n" id="t-rate">—</div><div class="l">Rate+DAI confirms</div></div>
+      <div class="tile"><div class="n" id="t-rf">—</div><div class="l">RF detections</div></div>
+      <div class="tile"><div class="n" id="t-ae">—</div><div class="l">AE anomalies</div></div>
+    </div>
+  </div>
+
+  <!-- System health -->
+  <div class="card">
+    <h2>System health (t530)</h2>
+    <div class="sub">RAM <b id="ram">—</b> · CPU <b id="cpu">—</b></div>
+    <div class="sub">window compute <b id="cmp">—</b> <span class="muted">(&lt; 5000 ms)</span></div>
+    <div class="sub">backlog drops <b id="drops">—</b> · <b id="pps">—</b> pps</div>
+  </div>
+
+  <!-- Attack breakdown -->
+  <div class="card span2">
+    <h2>Attacks by type</h2>
+    <svg id="bars" width="100%" height="150" viewBox="0 0 600 150" preserveAspectRatio="none"></svg>
+  </div>
+
+  <!-- Blocked hosts -->
+  <div class="card span2">
+    <h2>Blocked hosts</h2>
+    <table><thead><tr><th>IP</th><th>Type</th><th>Reason / tier</th><th></th></tr></thead>
+      <tbody id="blkrows"><tr><td colspan="4" class="muted">none</td></tr></tbody></table>
+  </div>
+
+  <!-- Event timeline -->
+  <div class="card span2">
+    <h2>Recent events (deduped)</h2>
+    <div class="feed" id="feed"><div class="muted">waiting for /ips/alerts …</div></div>
+  </div>
+</div>
+
+<script>
+// ===== config =====
+const API_BASE = "";            // "" = same-origin (served by controller). Else "http://192.168.1.65:8080"
+const POLL_MS  = 2000;
+
+const $ = id => document.getElementById(id);
+async function getJSON(path){
+  try{ const r = await fetch(API_BASE + path, {cache:"no-store"});
+       if(!r.ok) return null; return await r.json(); }
+  catch(e){ return null; }
+}
+const sev = (cls,a,b)=> cls>=b?'bad':cls>=a?'warn':'ok';
+function setPill(el,txt,kls){ el.className='pill bg-'+kls+' '+kls; el.textContent='● '+txt; }
+
+async function tick(){
+  const status = await getJSON('/ips/status');
+  if(!status){ setPill($('conn'),'controller offline','bad'); return; }
+  setPill($('conn'),'live','ok');
+  $('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+
+  // status bar
+  const det = status.detection_enabled ? 'ON':'OFF';
+  $('mode').textContent = `DETECT ${det} · ML ${status.ml_mode||'—'}`;
+  $('mode').className = 'pill ' + (status.detection_enabled?'bg-ok ok':'bg-warn warn');
+  $('sw').textContent = status.switches;
+
+  // blocked
+  const blk = await getJSON('/ips/blocked');
+  const rows = (blk && blk.blocked) || [];
+  $('blocked').textContent = rows.length;
+  renderBlocked(rows);
+
+  // metrics (optional endpoint)
+  const m = await getJSON('/ips/metrics');
+  renderMetrics(m, status, rows.length);
+
+  // alerts feed (optional endpoint)
+  const al = await getJSON('/ips/alerts?n=50');
+  renderFeed(al && al.alerts);
+}
+
+function renderMetrics(m, status, blockedCount){
+  const attackers = m?.confirmed_attackers ?? 0;
+  const a60 = m?.alerts_last_60s ?? 0;
+  $('attackers').textContent = attackers;
+  $('a60').textContent = a60;
+  // threat level from current activity
+  const lvl = (blockedCount>0||attackers>0) ? 2 : (a60>0?1:0);
+  const t=$('threat'); t.textContent = ['CLEAR','ELEVATED','UNDER ATTACK'][lvl];
+  t.className = 'big ' + ['ok','warn','bad'][lvl];
+
+  const bt = m?.by_tier || {};
+  $('t-snort').textContent = bt.snort ?? '—';
+  $('t-rate').textContent  = bt.rate_dai ?? '—';
+  $('t-rf').textContent    = bt.rf ?? '—';
+  $('t-ae').textContent    = bt.ae ?? '—';
+
+  $('ram').textContent  = m?.ram_pct!=null ? m.ram_pct+'%' : '—';
+  $('cpu').textContent  = m?.cpu_pct!=null ? m.cpu_pct+'%' : '—';
+  const cmp = m?.window_compute_ms;
+  const ce=$('cmp'); ce.textContent = cmp!=null ? cmp+' ms':'—';
+  ce.className = cmp!=null ? sev(cmp,3000,5000):'';
+  $('drops').textContent = m?.backlog_drops ?? '—';
+  $('pps').textContent   = m?.throughput_pps ?? '—';
+
+  renderBars(m?.by_attack || {});
+}
+
+function renderBlocked(rows){
+  const tb=$('blkrows');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="4" class="muted">none</td></tr>'; return; }
+  tb.innerHTML = rows.map(r=>{
+    const reason = r.attack_type || r.reason || r.kind || '';
+    return `<tr><td>${r.ip}</td><td>${r.kind||''}</td><td>${reason}</td>
+      <td><button onclick="unblock('${r.ip}')">Unblock</button></td></tr>`;
+  }).join('');
+}
+async function unblock(ip){
+  await fetch(API_BASE + '/ips/block/' + ip, {method:'DELETE'}); tick();
+}
+
+function renderFeed(alerts){
+  const f=$('feed');
+  if(!alerts || !alerts.length){ if(f.children.length<=1) f.innerHTML='<div class="muted">no recent events (add /ips/alerts to enable)</div>'; return; }
+  f.innerHTML = alerts.map(a=>{
+    const c = a.tier==='blocked'||a.blocked ? 'bad' : a.tier==='AE'||a.tier==='RF' ? 'warn':'';
+    const t = a.time || '';
+    const conf = a.confidence!=null ? ` conf ${a.confidence}` : '';
+    return `<div class="${c}">${t}  ${a.src_ip||'?'} → ${a.dst_ip||'?'}  ${a.attack_type||''}  [${a.tier||a.sid||''}${conf}]</div>`;
+  }).join('');
+}
+
+function renderBars(by){
+  const entries = Object.entries(by);
+  const svg=$('bars');
+  if(!entries.length){ svg.innerHTML='<text x="8" y="20" class="barlbl">add /ips/metrics for the breakdown</text>'; return; }
+  const max = Math.max(1,...entries.map(e=>e[1]));
+  const W=600, n=entries.length, bw=W/n, pad=10;
+  svg.innerHTML = entries.map(([k,v],i)=>{
+    const h = Math.round((v/max)*100), x=i*bw, y=120-h;
+    const short = k.replace(' Flood','').replace('Control Plane Saturation','CPS').replace('ARP Spoofing','ARP').replace('Port Scan','Scan');
+    return `<rect x="${x+pad}" y="${y}" width="${bw-2*pad}" height="${h}" rx="3" fill="var(--blue)"/>
+      <text x="${x+bw/2}" y="135" text-anchor="middle" class="barlbl">${short}</text>
+      <text x="${x+bw/2}" y="${y-3}" text-anchor="middle" class="barval">${v}</text>`;
+  }).join('');
+}
+
+tick(); setInterval(tick, POLL_MS);
+</script>
