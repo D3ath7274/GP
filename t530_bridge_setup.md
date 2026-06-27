@@ -22,15 +22,18 @@ machines can **ping each other**. VXLAN uses UDP **4789** between them — fine 
 ---
 
 ## Step 1 — t530: create the bridge (run once)
+Each `add-port … -- set interface … type=vxlan …` is **ONE command** — paste the whole line.
+The `-- set interface … type=vxlan options:…` half is what makes it a tunnel; run the
+`add-port` without it and you get *"could not open network device vxlan-s1 (No such device)."*
 ```bash
 sudo ovs-vsctl --may-exist add-br br-snort
-sudo ovs-vsctl --may-exist add-port br-snort vxlan-s1 \
-  -- set interface vxlan-s1  type=vxlan options:remote_ip=<MININET_IP> options:key=100
-sudo ovs-vsctl --may-exist add-port br-snort vxlan-ap1 \
-  -- set interface vxlan-ap1 type=vxlan options:remote_ip=<MININET_IP> options:key=101
+sudo ovs-vsctl --may-exist add-port br-snort vxlan-s1 -- set interface vxlan-s1 type=vxlan options:remote_ip=<MININET_IP> options:key=100
+sudo ovs-vsctl --may-exist add-port br-snort vxlan-ap1 -- set interface vxlan-ap1 type=vxlan options:remote_ip=<MININET_IP> options:key=101
 sudo ip link set br-snort up
-sudo ovs-vsctl show          # GATE: br-snort with vxlan-s1 + vxlan-ap1
+sudo ovs-vsctl show          # GATE: br-snort with vxlan-s1 + vxlan-ap1 (type vxlan)
 ```
+*If you already ran a bare `add-port` and hit "No such device", first:*
+`sudo ovs-vsctl --if-exists del-port br-snort vxlan-s1` *then re-run the full line.*
 *(This is the whole t530 side. No `tc`/veth mirror — that only copies the t530's own NIC
 traffic, which is just physical-LAN noise; the test only needs the Mininet plane.)*
 
@@ -56,24 +59,19 @@ This creates `s1` and `ap1` and connects them to the t530 over OpenFlow. **GATE:
 
 ## Step 4 — Mininet VM: attach the mirrors (run once, AFTER Step 3)
 `s1`/`ap1` only exist after the topology starts, so do this now (2nd terminal on the Mininet VM):
+Each `add-port …` and each mirror `create …` is **one line** — paste them whole.
 ```bash
 # s1  -> VXLAN key 100
 sudo ovs-vsctl --if-exists clear bridge s1 mirrors
 sudo ovs-vsctl --if-exists del-port s1 vxlan-snort-s1
-sudo ovs-vsctl add-port s1 vxlan-snort-s1 \
-  -- set interface vxlan-snort-s1 type=vxlan options:remote_ip=<T530_IP> options:key=100
-sudo ovs-vsctl -- --id=@p get port vxlan-snort-s1 \
-  -- --id=@m create mirror name=snort-mirror-s1 select-all=true output-port=@p \
-  -- set bridge s1 mirrors=@m
+sudo ovs-vsctl add-port s1 vxlan-snort-s1 -- set interface vxlan-snort-s1 type=vxlan options:remote_ip=<T530_IP> options:key=100
+sudo ovs-vsctl -- --id=@p get port vxlan-snort-s1 -- --id=@m create mirror name=snort-mirror-s1 select-all=true output-port=@p -- set bridge s1 mirrors=@m
 
 # ap1 -> VXLAN key 101
 sudo ovs-vsctl --if-exists clear bridge ap1 mirrors
 sudo ovs-vsctl --if-exists del-port ap1 vxlan-snort-ap1
-sudo ovs-vsctl add-port ap1 vxlan-snort-ap1 \
-  -- set interface vxlan-snort-ap1 type=vxlan options:remote_ip=<T530_IP> options:key=101
-sudo ovs-vsctl -- --id=@p get port vxlan-snort-ap1 \
-  -- --id=@m create mirror name=snort-mirror-ap1 select-all=true output-port=@p \
-  -- set bridge ap1 mirrors=@m
+sudo ovs-vsctl add-port ap1 vxlan-snort-ap1 -- set interface vxlan-snort-ap1 type=vxlan options:remote_ip=<T530_IP> options:key=101
+sudo ovs-vsctl -- --id=@p get port vxlan-snort-ap1 -- --id=@m create mirror name=snort-mirror-ap1 select-all=true output-port=@p -- set bridge ap1 mirrors=@m
 
 sudo ovs-vsctl list mirror   # GATE: snort-mirror-s1 / -ap1 present
 ```
