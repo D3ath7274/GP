@@ -1176,12 +1176,15 @@ class SimpleSwitch(app_manager.RyuApp):
         port_no = msg.desc.port_no
 
         ofproto = msg.datapath.ofproto
+        # debug-level: Mininet churns ports constantly (flows install/expire on s1 AND ap1),
+        # and at info this floods stdout — through the `tee` pipe that can back-pressure and
+        # stall the controller. Keep it for debugging only.
         if reason == ofproto.OFPPR_ADD:
-            self.logger.info("port added %s", port_no)
+            self.logger.debug("port added %s", port_no)
         elif reason == ofproto.OFPPR_DELETE:
-            self.logger.info("port deleted %s", port_no)
+            self.logger.debug("port deleted %s", port_no)
         elif reason == ofproto.OFPPR_MODIFY:
-            self.logger.info("port modified %s", port_no)
+            self.logger.debug("port modified %s", port_no)
         else:
             self.logger.info("Illeagal port state %s %s", port_no, reason)
 
