@@ -1257,6 +1257,14 @@ class IPSRestController(ControllerBase):
                         last60 += 1
             except Exception:
                 last60 = 0
+        ram = cpu = disk = None
+        try:
+            import psutil
+            ram = psutil.virtual_memory().percent
+            cpu = psutil.cpu_percent(interval=0.0)   # non-blocking; real value from 2nd poll on
+            disk = psutil.disk_usage('/').percent
+        except Exception:
+            pass
         return self._json({
             'snort_running': bool(sm and getattr(sm, '_snort_processes', None)),
             'rf_loaded': bool(getattr(getattr(app, '_ml_engine', None), 'is_loaded', False)),
@@ -1271,6 +1279,9 @@ class IPSRestController(ControllerBase):
                 'snort': sm.get_alert_count() if sm else 0,
                 'rate_dai': len(getattr(tc, '_confirmed_attackers', {}) or {}),
             },
+            'ram_pct': ram,
+            'cpu_pct': cpu,
+            'disk_pct': disk,
             'switches': len(app._datapaths),
             'rest_blocked': len(app._rest_blocked_ips),
             'tier_blocked': len(app._blocked_ips),
