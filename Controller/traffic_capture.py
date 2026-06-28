@@ -1144,8 +1144,9 @@ class TrafficCapture:
 
             for row in rows:
                 # Skip rows already labeled as attacks by Snort / rate counters
-                if str(row.get('label', '0')) != '0':
-                    continue
+                # (Commented out for debugging: allow ML to score continuously)
+                # if str(row.get('label', '0')) != '0':
+                #     continue
 
                 try:
                     ml_label, ml_type, ml_conf = ml_engine.predict(row)

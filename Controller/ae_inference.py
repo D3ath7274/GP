@@ -102,6 +102,14 @@ class AEInferenceEngine:
         # then standardize with the stored mean/scale.
         df = pd.DataFrame([flow_dict])
         df = pd.get_dummies(df, prefix='protocol')
+        # FIX: protocol_normal is a training artifact — the notebook's get_dummies
+        # one-hot'd attack_type='normal' with prefix='protocol', producing a constant
+        # protocol_normal=1 column in every training row.  In production the RF hook
+        # may have already mutated row['attack_type'] to the attack name (e.g.
+        # 'SYN Flood') BEFORE the AE scores it, so get_dummies no longer produces
+        # protocol_normal.  Force it to 1.0 to match training.
+        if 'protocol_normal' in self._features:
+            df['protocol_normal'] = 1.0
         df = df.reindex(columns=self._features, fill_value=0)
         x = df.apply(pd.to_numeric, errors='coerce').fillna(0.0).astype(np.float64).values
         return (x - self._mean) / self._scale          # (1, n)
@@ -128,6 +136,13 @@ class AEInferenceEngine:
             self._total += 1
             if is_anom:
                 self._anomalies += 1
+            # Diagnostic: surface every AE scoring result (debug level) so the
+            # operator can see whether the AE is running and what values it
+            # produces. Visible with Ryu's --verbose or by temporarily
+            # changing 'debug' to 'info' here.
+            self._log('debug',
+                      "AE scored: error=%.5f thresh=%.5f conf=%.3f anom=%s",
+                      error, self._threshold, conf, is_anom)
             return bool(is_anom), float(conf), error
         except Exception as e:
             self._log('error', "AE score error: %s", e)
