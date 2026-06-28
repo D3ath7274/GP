@@ -1143,30 +1143,27 @@ class TrafficCapture:
             ml_blocked_this_window = set()  # Avoid duplicate blocks per IP per window
 
             for row in rows:
-                # Skip rows already labeled as attacks by Snort / rate counters
-                # (Commented out for debugging: allow ML to score continuously)
-                # if str(row.get('label', '0')) != '0':
-                #     continue
-
                 try:
                     ml_label, ml_type, ml_conf = ml_engine.predict(row)
                 except Exception:
                     continue
 
-                if ml_label == 0 or ml_type == 'normal':
-                    continue
                 src_ip = row.get('src_ip', '?')
                 dst_ip = row.get('dst_ip', '?')
                 band = ('BLOCK' if ml_conf >= block_thr
                         else 'FLAG' if ml_conf >= flag_thr else 'below-thresh')
 
-                # OBSERVE: surface EVERY non-normal verdict + confidence, regardless
-                # of band (incl. below the flag threshold), so the model can be
-                # judged before authorizing blocking.
+                # OBSERVE = full transparency: log EVERY verdict (INCLUDING 'normal') so the
+                # operator can SEE the RF scoring every window during verification — otherwise
+                # a normal verdict prints nothing and looks like the engine is dead.
                 if ml_mode == 'OBSERVE':
                     self._log('info',
                         "[ML-OBSERVE] %s → %s  verdict=%s  conf=%.2f  band=%s",
                         src_ip, dst_ip, ml_type, ml_conf, band)
+
+                # No block/flag ACTION on a normal verdict (but it was already shown above).
+                if ml_label == 0 or ml_type == 'normal':
+                    continue
 
                 if ml_conf >= block_thr:
                     # --- BLOCK band ---
@@ -1230,16 +1227,22 @@ class TrafficCapture:
                     is_anom, ae_conf, ae_err = ae_engine.score(row)
                 except Exception:
                     continue
-                if ae_conf < ae_flag_thr:
-                    continue                       # silent: well-reconstructed (normal) window
                 src_ip = row.get('src_ip', '?')
                 dst_ip = row.get('dst_ip', '?')
-                band = 'BLOCK' if ae_conf >= ae_block_thr else 'FLAG'
+                band = ('BLOCK' if ae_conf >= ae_block_thr
+                        else 'FLAG' if ae_conf >= ae_flag_thr else 'normal')
 
+                # OBSERVE = full transparency: log EVERY window's AE score (INCLUDING below
+                # threshold) so the operator can see live err/conf during verification —
+                # otherwise a well-reconstructed (normal) window prints nothing.
                 if ae_mode == 'OBSERVE':
                     self._log('info',
                         "[AE-OBSERVE] %s → %s  anomaly conf=%.2f  err=%.4f  band=%s",
                         src_ip, dst_ip, ae_conf, ae_err, band)
+
+                # Below the flag band: no action (already surfaced above in OBSERVE).
+                if ae_conf < ae_flag_thr:
+                    continue
 
                 if ae_conf >= ae_block_thr:
                     if str(row.get('label', '0')) == '0':   # don't overwrite RF/rate label

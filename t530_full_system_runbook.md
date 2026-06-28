@@ -82,53 +82,78 @@ Only when GATE 1 = 1 **and** `dataset.csv` is growing do RF/AE have anything to 
 
 ---
 
-## PART 4 — Test the Random Forest (Tier 3) alone
-Goal: RF classifies each attack, nothing else interfering. All control via `ipsctl.py` on the t530.
+## PART 4 — PRE-ATTACK CHECKLIST (run EVERY one of these, in order, before any attack)
+
+> Needs the OBSERVE-transparency fix (commit after `af708f2`): **`git pull` + restart the
+> controller** so OBSERVE logs *every* window (incl. `verdict=normal` / low AE conf). Before this
+> fix, normal verdicts printed nothing — which looked like "ML/AE silent."
+
+On the **t530, Terminal B** (Terminal A is the running controller):
 ```bash
 cd ~/GP/Controller
-python3 ipsctl.py CONTROL:DETECT:OFF      # only ML scores (no Snort/rate labeling/blocking)
-python3 ipsctl.py CONTROL:ML:OBSERVE      # RF + AE predict and LOG, never block
-```
-*(Optional, to isolate RF from AE: `mv ml_models/ae_bundle.joblib ml_models/ae_bundle.off` then
-restart the controller — banner shows AE disabled. Restore + restart afterwards.)*
 
-For each attack, in the Mininet CLI — **let each run ≥ 20 s** (so 5-s windows flush):
+# 1) DATA IS FLOWING (from PART 3) — both must pass or ML/AE have nothing to score
+curl -s http://127.0.0.1:8081/ips/switches            # -> "count": 1
+wc -l dataset.csv ; sleep 6 ; wc -l dataset.csv        # -> line count GROWING
+
+# 2) ARM ML + AE in OBSERVE (no blocking, log everything)
+python3 ipsctl.py CONTROL:DETECT:OFF                   # isolate ML: no Snort/rate labels interfere
+python3 ipsctl.py CONTROL:ML:OBSERVE                   # RF + AE score + LOG every window
+
+# 3) CONFIRM the mode actually took effect
+curl -s http://127.0.0.1:8081/ips/status               # -> "ml_mode":"OBSERVE"
+python3 ipsctl.py CONTROL:ML:STATS                     # engines respond (note the scored count)
+
+# 4) WATCH live ML/AE output in a 3rd terminal (leave it running during the attack)
+tail -f controller_run.log | grep -E "ML-OBSERVE|AE-OBSERVE"
+```
+Only after all four pass do you launch an attack. **Every attack must run ≥ 20 s** (so several
+5-second windows flush). With the fix, you should now see a line **per flow per window** — both
+when it's `normal` and when it's an attack — proving the engines are alive.
+
+---
+
+## PART 5 — Test the Random Forest (Tier 3)
+Do the PART 4 checklist, then in the Mininet CLI:
 ```python
-py net.run_attack_session(net,'syn')      # then icmp, udp, scan, arp, cps
+py net.run_attack_session(net,'syn')      # then icmp, udp, scan, arp, cps  (≥20s each)
 ```
-**GATE / RECORD:** in Terminal A you see, per window, lines like
-`[ML-OBSERVE] 10.0.0.1 → 10.0.0.4  verdict=SYN Flood  conf=0.xx  band=…`.
-Verify the verdict matches the attack. Tally:
+**GATE / RECORD:** the watch terminal streams
+`[ML-OBSERVE] 10.0.0.1 → 10.0.0.4  verdict=SYN Flood  conf=0.xx  band=…` every window.
 ```bash
-grep "ML-OBSERVE" controller_run.log | tail -20
-python3 ipsctl.py CONTROL:ML:STATS        # prints how many flows ML scored (should be > 0)
+grep "ML-OBSERVE" controller_run.log | tail -30
+python3 ipsctl.py CONTROL:ML:STATS        # scored count keeps rising
 ```
-- **If `ML:STATS` says 0 scored** while `dataset.csv` grows → RF is erroring per-row; paste the
-  next ~40 lines of `controller_run.log` after an attack and I'll pinpoint it.
+- **Now interpret it correctly:** if you see `verdict=normal` during a SYN flood, the RF is
+  *running but misclassifying* (train/serve skew) — that's a model problem to retrain
+  (`ml_ae_confidence_boost_plan.md`), **not** "ML didn't activate." If `ML:STATS` scored count
+  stays 0 while `dataset.csv` grows → RF is erroring per-row; paste the next ~40 log lines.
+- *(Optional, to isolate RF from AE: `mv ml_models/ae_bundle.joblib ml_models/ae_bundle.off` +
+  restart; restore + restart afterwards.)*
 
 ---
 
-## PART 5 — Test the Autoencoder (Tier 4) alone
-Goal: AE silent on normal, flags anomalies on attacks.
-```bash
-python3 ipsctl.py CONTROL:DETECT:OFF
-python3 ipsctl.py CONTROL:ML:OBSERVE
-```
-*(Optional isolation: `mv ml_models/rf_pipeline.joblib ml_models/rf_pipeline.off` + restart.)*
-1. Let **normal** traffic run ~60 s (no attack). **GATE:** few/no `[AE-OBSERVE]` lines (the AE is
-   silent below 0.60 confidence on normal).
+## PART 6 — Test the Autoencoder (Tier 4)
+Do the PART 4 checklist (same OBSERVE setup). With the transparency fix, AE now logs **every
+window** (`band=normal` too), so you can watch err/conf live instead of silence.
+1. Let **normal** traffic run ~60 s (no attack). **GATE:** `[AE-OBSERVE] … band=normal` with
+   **low `err`** and conf < 0.60 — proves AE is scoring and (correctly) sees normal as normal.
 2. Run each attack `py net.run_attack_session(net,'<kind>')` (≥ 20 s each). **GATE / RECORD:**
-   `[AE-OBSERVE] … conf=0.xx err=0.xxxx band=FLAG|BLOCK` appears, conf ≥ 0.60 on attacks.
+   `err` jumps and conf crosses into FLAG/BLOCK.
 ```bash
-grep "AE-OBSERVE" controller_run.log | tail -20
+grep "AE-OBSERVE" controller_run.log | tail -30
 ```
-- Normal err well below the bundle threshold; attack err well above. (Conf = err/(err+threshold):
-  flags at err ≈ 1.5×, blocks at err ≈ 2.7× threshold.)
-- Restore any moved model file + restart.
+- If `err` stays low even during attacks → the AE isn't separating attack from normal in this
+  environment (train/serve skew / threshold) → re-fit per `ml_ae_confidence_boost_plan.md`.
+  Conf = err/(err+threshold): flags at err ≈ 1.5×, blocks at err ≈ 2.7× threshold.
+- Confirm the **right bundle is loaded**: the PART 2 banner threshold should be your new model's
+  (≈ your p99), not the old `0.03750`. If it says `0.03750`, the old `ae_bundle.joblib` is still in
+  place — rebuild/copy the new one and restart.
+- *(Optional isolation: `mv ml_models/rf_pipeline.joblib ml_models/rf_pipeline.off` + restart.)*
 
 ---
 
-## PART 6 — Full stack: Snort 3 + Rate/DAI + RF + AE (blocking ON)
+## PART 7 — Full stack: Snort 3 + Rate/DAI + RF + AE (blocking ON)
 Both model files present + restarted.
 ```bash
 python3 ipsctl.py CONTROL:DETECT:ON          # Snort labels + Tier-2 rate/DAI block
@@ -155,7 +180,7 @@ RF; ARP spoof → DAI + Snort arp_spoof (+AE); novel/zero-day → AE.
 
 ---
 
-## PART 7 — Dashboard + recording
+## PART 8 — Dashboard + recording
 - Dashboard: `http://<t530-IP>:8081/` (served by the controller, same origin). If "can't be
   reached": `curl -s http://127.0.0.1:8081/ | head` on the t530 — HTML ⇒ it's an IP/reach issue
   (use the current enp1s0 IP); 404 ⇒ old code (`git pull` + restart); refused ⇒ controller down.
