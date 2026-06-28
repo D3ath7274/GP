@@ -1118,6 +1118,22 @@ class TrafficCapture:
             for profile in self._devices.values():
                 profile.reset_recent()
 
+        # --- Bound per-window inference so a heavy window can't starve Ryu's eventlet
+        #     hub. Each scored row does per-row pandas (slow); on a weak box (t530) a
+        #     ~100-row window can take longer than the 5-s interval, so the flush thread
+        #     never yields and REST/OpenFlow/capture all freeze. Score the loudest flows
+        #     first (attacks dominate pps), cap the rest. Tunable via IPS_MAX_SCORE_ROWS. ---
+        _MAX_SCORE_ROWS = int(os.environ.get('IPS_MAX_SCORE_ROWS', '60'))
+        if rows and len(rows) > _MAX_SCORE_ROWS:
+            try:
+                score_rows = sorted(
+                    rows, key=lambda r: float(r.get('packets_per_second') or 0),
+                    reverse=True)[:_MAX_SCORE_ROWS]
+            except Exception:
+                score_rows = rows[:_MAX_SCORE_ROWS]
+        else:
+            score_rows = rows
+
         # =====================================================================
         # ML Tier 4: Per-Flow RF Inference (mode OBSERVE or AUTHORIZE)
         # =====================================================================
@@ -1142,7 +1158,9 @@ class TrafficCapture:
             ml_engine = self.controller._ml_engine
             ml_blocked_this_window = set()  # Avoid duplicate blocks per IP per window
 
-            for row in rows:
+            for _si, row in enumerate(score_rows):
+                if _si and _si % 16 == 0:
+                    time.sleep(0)   # yield the GIL so the eventlet hub (REST/OpenFlow) runs
                 try:
                     ml_label, ml_type, ml_conf = ml_engine.predict(row)
                 except Exception:
@@ -1222,7 +1240,9 @@ class TrafficCapture:
             ae_engine = self.controller._ae_engine
             ae_blocked_this_window = set()
 
-            for row in rows:
+            for _si, row in enumerate(score_rows):
+                if _si and _si % 16 == 0:
+                    time.sleep(0)   # yield the GIL so the eventlet hub stays responsive
                 try:
                     is_anom, ae_conf, ae_err = ae_engine.score(row)
                 except Exception:
