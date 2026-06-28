@@ -125,7 +125,75 @@ compute time (`meta_controller_load`, must stay **< 5000 ms**). No window backlo
 
 ---
 
+## PART 5 — Detection-tier test plan (RF alone · AE alone · full stack)
+
+*Isolate each ML tier, then run everything together. All control commands go over UDP 9999 via
+the bundled sender (run on the t530; `nc` is unreliable there):*
+```bash
+cd ~/GP/Controller
+python3 ipsctl.py CONTROL:DETECT:OFF       # full command list in ipsctl.py's header
+```
+
+> **t530 launch reality** (Ubuntu 22.04 / Python 3.10, NIC `enp1s0`, nginx holds :8080):
+> ```bash
+> sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=snort_tap IPS_V2_FEATURES=1 python3 -c "import collections,collections.abc; collections.MutableMapping=collections.abc.MutableMapping; from ryu.cmd.manager import main; main()" Controller_main_Claude.py --wsapi-port 8081 2>&1 | tee controller_run.log
+> ```
+> Dashboard + REST live on **:8081**. Leave the controller terminal running; drive everything from
+> a 2nd terminal (`ipsctl.py`, `curl`) + the Mininet CLI.
+
+Prereq for all phases: controller up, topology up, IoT devices registered, `pingall` 0%,
+`/ips/switches` = 1.
+
+### Phase 5A — Random Forest (Tier 3) alone
+Goal: RF classifies each attack type, nothing else interfering.
+1. *(optional, to fully isolate from the AE)* `mv ml_models/ae_bundle.joblib ml_models/ae_bundle.off` then restart — banner shows RF loaded, AE disabled.
+2. `python3 ipsctl.py CONTROL:DETECT:OFF`   ← keep OFF so Snort/rate don't label; only ML scores
+3. `python3 ipsctl.py CONTROL:ML:OBSERVE`   ← RF predicts + logs, no blocking
+4. For each kind, in the Mininet CLI: `py net.run_attack_session(net,'<kind>')`  (icmp syn udp scan arp cps)
+- **CAPTURE / GATE:** one `[ML-OBSERVE] <src> → <dst> verdict=<class> conf=0.xx` per attack; the
+  verdict matches the attack with meaningful confidence. Record the per-class verdict+conf table.
+- Restore: `mv ml_models/ae_bundle.off ml_models/ae_bundle.joblib` + restart.
+
+### Phase 5B — Autoencoder (Tier 4) alone
+Goal: AE silent on normal, flags anomalies on attacks.
+1. *(optional, to isolate from RF)* `mv ml_models/rf_pipeline.joblib ml_models/rf_pipeline.off` + restart.
+2. `python3 ipsctl.py CONTROL:DETECT:OFF` ; `python3 ipsctl.py CONTROL:ML:OBSERVE`
+3. Let **normal** traffic run ~60 s → expect **no / low** `[AE-OBSERVE]` (silent < 0.60 conf).
+4. Run each attack: `py net.run_attack_session(net,'<kind>')` → expect
+   `[AE-OBSERVE] … conf=0.xx err=0.xxxx band=FLAG|BLOCK`.
+- **CAPTURE / GATE:** normal = silent/low; attacks push AE conf ≥ 0.60. Record normal-vs-attack
+  err/conf. (With threshold ≈ your p99, the AE flags at err ≈ 1.5×, blocks at err ≈ 2.7× threshold.)
+- Restore: `mv ml_models/rf_pipeline.off ml_models/rf_pipeline.joblib` + restart.
+
+### Phase 5C — Full stack: Snort 3 + Rate/DAI + RF + AE (blocking ON)
+Goal: all four tiers active, OpenFlow DROP on confirmation.
+1. Both model files present (restored) + restart.
+2. `python3 ipsctl.py CONTROL:DETECT:ON`         ← Snort labels + Tier-2 rate/DAI blocks
+3. `python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80` ← RF + AE block on high confidence
+4. For each attack `py net.run_attack_session(net,'<kind>')`, capture whichever tiers fire:
+   - **Tier 1 (Snort):** `🚨 IDS ALERT … SID …`
+   - **Tier 2 (rate/DAI):** `SUSPECTED … 1/N → CONFIRMED → BLOCKED`
+   - **Tier 3 (RF):** `[ML] ATTACK (block) … conf=0.xx`
+   - **Tier 4 (AE):** `[AE] ANOMALY (block) …`
+   - then the `ATTACKER BLOCKED` box.
+5. Confirm end-to-end: `curl -s http://127.0.0.1:8081/ips/blocked | python3 -m json.tool` lists the
+   attacker; the dashboard (`http://<T530_IP>:8081/`) shows threat HIGH + blocked table + timeline +
+   health panel; before/after ping from the attacker host fails while blocked.
+6. Release: `python3 ipsctl.py CONTROL:CLEAR:<attacker-ip>`  (or `CONTROL:UNBLOCK:<ip>`).
+- **GATE:** every attack is caught by ≥1 tier and blocked; `/ips/blocked` + dashboard reflect it;
+  window compute < 5000 ms and RAM has headroom.
+
+Expected coverage: floods (ICMP/SYN/UDP) → Snort + rate + RF (+AE); Port Scan → Snort port_scan + RF;
+ARP spoof → DAI + Snort arp_spoof (+AE); novel/zero-day → AE.
+
+---
+
 ## Quick gotchas (t530)
+- **Dashboard "can't be reached" / times out:** test locally first — `curl -s http://127.0.0.1:8081/ | head`.
+  If that returns HTML, it's a reach issue: wrong/changed t530 IP (`ip -br addr`), or a firewall
+  (`sudo ufw status`; `sudo ufw allow 8081/tcp`). If it 404s, you're on old code — `git pull` + restart
+  (the `GET /` serve route). If refused, the controller isn't running (`sudo ss -ltnp | grep 8081`).
+- **`nc` missing / UDP commands fail:** use `python3 Controller/ipsctl.py CONTROL:…` (pure Python).
 - **Snort 2 vs 3:** if `snort -V` says 2.x, the wrong binary is on PATH — use `/usr/local/bin/snort`.
 - **`ae_bundle.joblib`/`rf_pipeline.joblib` missing** → AE/RF tier disables; confirm Step 6.
 - **`curl :8080` refused** → WSGI didn't start; check Step 8 log for `REST IPS API on :8080`.
