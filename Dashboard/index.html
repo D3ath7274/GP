@@ -75,7 +75,7 @@
   <!-- System health -->
   <div class="card">
     <h2>System health (t530)</h2>
-    <div class="sub">RAM <b id="ram">—</b> · CPU <b id="cpu">—</b></div>
+    <div class="sub">RAM <b id="ram">—</b> · CPU <b id="cpu">—</b> · Disk <b id="disk">—</b></div>
     <div class="sub">window compute <b id="cmp">—</b> <span class="muted">(&lt; 5000 ms)</span></div>
     <div class="sub">backlog drops <b id="drops">—</b> · <b id="pps">—</b> pps</div>
   </div>
@@ -159,6 +159,7 @@ function renderMetrics(m, status, blockedCount){
 
   $('ram').textContent  = m?.ram_pct!=null ? m.ram_pct+'%' : '—';
   $('cpu').textContent  = m?.cpu_pct!=null ? m.cpu_pct+'%' : '—';
+  $('disk').textContent = m?.disk_pct!=null ? m.disk_pct+'%' : '—';
   const cmp = m?.window_compute_ms;
   const ce=$('cmp'); ce.textContent = cmp!=null ? cmp+' ms':'—';
   ce.className = cmp!=null ? sev(cmp,3000,5000):'';
