@@ -97,21 +97,26 @@ class AEInferenceEngine:
             self._log('error', "Failed to load AE bundle %s: %s", path, e)
 
     def _vectorize(self, flow_dict):
-        # Same end-state as the notebook: one-hot protocol, then keep exactly the
-        # trained feature columns (reindex drops everything else, fills missing=0),
-        # then standardize with the stored mean/scale.
+        # Match the notebook's preprocessing. CRITICAL: one-hot ONLY the 'protocol'
+        # column. Training dropped all other string columns (src_ip, dst_ip, timestamp,
+        # snort_sid, meta_*, …) BEFORE get_dummies; one-hotting the whole row instead
+        # turns every string column into 'protocol_<value>' and any value collision
+        # (e.g. two columns sharing a value) yields DUPLICATE columns -> pandas raises
+        # "cannot reindex on an axis with duplicate labels" and the AE scores nothing.
         df = pd.DataFrame([flow_dict])
-        df = pd.get_dummies(df, prefix='protocol')
-        # FIX: protocol_normal is a training artifact — the notebook's get_dummies
-        # one-hot'd attack_type='normal' with prefix='protocol', producing a constant
-        # protocol_normal=1 column in every training row.  In production the RF hook
-        # may have already mutated row['attack_type'] to the attack name (e.g.
-        # 'SYN Flood') BEFORE the AE scores it, so get_dummies no longer produces
-        # protocol_normal.  Force it to 1.0 to match training.
+        if 'protocol' in df.columns:
+            df = pd.get_dummies(df, columns=['protocol'], prefix='protocol')
+        # protocol_normal is a training artifact (the notebook one-hot'd attack_type=
+        # 'normal' under prefix='protocol'); force it to 1.0 to match training.
         if 'protocol_normal' in self._features:
             df['protocol_normal'] = 1.0
-        df = df.reindex(columns=self._features, fill_value=0)
-        x = df.apply(pd.to_numeric, errors='coerce').fillna(0.0).astype(np.float64).values
+        # Assemble the vector BY POSITION from self._features (handles duplicate feature
+        # names too); reindex can't, but a positional lookup over a unique single-row
+        # Series can. Missing feature -> 0.
+        s = df.iloc[0]
+        vals = [pd.to_numeric(s.get(f, 0.0), errors='coerce') for f in self._features]
+        x = np.asarray(vals, dtype=np.float64).reshape(1, -1)
+        x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
         return (x - self._mean) / self._scale          # (1, n)
 
     def _forward(self, x):

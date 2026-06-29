@@ -1157,6 +1157,7 @@ class TrafficCapture:
             flag_thr = getattr(self.controller, '_ml_flag_threshold', 0.80)
             ml_engine = self.controller._ml_engine
             ml_blocked_this_window = set()  # Avoid duplicate blocks per IP per window
+            ml_counts = {}                  # verdict -> count, for the per-window summary
 
             for _si, row in enumerate(score_rows):
                 if _si and _si % 16 == 0:
@@ -1165,23 +1166,24 @@ class TrafficCapture:
                     ml_label, ml_type, ml_conf = ml_engine.predict(row)
                 except Exception:
                     continue
+                ml_counts[ml_type] = ml_counts.get(ml_type, 0) + 1
 
                 src_ip = row.get('src_ip', '?')
                 dst_ip = row.get('dst_ip', '?')
                 band = ('BLOCK' if ml_conf >= block_thr
                         else 'FLAG' if ml_conf >= flag_thr else 'below-thresh')
 
-                # OBSERVE = full transparency: log EVERY verdict (INCLUDING 'normal') so the
-                # operator can SEE the RF scoring every window during verification — otherwise
-                # a normal verdict prints nothing and looks like the engine is dead.
+                # No block/flag ACTION on a normal verdict.
+                if ml_label == 0 or ml_type == 'normal':
+                    continue
+
+                # OBSERVE: surface each NON-normal verdict individually; 'normal' is rolled
+                # into the per-window summary below. (Logging every flow every window floods
+                # stdout through the tee pipe and can stall the whole controller.)
                 if ml_mode == 'OBSERVE':
                     self._log('info',
                         "[ML-OBSERVE] %s → %s  verdict=%s  conf=%.2f  band=%s",
                         src_ip, dst_ip, ml_type, ml_conf, band)
-
-                # No block/flag ACTION on a normal verdict (but it was already shown above).
-                if ml_label == 0 or ml_type == 'normal':
-                    continue
 
                 if ml_conf >= block_thr:
                     # --- BLOCK band ---
@@ -1218,6 +1220,12 @@ class TrafficCapture:
                     self._capture_evidence(row, ml_type, ml_conf, flag_thr, block_thr)
                 # else conf < flag_thr: ignore (OBSERVE already surfaced it above)
 
+            # Per-window summary — proves the RF ran even when every flow is 'normal'.
+            if ml_mode == 'OBSERVE' and ml_counts:
+                self._log('info', "[ML-OBSERVE] window: %d flows scored — %s",
+                          sum(ml_counts.values()),
+                          ', '.join('%s:%d' % (k, v) for k, v in sorted(ml_counts.items())))
+
         # =====================================================================
         # AE Tier 4: Per-Flow Autoencoder anomaly scoring (CONCURRENT with the RF)
         # =====================================================================
@@ -1239,6 +1247,10 @@ class TrafficCapture:
             ae_flag_thr = getattr(self.controller, '_ae_flag_threshold', 0.60)
             ae_engine = self.controller._ae_engine
             ae_blocked_this_window = set()
+            ae_scored = 0
+            ae_max_conf = 0.0
+            ae_max_err = 0.0
+            ae_flagged = 0
 
             for _si, row in enumerate(score_rows):
                 if _si and _si % 16 == 0:
@@ -1247,22 +1259,25 @@ class TrafficCapture:
                     is_anom, ae_conf, ae_err = ae_engine.score(row)
                 except Exception:
                     continue
+                ae_scored += 1
+                if ae_conf > ae_max_conf:
+                    ae_max_conf = ae_conf
+                    ae_max_err = ae_err
                 src_ip = row.get('src_ip', '?')
                 dst_ip = row.get('dst_ip', '?')
-                band = ('BLOCK' if ae_conf >= ae_block_thr
-                        else 'FLAG' if ae_conf >= ae_flag_thr else 'normal')
 
-                # OBSERVE = full transparency: log EVERY window's AE score (INCLUDING below
-                # threshold) so the operator can see live err/conf during verification —
-                # otherwise a well-reconstructed (normal) window prints nothing.
+                # Below the flag band: no action; rolled into the per-window summary only
+                # (logging every normal window floods stdout and can stall the controller).
+                if ae_conf < ae_flag_thr:
+                    continue
+                ae_flagged += 1
+                band = 'BLOCK' if ae_conf >= ae_block_thr else 'FLAG'
+
+                # OBSERVE: surface each FLAGGED window individually.
                 if ae_mode == 'OBSERVE':
                     self._log('info',
                         "[AE-OBSERVE] %s → %s  anomaly conf=%.2f  err=%.4f  band=%s",
                         src_ip, dst_ip, ae_conf, ae_err, band)
-
-                # Below the flag band: no action (already surfaced above in OBSERVE).
-                if ae_conf < ae_flag_thr:
-                    continue
 
                 if ae_conf >= ae_block_thr:
                     if str(row.get('label', '0')) == '0':   # don't overwrite RF/rate label
@@ -1288,6 +1303,12 @@ class TrafficCapture:
                 elif ae_mode == 'AUTHORIZE':
                     self._log('warning',
                         "[AE] FLAGGED (no block) %s → %s  conf=%.2f", src_ip, dst_ip, ae_conf)
+
+            # Per-window summary — proves the AE ran even when nothing crosses the band.
+            if ae_mode == 'OBSERVE' and ae_scored:
+                self._log('info',
+                    "[AE-OBSERVE] window: %d flows scored — max conf=%.2f (err=%.4f), flagged=%d",
+                    ae_scored, ae_max_conf, ae_max_err, ae_flagged)
 
         # Drop the raw-frame evidence buffer for this window (bounded memory).
         if self._raw_frames:
