@@ -71,6 +71,32 @@ IPS_INSTANCE_NAME = 'controller_main_ips'
 COLLECTION_MODE = True
 
 
+def _route_wsgi_access_log_to_file(path=None):
+    """Send eventlet's WSGI access log — the 'GET /ips/status … 200' flood the
+    dashboard generates by polling four endpoints every ~2s — to a file instead of
+    the controller's terminal, so the console shows only IPS events (IDS alerts,
+    blocks, ML/AE window summaries). Eventlet's wsgi server logs through the
+    'eventlet.wsgi' / 'eventlet.wsgi.server' Python loggers; we point those at the
+    file and turn OFF propagation so nothing reaches the root logger / terminal.
+
+    File defaults to GET_log.txt in the CWD (override with env IPS_GET_LOG). Opened
+    in 'w' so each run starts fresh (these are disposable access logs, not evidence).
+    Called early in __init__, before the WSGI server starts serving.
+    """
+    import logging as _logging
+    path = path or os.environ.get('IPS_GET_LOG', 'GET_log.txt')
+    try:
+        handler = _logging.FileHandler(path, mode='w')
+        handler.setFormatter(_logging.Formatter('%(message)s'))
+        for _name in ('eventlet.wsgi', 'eventlet.wsgi.server'):
+            lg = _logging.getLogger(_name)
+            lg.handlers[:] = [handler]
+            lg.setLevel(_logging.INFO)
+            lg.propagate = False          # do NOT bubble up to the terminal
+    except Exception:
+        pass                              # logging redirect is best-effort, never fatal
+
+
 class SimpleSwitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_0.OFP_VERSION]
     # WSGI context (merged from ryu_ips_app.py): ryu-manager starts the REST
@@ -79,6 +105,8 @@ class SimpleSwitch(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch, self).__init__(*args, **kwargs)
+        # Quiet the terminal: WSGI access-log flood (dashboard polling) -> GET_log.txt.
+        _route_wsgi_access_log_to_file()
         self.mac_to_port = {}
         self._datapaths = {}   # dpid -> datapath (for sending flow mods outside packet_in)
         self._blocked_ips = {} # ip -> {'mac':, 'until':, 'attack_type':}
