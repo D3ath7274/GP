@@ -21,11 +21,12 @@ standalone `snort_alert_reader.py` signature path, the merged-controller REST/bl
 | 0 | What you can test & how the pieces fit | read once |
 | 1 | One-time install & verify (Snort 3, config, rules, mirror, deps, models) | fresh/repaved t530 |
 | 2 | Launch the merged controller | every session |
-| 3 | Topology + **data-flow GATES** (the #1 failure) | every session |
+| 3 | Topology + **background (normal) traffic** + **data-flow GATES** (the #1 failure) | every session |
 | 4 | Pre-attack checklist (arm ML/AE in OBSERVE) | before any attack |
 | 5 | Test **Random Forest** (Tier 3) | ML evidence |
 | 6 | Test **Autoencoder** (Tier 4 / zero-day) | AE evidence |
-| 7 | **Full stack** blocking (Snort + rate/DAI + RF + AE) | end-to-end proof |
+| 7A | **ML-only blocking** (DETECT OFF + AUTHORIZE → RF/AE are the only deciders) | prove the models block hosts |
+| 7B | **Full-stack** layered blocking (Snort + rate/DAI + RF + AE) | end-to-end proof |
 | 8 | **REST API** block test (`/ips/block`) | REST/block evidence |
 | 9 | **Standalone Snort reader** path (`snort_alert_reader.py`) | explicit IDS boxes + external-IP iptables block |
 | 10 | **Dashboard** — connect, verify, operate | visibility + screenshots |
@@ -143,7 +144,19 @@ Then in `mininet-wifi>`:
 py net.register_iot_device(net,'TempSensor','10.0.0.5/24','00:00:00:00:00:05','s1','IOT:TempSensor')
 py net.register_iot_device(net,'Cam','10.0.0.6/24','00:00:00:00:00:06','s1','IOT:Camera')
 pingall
+py net.start_background_traffic(net)
 ```
+The last line starts the **normal-traffic simulator** — an HTTP server + iperf server on `h2`, web
+browsing from `sta1/sta2`, periodic iperf, low-rate pings, and realistic IoT telemetry (TempSensor
+HTTP/MQTT-UDP publishes, Cam video-style iperf bursts + heartbeats). It serves three purposes:
+1. keeps `dataset.csv` growing so the GATEs below pass without you hand-pinging,
+2. lets **device baselines mature** — leave it running **≥ 180 s** before judging the AE
+   (`is_baseline_mature`); a cold baseline makes normal traffic look anomalous,
+3. it's the **legitimate traffic that must keep flowing while an attacker is blocked** — your proof
+   (PART 7) that blocking is surgical, not a global outage.
+
+> Leave background traffic running for the **whole** session (all ML/AE/blocking tests). Start every
+> attack *on top of* it.
 
 **3.3 — GATE 1 (switch connected).** On the t530: `curl -s http://127.0.0.1:8081/ips/switches`
 - **Must show `"count": 1`.** If `0`, `CONTROLLER_IP` is wrong (stale t530 IP) → `mn -c` and relaunch
@@ -218,8 +231,59 @@ grep "AE-OBSERVE" controller_run.log | tail -30
 
 ---
 
-## PART 7 — Full stack: Snort 3 + Rate/DAI + RF + AE (blocking ON)
-Both model files present + controller restarted.
+## PART 7A — Make the ML models ACTUALLY block (pure-ML blocking)
+This proves **the RF/AE themselves block a host**, with Snort and the rate/DAI tier taken out of the
+picture so the block can only have come from a model. The trick is the **DETECT gate**: with
+`DETECT:OFF` the controller does not rate/Snort-label anything, so RF + AE score **every** flow and
+are the **only** tiers that can decide a block.
+
+Background traffic running (PART 3) and both models loaded (PART 2 banner). On the **t530**:
+```bash
+cd ~/GP/Controller
+python3 ipsctl.py CONTROL:DETECT:OFF          # remove rate/DAI/Snort labeling -> ML is the only decider
+python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80   # RF blocks >=0.80, AE blocks >=0.73 (AE band fixed)
+curl -s http://127.0.0.1:8081/ips/status      # confirm "ml_mode":"AUTHORIZE"
+# optional live watch (Terminal C):
+tail -f controller_run.log | grep -E "\[ML\]|\[AE\]|ATTACKER BLOCKED"
+```
+Now launch an attack from the topology and confirm a model blocks the source:
+```python
+py net.run_attack_session(net,'syn')          # then icmp / udp / scan / cps  (>=20s each)
+```
+- **GATE / RECORD:** Terminal A shows a model verdict crossing its band then the block, e.g.
+  `[ML] ATTACK (block) 10.0.0.1 verdict=SYN Flood conf=0.9x` **or** `[AE] ANOMALY (block) 10.0.0.1
+  conf=0.7x` → `ATTACKER BLOCKED … reason=ml-…/ae-…` (the `reason` names the deciding model).
+- **Verify the block actually took effect (two ways):**
+  ```bash
+  curl -s http://127.0.0.1:8081/ips/blocked | python3 -m json.tool     # attacker IP listed
+  ```
+  ```python
+  # from mininet-wifi>, the attacker can no longer reach the server, but background hosts still can:
+  10.0.0.1 ping -c3 10.0.0.4      # the blocked attacker  -> 100% loss
+  10.0.0.3 ping -c3 10.0.0.4      # an innocent host      -> 0% loss (surgical block)
+  ```
+- **Release between rounds:** `python3 ipsctl.py CONTROL:UNBLOCK:10.0.0.1`
+  (or `CONTROL:CLEAR:10.0.0.1`), confirm the attacker's ping recovers, then test the next class.
+- **Isolate ONE model** (to prove *that* model blocks): rename the other bundle and restart —
+  `mv ml_models/ae_bundle.joblib ml_models/ae_bundle.off` (RF-only) **or**
+  `mv ml_models/rf_pipeline.joblib ml_models/rf_pipeline.off` (AE-only); restore + restart after.
+- **Tune the bar live** without restart: `python3 ipsctl.py CONTROL:ML:BLOCK:0.70` lowers the RF
+  block threshold (more aggressive); `CONTROL:ML:FLAG:0.50` lowers the flag bar. Raise them back up
+  if you see a legitimate host get blocked.
+- This is **Ch.5 Fig 5.16/5.17** evidence (detection→block latency + lateral-movement containment).
+
+> If a model *detects* (you saw it in OBSERVE, PART 5/6) but never blocks here: it's scoring below
+> the block band — lower the bar (`CONTROL:ML:BLOCK`) or, for persistent under-confidence on real
+> attacks, retrain per `ml_ae_confidence_boost_plan.md`. If nothing scores at all, DETECT is still
+> ON or there's no `packet_in` (re-check PART 3 GATEs).
+
+When done, return to the layered configuration for PART 7B:
+```bash
+python3 ipsctl.py CONTROL:DETECT:ON
+```
+
+## PART 7B — Full stack: Snort 3 + Rate/DAI + RF + AE (layered blocking)
+Both model files present + controller restarted (or DETECT just turned back ON).
 ```bash
 python3 ipsctl.py CONTROL:DETECT:ON          # Snort labels + Tier-2 rate/DAI block
 python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80  # RF + AE block on high confidence
@@ -317,8 +381,9 @@ captures map onto this runbook as:
 | 5.10 live RF verdicts | PART 5 | `grep "ML-OBSERVE" controller_run.log` |
 | 5.11–5.13 AE / zero-day | PART 6 | AE notebook eval + `grep "AE-OBSERVE"` + the unseen-class block |
 | 5.14 attacks-by-type | PART 10 | dashboard panel after a multi-attack session |
-| 5.15 flow rule before/after | PART 7 | `sudo ovs-ofctl dump-flows s1` ×2 around a block (Mininet VM) |
-| 5.16 detection→block latency | PART 7 | diff detection-log vs flow-install timestamps |
+| 5.15 flow rule before/after | PART 7A/7B | `sudo ovs-ofctl dump-flows s1` ×2 around a block (Mininet VM) |
+| 5.16 detection→block latency | PART 7A | diff detection-log vs flow-install timestamps |
+| 5.17 lateral-movement containment | PART 7A | blocked attacker ping fails while an innocent host's ping succeeds |
 | 5.18 t530 resource use | PART 10 | dashboard health panel or `curl …/ips/metrics` under load |
 | 5.19 dashboard mid-attack | PART 10 | browser at `http://<t530>:8081/` during PART 7 |
 
