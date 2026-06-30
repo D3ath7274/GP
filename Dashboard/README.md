@@ -1,9 +1,16 @@
 # SDN-IPS Dashboard
 
-A single-file, dependency-free web dashboard for the controller (`index.html`). It turns the
-flooded console into a glanceable view — see `../dashboard_plan.md` for the design rationale.
+A single-file, dependency-free web dashboard for the controller (`index.html`), built in the
+**shadcn/ui** design language (the real zinc dark theme tokens, Card/Badge/Button/Progress/Table
+components, lucide icons, Inter). It turns the flooded console into a glanceable view — see
+`../dashboard_plan.md` for the design rationale.
 **The backend is already wired into `Controller_main_Claude.py`** (read-only endpoints +
 a serve route), so there is nothing to install or paste — just run the controller and open it.
+
+> **One file, zero dependencies, served by the controller.** shadcn/ui is normally a Node/React
+> build; here the same look is reproduced with hand-written CSS (the shadcn HSL tokens) + vanilla
+> JS, so it needs **no CDN, no build, and works fully offline** on the t530. Deployment is
+> unchanged: the controller serves this file at `GET /`.
 
 ## Use it (3 steps)
 1. **Start the merged controller** (any wsapi-port; the t530 uses 8081 because nginx holds 8080):
@@ -38,6 +45,8 @@ blocked-hosts table **with Unblock buttons**, deduped event timeline, and t530 h
   just works. If you instead open `index.html` as a local file, set `API_BASE` near the top of
   `index.html` to `http://<controller-ip>:8081` (and you'd then need a CORS header — simpler to
   use the served route in step 2).
+- **No internet required:** the dashboard has no external scripts/fonts — the shadcn look is
+  hand-written CSS + vanilla JS, so it renders identically online, air-gapped, or in a sandbox.
 - `by_tier` currently reports **snort** (alert count) and **rate_dai** (confirmed attackers);
   RF/AE per-tier counters can be added later if you want those tiles populated.
 - `PROJECT_DOCUMENTATION.md` (this folder) = what the whole system does + SOC deployment + comparison.
