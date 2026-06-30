@@ -151,6 +151,7 @@ class MLInferenceEngine:
         if os.path.exists(pipe_path):
             try:
                 self._pipeline = joblib.load(pipe_path)
+                self._force_single_threaded(self._pipeline)
                 self._classes = list(getattr(self._pipeline, 'classes_', []))
                 self._mode = 'pipeline'
                 self.is_loaded = True
@@ -168,6 +169,7 @@ class MLInferenceEngine:
             try:
                 art = joblib.load(bundle_path)
                 self._rf = art['rf']
+                self._force_single_threaded(self._rf)
                 self._scaler = art['scaler']
                 self._encoded_columns = list(art['encoded_columns'])
                 self._final_columns = list(art['final_columns'])
@@ -185,6 +187,26 @@ class MLInferenceEngine:
                   "No ML model found in %s (looked for %s, then %s) — inference disabled.",
                   self._model_dir, PIPELINE_FILENAME, BUNDLE_FILENAME)
 
+    def _force_single_threaded(self, model):
+        """Set n_jobs=1 on the loaded estimator (and every pipeline step that has it),
+        so RandomForest.predict_proba runs sequentially and never starts a joblib
+        multiprocessing pool. See _infer for WHY this is mandatory under eventlet — a
+        model pickled with n_jobs=-1 otherwise deadlocks the controller the instant ML
+        is armed. This neutralises that at the source; _infer's threading-backend wrap
+        is the second line of defence."""
+        targets = [model]
+        steps = getattr(model, 'steps', None)
+        if steps:
+            targets += [est for _, est in steps]
+        for est in targets:
+            if hasattr(est, 'n_jobs'):
+                try:
+                    est.n_jobs = 1
+                    self._log('info', "Forced n_jobs=1 on %s (no multiprocessing pool)",
+                              type(est).__name__)
+                except Exception:
+                    pass
+
     # bundle-mode preprocessing (pipeline mode does this inside RFPreprocessor)
     def _preprocess_bundle(self, flow_dicts):
         df = pd.DataFrame(list(flow_dicts))
@@ -198,21 +220,33 @@ class MLInferenceEngine:
         return scaled[self._final_columns]
 
     def _infer(self, flow_dicts):
-        """Return (preds, probas) for a list of flow dicts, using whichever model loaded."""
-        if self._mode == 'pipeline':
-            X = pd.DataFrame(list(flow_dicts))
-            preds = self._pipeline.predict(X)
-            try:
-                probas = self._pipeline.predict_proba(X)
-            except Exception:
-                probas = None
-        else:
-            X = self._preprocess_bundle(flow_dicts)
-            preds = self._rf.predict(X)
-            try:
-                probas = self._rf.predict_proba(X)
-            except Exception:
-                probas = None
+        """Return (preds, probas) for a list of flow dicts, using whichever model loaded.
+
+        CRITICAL: wrapped in joblib's THREADING backend (n_jobs=1) so prediction NEVER
+        spawns a multiprocessing pool. The controller runs under Ryu's eventlet hub,
+        whose monkey-patch leaves multiprocessing semaphores un-greened ("RLock not
+        greened" startup warning). A RandomForest saved with n_jobs=-1 then makes
+        predict_proba launch a multiprocessing pool from the feature-flush thread, which
+        DEADLOCKS on that lock — the flush thread wedges inside predict_proba, the
+        controller stops scoring AND stops writing dataset.csv (and appears hung) the
+        moment ML is armed. Threading/sequential inference is more than fast enough for a
+        single 5s window of flows. (n_jobs is also forced to 1 on load, see _load.)
+        """
+        with joblib.parallel_backend('threading', n_jobs=1):
+            if self._mode == 'pipeline':
+                X = pd.DataFrame(list(flow_dicts))
+                preds = self._pipeline.predict(X)
+                try:
+                    probas = self._pipeline.predict_proba(X)
+                except Exception:
+                    probas = None
+            else:
+                X = self._preprocess_bundle(flow_dicts)
+                preds = self._rf.predict(X)
+                try:
+                    probas = self._rf.predict_proba(X)
+                except Exception:
+                    probas = None
         return preds, probas
 
     def _result(self, attack_type, proba_row):
