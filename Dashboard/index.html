@@ -1,212 +1,376 @@
+<!doctype html>
+<html lang="en">
 <!--
-  SDN-IPS Dashboard — single-file, vanilla JS + inline SVG, no CDN/framework.
-  Polls the controller's REST API on :8080. Works today against the existing
-  endpoints (/ips/status, /ips/blocked, /ips/switches); the richer panels light up
-  once you add /ips/metrics and /ips/alerts (see Dashboard/README.md).
-  Set API_BASE below if not served same-origin from the controller.
+  SDN-IPS Dashboard — shadcn/ui design language, zero dependencies.
+  Single self-contained file served by the controller at GET / (:8081). No CDN, no
+  build, no framework: it renders the real shadcn "zinc" dark theme (CSS HSL tokens,
+  Card/Badge/Button/Progress/Table components, lucide icons) with hand-written CSS +
+  vanilla JS, so it works in any sandbox AND fully offline on the t530.
+
+  Data contract (unchanged): polls /ips/status, /ips/blocked, /ips/metrics, /ips/alerts.
+  Controls: DELETE /ips/block/<ip>. Set API_BASE if not served same-origin.
 -->
-<meta charset="utf-8">
-<title>SDN-IPS Dashboard</title>
-<style>
-  :root{
-    --bg:#0e1116; --panel:#161b22; --line:#222a35; --txt:#c9d4e1; --muted:#7d8aa0;
-    --green:#2ea043; --amber:#d29922; --red:#da3633; --blue:#388bfd;
-  }
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);
-    font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
-  header{display:flex;align-items:center;gap:14px;padding:10px 16px;
-    background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
-  header h1{font-size:16px;margin:0;font-weight:600}
-  .pill{padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;
-    border:1px solid var(--line)}
-  .ok{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)}
-  .bg-ok{background:rgba(46,160,67,.15)} .bg-warn{background:rgba(210,153,34,.15)}
-  .bg-bad{background:rgba(218,54,51,.18)}
-  .grid{display:grid;gap:12px;padding:16px;
-    grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
-  .card h2{margin:0 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
-    color:var(--muted);font-weight:600}
-  .big{font-size:30px;font-weight:700;line-height:1}
-  .sub{color:var(--muted);font-size:12px;margin-top:4px}
-  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-  .tile{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
-  .tile .n{font-size:22px;font-weight:700} .tile .l{font-size:11px;color:var(--muted)}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
-  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase}
-  button{background:#21262d;color:var(--txt);border:1px solid var(--line);
-    border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px}
-  button:hover{border-color:var(--blue)}
-  .feed{max-height:260px;overflow:auto;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
-  .feed div{padding:2px 0;border-bottom:1px solid #1a212b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .span2{grid-column:span 2} .muted{color:var(--muted)} .dot{font-size:10px}
-  .barlbl{font-size:11px;fill:var(--muted)} .barval{font-size:11px;fill:var(--txt)}
-</style>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SDN-IPS Dashboard</title>
+  <style>
+    /* ===== shadcn/ui "zinc" dark theme tokens ===== */
+    :root{
+      --background:240 10% 3.9%; --foreground:0 0% 98%;
+      --card:240 10% 3.9%; --card-foreground:0 0% 98%;
+      --primary:0 0% 98%; --primary-foreground:240 5.9% 10%;
+      --secondary:240 3.7% 15.9%; --secondary-foreground:0 0% 98%;
+      --muted:240 3.7% 15.9%; --muted-foreground:240 5% 64.9%;
+      --accent:240 3.7% 15.9%; --accent-foreground:0 0% 98%;
+      --destructive:0 62.8% 50.6%; --destructive-foreground:0 0% 98%;
+      --border:240 3.7% 15.9%; --input:240 3.7% 15.9%; --ring:240 4.9% 83.9%;
+      --radius:.5rem;
+      --ok:142 71% 45%; --warn:38 92% 50%; --bad:0 84% 60%; --info:217 91% 60%;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:hsl(var(--background));color:hsl(var(--foreground));
+      font:14px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      -webkit-font-smoothing:antialiased}
+    .mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+    .muted{color:hsl(var(--muted-foreground))}
 
-<header>
-  <h1>🛡️ SDN-IPS Dashboard</h1>
-  <span id="conn" class="pill bg-bad bad">● connecting…</span>
-  <span id="mode" class="pill">DETECT — · ML —</span>
-  <span class="pill"><span class="muted">switches</span> <b id="sw">—</b></span>
-  <span style="margin-left:auto" class="muted" id="updated">—</span>
-</header>
+    /* ===== layout ===== */
+    header{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;
+      gap:10px;padding:12px 24px;border-bottom:1px solid hsl(var(--border));
+      background:hsl(var(--background)/.85);backdrop-filter:blur(8px)}
+    header .brand{display:flex;align-items:center;gap:8px}
+    header .title{font-size:16px;font-weight:600;letter-spacing:-.01em}
+    header .sub{font-size:12px;color:hsl(var(--muted-foreground))}
+    .spacer{margin-left:auto}
+    main{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:24px}
+    .col2{grid-column:span 2}
+    @media(max-width:1100px){main{grid-template-columns:repeat(2,1fr)}.col2{grid-column:span 2}}
+    @media(max-width:680px){main{grid-template-columns:1fr}.col2{grid-column:span 1}}
+    footer{padding:0 24px 24px;text-align:center;font-size:11px;color:hsl(var(--muted-foreground))}
 
-<div class="grid">
-  <!-- Threat summary -->
-  <div class="card">
-    <h2>Threat level</h2>
-    <div class="big" id="threat">—</div>
-    <div class="sub"><b id="attackers">0</b> active attackers · <b id="blocked">0</b> blocked ·
-      <b id="a60">0</b> alerts/60s</div>
-  </div>
+    /* ===== card ===== */
+    .card{background:hsl(var(--card));border:1px solid hsl(var(--border));
+      border-radius:var(--radius);box-shadow:0 1px 2px rgba(0,0,0,.3)}
+    .card-h{padding:20px 20px 8px}
+    .card-c{padding:8px 20px 20px}
+    .card-t{font-size:13px;font-weight:500;letter-spacing:-.01em;margin:0;display:flex;
+      align-items:center;justify-content:space-between;gap:8px;color:hsl(var(--muted-foreground))}
+    .card-d{font-size:12px;color:hsl(var(--muted-foreground));margin:4px 0 0}
+    .stat{font-size:30px;font-weight:700;line-height:1.1;letter-spacing:-.02em}
+    .stat-sub{font-size:12px;color:hsl(var(--muted-foreground));margin-top:8px}
 
-  <!-- Per-tier -->
-  <div class="card span2">
-    <h2>Detection tiers (alive = contributing)</h2>
-    <div class="tiles">
-      <div class="tile"><div class="n" id="t-snort">—</div><div class="l">Snort 3 alerts/min</div></div>
-      <div class="tile"><div class="n" id="t-rate">—</div><div class="l">Rate+DAI confirms</div></div>
-      <div class="tile"><div class="n" id="t-rf">—</div><div class="l">RF detections</div></div>
-      <div class="tile"><div class="n" id="t-ae">—</div><div class="l">AE anomalies</div></div>
+    /* ===== badge ===== */
+    .badge{display:inline-flex;align-items:center;gap:5px;border:1px solid transparent;
+      border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+    .b-secondary{background:hsl(var(--secondary));color:hsl(var(--secondary-foreground))}
+    .b-outline{border-color:hsl(var(--border));color:hsl(var(--foreground))}
+    .b-ok{background:hsl(var(--ok)/.15);color:hsl(var(--ok))}
+    .b-warn{background:hsl(var(--warn)/.15);color:hsl(var(--warn))}
+    .b-bad{background:hsl(var(--bad)/.18);color:hsl(var(--bad))}
+    .b-info{background:hsl(var(--info)/.15);color:hsl(var(--info))}
+    .t-ok{color:hsl(var(--ok))}.t-warn{color:hsl(var(--warn))}.t-bad{color:hsl(var(--bad))}.t-info{color:hsl(var(--info))}
+
+    /* ===== button ===== */
+    .btn{display:inline-flex;align-items:center;gap:6px;border-radius:calc(var(--radius) - 2px);
+      font-size:12px;font-weight:500;cursor:pointer;border:1px solid hsl(var(--border));
+      background:transparent;color:hsl(var(--foreground));padding:5px 11px;transition:.12s}
+    .btn:hover{background:hsl(var(--accent));border-color:hsl(var(--ring)/.5)}
+
+    /* ===== dot / pulse ===== */
+    .dot{width:7px;height:7px;border-radius:999px;display:inline-block}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    .pulse{animation:pulse 1.6s ease-in-out infinite}
+
+    /* ===== tier tiles ===== */
+    .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    @media(max-width:680px){.tiles{grid-template-columns:repeat(2,1fr)}}
+    .tile{border:1px solid hsl(var(--border));border-radius:calc(var(--radius) - 2px);
+      background:hsl(var(--background));padding:12px}
+    .tile .top{display:flex;align-items:center;justify-content:space-between}
+    .tile .n{font-size:22px;font-weight:700;margin-top:8px}
+    .tile .k{font-size:12px;font-weight:500}
+    .tile .d{font-size:11px;color:hsl(var(--muted-foreground))}
+
+    /* ===== progress ===== */
+    .prog{height:8px;width:100%;border-radius:999px;background:hsl(var(--secondary));overflow:hidden}
+    .prog>span{display:block;height:100%;border-radius:999px;transition:width .3s}
+    .row{margin-bottom:12px} .row:last-child{margin-bottom:0}
+    .rowlbl{display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-bottom:6px}
+
+    /* ===== bars ===== */
+    .bar{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .bar .lbl{width:120px;flex:none;font-size:12px;color:hsl(var(--muted-foreground));
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bar .track{position:relative;flex:1;height:20px;border-radius:4px;background:hsl(var(--secondary));overflow:hidden}
+    .bar .fill{height:100%;border-radius:4px;background:hsl(var(--info)/.8)}
+    .bar .v{width:32px;flex:none;text-align:right;font-size:12px;font-weight:500}
+
+    /* ===== table ===== */
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{text-align:left;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+      font-weight:500;color:hsl(var(--muted-foreground));border-bottom:1px solid hsl(var(--border))}
+    td{padding:8px;border-bottom:1px solid hsl(var(--border)/.6)}
+    tr:last-child td{border-bottom:0}
+
+    /* ===== feed ===== */
+    .feed{max-height:288px;overflow:auto;font-size:12px}
+    .feed::-webkit-scrollbar{width:8px}
+    .feed::-webkit-scrollbar-thumb{background:hsl(var(--border));border-radius:999px}
+    .ev{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid hsl(var(--border)/.4)}
+    .ev:last-child{border-bottom:0}
+    .ev .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .empty{text-align:center;color:hsl(var(--muted-foreground));padding:24px 0}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--info))" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+      <span class="title">SDN-IPS</span>
+      <span class="sub">Adaptive 4-Tier Intrusion Prevention</span>
     </div>
-  </div>
+    <span id="conn" class="badge b-bad"><span class="dot" style="background:hsl(var(--bad))"></span>connecting…</span>
+    <span id="detect" class="badge b-secondary">DETECT —</span>
+    <span id="ml" class="badge b-secondary">ML —</span>
+    <span id="sw" class="badge b-outline">— switches</span>
+    <span class="spacer sub" id="updated">—</span>
+  </header>
 
-  <!-- System health -->
-  <div class="card">
-    <h2>System health (t530)</h2>
-    <div class="sub">RAM <b id="ram">—</b> · CPU <b id="cpu">—</b> · Disk <b id="disk">—</b></div>
-    <div class="sub">window compute <b id="cmp">—</b> <span class="muted">(&lt; 5000 ms)</span></div>
-    <div class="sub">backlog drops <b id="drops">—</b> · <b id="pps">—</b> pps</div>
-  </div>
+  <main>
+    <!-- KPI: threat -->
+    <div class="card">
+      <div class="card-h"><h3 class="card-t">Threat level <span id="threat-ic"></span></h3></div>
+      <div class="card-c">
+        <div class="stat" id="threat">—</div>
+        <div class="stat-sub">
+          <b id="attackers" style="color:hsl(var(--foreground))">0</b> active attackers ·
+          <b id="blocked" style="color:hsl(var(--foreground))">0</b> blocked ·
+          <b id="a60" style="color:hsl(var(--foreground))">0</b> alerts/60s
+        </div>
+      </div>
+    </div>
 
-  <!-- Attack breakdown -->
-  <div class="card span2">
-    <h2>Attacks by type</h2>
-    <svg id="bars" width="100%" height="150" viewBox="0 0 600 150" preserveAspectRatio="none"></svg>
-  </div>
+    <!-- KPI: attackers -->
+    <div class="card">
+      <div class="card-h"><h3 class="card-t">Active attackers</h3></div>
+      <div class="card-c"><div class="stat" id="kpi-att">0</div><div class="stat-sub">rate-confirmed sources</div></div>
+    </div>
 
-  <!-- Blocked hosts -->
-  <div class="card span2">
-    <h2>Blocked hosts</h2>
-    <table><thead><tr><th>IP</th><th>Type</th><th>Reason / tier</th><th></th></tr></thead>
-      <tbody id="blkrows"><tr><td colspan="4" class="muted">none</td></tr></tbody></table>
-  </div>
+    <!-- KPI: alerts/60s -->
+    <div class="card">
+      <div class="card-h"><h3 class="card-t">Alerts / 60s</h3></div>
+      <div class="card-c"><div class="stat" id="kpi-a60">0</div><div class="stat-sub"><span id="kpi-atotal">0</span> total this session</div></div>
+    </div>
 
-  <!-- Event timeline -->
-  <div class="card span2">
-    <h2>Recent events (deduped)</h2>
-    <div class="feed" id="feed"><div class="muted">waiting for /ips/alerts …</div></div>
-  </div>
-</div>
+    <!-- KPI: blocked -->
+    <div class="card">
+      <div class="card-h"><h3 class="card-t">Blocked hosts</h3></div>
+      <div class="card-c"><div class="stat" id="kpi-blk">0</div><div class="stat-sub"><span id="kpi-tier">0</span> tier · <span id="kpi-rest">0</span> REST</div></div>
+    </div>
 
-<script>
-// ===== config =====
-const API_BASE = "";            // "" = same-origin (served by controller). Else "http://192.168.1.65:8080"
-const POLL_MS  = 2000;
+    <!-- Tiers -->
+    <div class="card col2">
+      <div class="card-h">
+        <h3 class="card-t">Detection tiers</h3>
+        <p class="card-d">A host is blocked when ANY tier fires under AUTHORIZE</p>
+      </div>
+      <div class="card-c"><div class="tiles" id="tiles"></div></div>
+    </div>
 
-const $ = id => document.getElementById(id);
-async function getJSON(path){
-  try{ const r = await fetch(API_BASE + path, {cache:"no-store"});
-       if(!r.ok) return null; return await r.json(); }
-  catch(e){ return null; }
-}
-const sev = (cls,a,b)=> cls>=b?'bad':cls>=a?'warn':'ok';
-function setPill(el,txt,kls){ el.className='pill bg-'+kls+' '+kls; el.textContent='● '+txt; }
+    <!-- Health -->
+    <div class="card col2">
+      <div class="card-h"><h3 class="card-t">System health · t530</h3><p class="card-d">thin-client resource pressure</p></div>
+      <div class="card-c" id="health"></div>
+    </div>
 
-async function tick(){
-  const status = await getJSON('/ips/status');
-  if(!status){ setPill($('conn'),'controller offline','bad'); return; }
-  setPill($('conn'),'live','ok');
-  $('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+    <!-- Attacks by type -->
+    <div class="card col2">
+      <div class="card-h"><h3 class="card-t">Attacks by type</h3><p class="card-d">Snort-classified, cumulative this session</p></div>
+      <div class="card-c" id="attacks"><div class="empty">no classified attacks yet</div></div>
+    </div>
 
-  // status bar
-  const det = status.detection_enabled ? 'ON':'OFF';
-  $('mode').textContent = `DETECT ${det} · ML ${status.ml_mode||'—'}`;
-  $('mode').className = 'pill ' + (status.detection_enabled?'bg-ok ok':'bg-warn warn');
-  $('sw').textContent = status.switches;
+    <!-- Feed -->
+    <div class="card col2">
+      <div class="card-h"><h3 class="card-t">Recent events</h3><p class="card-d">live Snort alert timeline</p></div>
+      <div class="card-c"><div class="feed" id="feed"><div class="empty">waiting for /ips/alerts…</div></div></div>
+    </div>
 
-  // blocked
-  const blk = await getJSON('/ips/blocked');
-  const rows = (blk && blk.blocked) || [];
-  $('blocked').textContent = rows.length;
-  renderBlocked(rows);
+    <!-- Blocked hosts -->
+    <div class="card col2">
+      <div class="card-h"><h3 class="card-t" id="blk-title">Blocked hosts</h3></div>
+      <div class="card-c" style="overflow-x:auto">
+        <table>
+          <thead><tr><th>IP</th><th>Kind</th><th>Reason / tier</th><th></th></tr></thead>
+          <tbody id="blkrows"><tr><td colspan="4" class="empty">none</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
 
-  // metrics (optional endpoint)
-  const m = await getJSON('/ips/metrics');
-  renderMetrics(m, status, rows.length);
+  <footer>Adaptive IPS for IoT in SD-WAN · Ryu + OVS · polls every 2s</footer>
 
-  // alerts feed (optional endpoint)
-  const al = await getJSON('/ips/alerts?n=50');
-  renderFeed(al && al.alerts);
-}
+  <script>
+    // ===== config =====
+    const API_BASE = "";          // "" = same-origin (served by controller). Else "http://192.168.1.65:8081"
+    const POLL_MS  = 2000;
+    const $ = id => document.getElementById(id);
 
-function renderMetrics(m, status, blockedCount){
-  const attackers = m?.confirmed_attackers ?? 0;
-  const a60 = m?.alerts_last_60s ?? 0;
-  $('attackers').textContent = attackers;
-  $('a60').textContent = a60;
-  // threat level from current activity
-  const lvl = (blockedCount>0||attackers>0) ? 2 : (a60>0?1:0);
-  const t=$('threat'); t.textContent = ['CLEAR','ELEVATED','UNDER ATTACK'][lvl];
-  t.className = 'big ' + ['ok','warn','bad'][lvl];
+    async function getJSON(path){
+      try{ const r = await fetch(API_BASE + path, {cache:"no-store"});
+           if(!r.ok) return null; return await r.json(); }
+      catch(e){ return null; }
+    }
+    const setBadge = (el, cls, html) => { el.className = "badge " + cls; el.innerHTML = html; };
+    const ICON = {
+      shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+      alert:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+      radio:'<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5m8.5 0c2.3 2.3 2.3 6.1 0 8.5m2.8 2.8c3.9-3.9 3.9-10.2 0-14.1"/><circle cx="12" cy="12" r="2"/>',
+      activity:'<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+      brain:'<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>',
+      layers:'<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/>',
+      cpu:'<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/>',
+      mem:'<path d="M6 19v-3M10 19v-3M14 19v-3M18 19v-3M8 11V9M16 11V9M12 11V9M2 15h20M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.1a2 2 0 0 0 0 3.837V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.1a2 2 0 0 0 0-3.837Z"/>',
+      disk:'<line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/>',
+    };
+    const svg = (name, color="hsl(var(--muted-foreground))", size=16) =>
+      `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[name]}</svg>`;
+    const toneForPct = v => v==null?"info":v>=90?"bad":v>=70?"warn":"ok";
+    const shortAttack = k => (k||"").replace(" Flood","").replace("Control Plane Saturation","CPS")
+      .replace("ARP Spoofing","ARP").replace("Port Scan","Scan");
 
-  const bt = m?.by_tier || {};
-  $('t-snort').textContent = bt.snort ?? '—';
-  $('t-rate').textContent  = bt.rate_dai ?? '—';
-  $('t-rf').textContent    = bt.rf ?? '—';
-  $('t-ae').textContent    = bt.ae ?? '—';
+    async function tick(){
+      const status = await getJSON("/ips/status");
+      if(!status){ setBadge($("conn"),"b-bad",'<span class="dot" style="background:hsl(var(--bad))"></span>controller offline'); return; }
+      setBadge($("conn"),"b-ok",'<span class="dot pulse" style="background:hsl(var(--ok))"></span>live');
+      $("updated").textContent = "updated " + new Date().toLocaleTimeString();
 
-  $('ram').textContent  = m?.ram_pct!=null ? m.ram_pct+'%' : '—';
-  $('cpu').textContent  = m?.cpu_pct!=null ? m.cpu_pct+'%' : '—';
-  $('disk').textContent = m?.disk_pct!=null ? m.disk_pct+'%' : '—';
-  const cmp = m?.window_compute_ms;
-  const ce=$('cmp'); ce.textContent = cmp!=null ? cmp+' ms':'—';
-  ce.className = cmp!=null ? sev(cmp,3000,5000):'';
-  $('drops').textContent = m?.backlog_drops ?? '—';
-  $('pps').textContent   = m?.throughput_pps ?? '—';
+      const det = status.detection_enabled;
+      setBadge($("detect"), det?"b-ok":"b-warn", "DETECT " + (det?"ON":"OFF"));
+      const ml = status.ml_mode || "—";
+      setBadge($("ml"), ml==="AUTHORIZE"?"b-bad":ml==="OBSERVE"?"b-warn":"b-secondary", "ML " + ml);
+      $("sw").textContent = (status.switches ?? "—") + " switch" + (status.switches===1?"":"es");
 
-  renderBars(m?.by_attack || {});
-}
+      const [blk, m, al] = await Promise.all([
+        getJSON("/ips/blocked"), getJSON("/ips/metrics"), getJSON("/ips/alerts?n=50")
+      ]);
+      const rows = (blk && blk.blocked) || [];
+      renderKpis(m, status, rows.length);
+      renderTiers(m);
+      renderHealth(m);
+      renderAttacks(m);
+      renderBlocked(rows);
+      renderFeed(al && al.alerts);
+    }
 
-function renderBlocked(rows){
-  const tb=$('blkrows');
-  if(!rows.length){ tb.innerHTML='<tr><td colspan="4" class="muted">none</td></tr>'; return; }
-  tb.innerHTML = rows.map(r=>{
-    const reason = r.attack_type || r.reason || r.kind || '';
-    return `<tr><td>${r.ip}</td><td>${r.kind||''}</td><td>${reason}</td>
-      <td><button onclick="unblock('${r.ip}')">Unblock</button></td></tr>`;
-  }).join('');
-}
-async function unblock(ip){
-  await fetch(API_BASE + '/ips/block/' + ip, {method:'DELETE'}); tick();
-}
+    function renderKpis(m, status, blockedCount){
+      const attackers = m?.confirmed_attackers ?? 0;
+      const a60 = m?.alerts_last_60s ?? 0;
+      const lvl = (blockedCount>0||attackers>0)?2:(a60>0?1:0);
+      const label = ["CLEAR","ELEVATED","UNDER ATTACK"][lvl];
+      const tone  = ["ok","warn","bad"][lvl];
+      const t=$("threat"); t.textContent=label; t.className="stat t-"+tone;
+      $("threat-ic").innerHTML = svg(lvl===0?"shield":"alert","hsl(var(--"+tone+"))");
+      $("attackers").textContent = attackers;
+      $("a60").textContent = a60;
+      $("blocked").textContent = blockedCount;
 
-function renderFeed(alerts){
-  const f=$('feed');
-  if(!alerts || !alerts.length){ if(f.children.length<=1) f.innerHTML='<div class="muted">no recent events (add /ips/alerts to enable)</div>'; return; }
-  f.innerHTML = alerts.map(a=>{
-    const c = a.tier==='blocked'||a.blocked ? 'bad' : a.tier==='AE'||a.tier==='RF' ? 'warn':'';
-    const t = a.time || '';
-    const conf = a.confidence!=null ? ` conf ${a.confidence}` : '';
-    return `<div class="${c}">${t}  ${a.src_ip||'?'} → ${a.dst_ip||'?'}  ${a.attack_type||''}  [${a.tier||a.sid||''}${conf}]</div>`;
-  }).join('');
-}
+      $("kpi-att").textContent = attackers;
+      $("kpi-att").className = "stat " + (attackers>0?"t-bad":"");
+      $("kpi-a60").textContent = a60;
+      $("kpi-a60").className = "stat " + (a60>0?"t-warn":"");
+      $("kpi-atotal").textContent = m?.alerts_total ?? 0;
+      $("kpi-blk").textContent = blockedCount;
+      $("kpi-blk").className = "stat " + (blockedCount>0?"t-bad":"");
+      $("kpi-tier").textContent = status?.tier_blocked ?? 0;
+      $("kpi-rest").textContent = status?.rest_blocked ?? 0;
+    }
 
-function renderBars(by){
-  const entries = Object.entries(by);
-  const svg=$('bars');
-  if(!entries.length){ svg.innerHTML='<text x="8" y="20" class="barlbl">add /ips/metrics for the breakdown</text>'; return; }
-  const max = Math.max(1,...entries.map(e=>e[1]));
-  const W=600, n=entries.length, bw=W/n, pad=10;
-  svg.innerHTML = entries.map(([k,v],i)=>{
-    const h = Math.round((v/max)*100), x=i*bw, y=120-h;
-    const short = k.replace(' Flood','').replace('Control Plane Saturation','CPS').replace('ARP Spoofing','ARP').replace('Port Scan','Scan');
-    return `<rect x="${x+pad}" y="${y}" width="${bw-2*pad}" height="${h}" rx="3" fill="var(--blue)"/>
-      <text x="${x+bw/2}" y="135" text-anchor="middle" class="barlbl">${short}</text>
-      <text x="${x+bw/2}" y="${y-3}" text-anchor="middle" class="barval">${v}</text>`;
-  }).join('');
-}
+    function renderTiers(m){
+      const bt = m?.by_tier || {};
+      const tiers = [
+        {k:"Snort 3", v:bt.snort, d:"signatures (Tier 1)", icon:"radio", on:m?.snort_running},
+        {k:"Rate + DAI", v:bt.rate_dai, d:"counters (Tier 2)", icon:"activity", on:true},
+        {k:"Random Forest", v:bt.rf, d:"supervised (Tier 3)", icon:"brain", on:m?.rf_loaded},
+        {k:"Autoencoder", v:bt.ae, d:"anomaly (Tier 4)", icon:"layers", on:m?.ae_loaded},
+      ];
+      $("tiles").innerHTML = tiers.map(t=>`
+        <div class="tile">
+          <div class="top">${svg(t.icon)}
+            <span class="dot" style="background:hsl(var(--${t.on?'ok':'muted-foreground'})${t.on?'':'/.4'})" title="${t.on?'loaded':'inactive'}"></span>
+          </div>
+          <div class="n">${t.v ?? "—"}</div>
+          <div class="k">${t.k}</div>
+          <div class="d">${t.d}</div>
+        </div>`).join("");
+    }
 
-tick(); setInterval(tick, POLL_MS);
-</script>
+    function renderHealth(m){
+      const rows = [
+        {label:"Memory", v:m?.ram_pct, icon:"mem"},
+        {label:"CPU",    v:m?.cpu_pct, icon:"cpu"},
+        {label:"Disk",   v:m?.disk_pct, icon:"disk"},
+      ];
+      $("health").innerHTML = rows.map(r=>{
+        const v = r.v!=null?Math.round(r.v):null, tone=toneForPct(v);
+        return `<div class="row">
+          <div class="rowlbl">
+            <span class="muted" style="display:flex;align-items:center;gap:6px">${svg(r.icon)} ${r.label}</span>
+            <span class="mono" style="font-weight:500">${v!=null?v+"%":"—"}</span>
+          </div>
+          <div class="prog"><span style="width:${v??0}%;background:hsl(var(--${tone}))"></span></div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderAttacks(m){
+      const by = m?.by_attack || {};
+      const entries = Object.entries(by).sort((a,b)=>b[1]-a[1]);
+      const host=$("attacks");
+      if(!entries.length){ host.innerHTML='<div class="empty">no classified attacks yet</div>'; return; }
+      const max = Math.max(1, ...entries.map(e=>e[1]));
+      host.innerHTML = entries.map(([k,v])=>`
+        <div class="bar">
+          <span class="lbl" title="${k}">${shortAttack(k)}</span>
+          <div class="track"><div class="fill" style="width:${(v/max)*100}%"></div></div>
+          <span class="v mono">${v}</span>
+        </div>`).join("");
+    }
+
+    function renderBlocked(rows){
+      $("blk-title").textContent = "Blocked hosts (" + rows.length + ")";
+      const tb=$("blkrows");
+      if(!rows.length){ tb.innerHTML='<tr><td colspan="4" class="empty">none</td></tr>'; return; }
+      tb.innerHTML = rows.map(r=>{
+        const reason = r.attack_type || r.reason || r.kind || "";
+        return `<tr>
+          <td class="mono">${r.ip}</td>
+          <td><span class="badge b-secondary">${r.kind||"—"}</span></td>
+          <td class="muted">${reason}</td>
+          <td style="text-align:right"><button class="btn" onclick="unblock('${r.ip}')">Unblock</button></td>
+        </tr>`;
+      }).join("");
+    }
+    async function unblock(ip){ await fetch(API_BASE + "/ips/block/" + ip, {method:"DELETE"}); tick(); }
+
+    function renderFeed(alerts){
+      const f=$("feed");
+      if(!alerts || !alerts.length){ if(f.children.length<=1) f.innerHTML='<div class="empty">no recent events</div>'; return; }
+      f.innerHTML = alerts.map(a=>{
+        const tier = (a.blocked||a.tier==="blocked")?"bad":(a.tier==="AE"||a.tier==="RF")?"warn":"info";
+        const time = (a.time||"").slice(11,19) || "--:--:--";
+        const at = a.attack_type ? ` · <span class="t-warn">${a.attack_type}</span>` : "";
+        const conf = a.confidence!=null ? ` · <span class="muted">conf ${a.confidence}</span>` : "";
+        return `<div class="ev">
+          <span class="muted mono">${time}</span>
+          <span class="badge b-${tier}">${a.tier||a.sid||"?"}</span>
+          <span class="txt mono">${a.src_ip||"?"} → ${a.dst_ip||"?"}${at}${conf}</span>
+        </div>`;
+      }).join("");
+    }
+
+    tick(); setInterval(tick, POLL_MS);
+  </script>
+</body>
+</html>

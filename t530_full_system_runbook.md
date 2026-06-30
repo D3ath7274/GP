@@ -1,207 +1,419 @@
-# HP t530 — Full System Runbook (ML + AE testing, end to end)
+# HP t530 — Full System Runbook (the single source: install → run → test every tier → dashboard → figures)
 
-*The complete, ordered path to run the IPS on the t530 and **prove RF (Tier 3) and AE (Tier 4)
-actually fire** — including the data-flow gate that catches the #1 failure (no `packet_in` →
-no features → ML/AE silent). Do each step, pass its **GATE** before moving on.*
+*Open **this one file** and you can stand up, exercise, and record the entire project on the t530.
+It folds in the Snort 3 install/rules (from `SDN_IPS_Snort_Installation_Runbook.pdf`), the
+standalone `snort_alert_reader.py` signature path, the merged-controller REST/block tests (was
+`Controller_main_test_guide.md`), the dashboard, and the figure-capture map (Ch.4 + Ch.5).*
 
-**Roles:** t530 = controller (Ryu + Snort 3 + RF + AE + REST/dashboard). Separate Mininet VM =
-the SDN topology. They connect over **OpenFlow 6633** + **UDP 9999**; REST/dashboard on **:8081**.
+**Roles:** **t530 = controller** (Ryu + Snort 3 + RF + AE + REST/dashboard). A separate
+**Mininet-WiFi VM = the SDN topology** (traffic + attacks). They connect over **OpenFlow 6633** +
+**UDP 9999**; REST + dashboard on **:8081** (nginx holds :8080 on the t530).
 
-> ⚠️ **The t530's IP keeps changing (DHCP): it's `192.168.1.4` right now (was .65, .69).**
-> Every time it changes, the topology's `CONTROLLER_IP` must match the *current* IP or the switch
-> never connects — and then **`pingall` still works** (OVS forwards on its own) while the
-> controller sees **nothing**. Fix permanently with a **router DHCP reservation** for the t530's
-> MAC. Always check `ip -br addr` on the t530 and use that exact IP.
+> ⚠️ **The t530's IP is DHCP and keeps changing** (seen .65 → .69 → .4). The topology's
+> `CONTROLLER_IP` must equal the t530's *current* IP or the switch never connects — and then
+> **`pingall` still works** (OVS forwards on its own) while the controller sees **nothing**
+> (no `packet_in` → no features → ML/AE silent). Fix permanently with a **router DHCP reservation**
+> for the t530's MAC; until then read `ip -br addr` every launch and pass that IP.
+
+## Quick index
+| Part | What | When you need it |
+|---|---|---|
+| 0 | What you can test & how the pieces fit | read once |
+| 1 | One-time install & verify (Snort 3, config, rules, mirror, deps, models) | fresh/repaved t530 |
+| 2 | Launch the merged controller | every session |
+| 3 | Topology + **background (normal) traffic** + **data-flow GATES** (the #1 failure) | every session |
+| 4 | Pre-attack checklist (arm ML/AE in OBSERVE) | before any attack |
+| 5 | Test **Random Forest** (Tier 3) | ML evidence |
+| 6 | Test **Autoencoder** (Tier 4 / zero-day) | AE evidence |
+| 7A | **ML-only blocking** (DETECT OFF + AUTHORIZE → RF/AE are the only deciders) | prove the models block hosts |
+| 7B | **Full-stack** layered blocking (Snort + rate/DAI + RF + AE) | end-to-end proof |
+| 8 | **REST API** block test (`/ips/block`) | REST/block evidence |
+| 9 | **Standalone Snort reader** path (`snort_alert_reader.py`) | explicit IDS boxes + external-IP iptables block |
+| 10 | **Dashboard** — connect, verify, operate | visibility + screenshots |
+| 11 | **Capture the thesis figures** (Ch.4 + Ch.5 map) | writing the thesis |
 
 ---
 
-## PART 1 — One-time setup (already done on your t530; verify)
-- Snort 3 from source: `/usr/local/bin/snort -V` → **Snort++ 3.x**.
-- ML deps present (Python 3.10 on this box): `python3 -c "import sklearn,numpy,pandas,joblib,ryu"`.
-- Config installed: `/etc/snort/sdn_ips.lua` + `/etc/snort/rules/sdn_ips_local.rules`.
-- Models present: `ls -l Controller/ml_models/rf_pipeline.joblib Controller/ml_models/ae_bundle.joblib`.
-- Ryu/eventlet patched for py3.10 (the `collections.MutableMapping` shim in the launch line below).
-- `Controller/ipsctl.py` present (UDP control sender; `nc` is unreliable here).
+## PART 0 — What you can test, and how the pieces fit
+The **merged controller `Controller_main_Claude.py`** is ONE `ryu-manager`-style process that already
+contains: the OF1.0 learning switch + packet mirror, its **own Snort 3** (`SnortManager`), Tier-2
+rate/DAI, Tier-3 RF, Tier-4 AE, the UDP-9999 control channel, OpenFlow-DROP blocking, and the REST
+API + dashboard on :8081. **For tiers 1–4 you only run this one process** (Parts 2–8, 10).
+
+The **standalone reader path** (Part 9: `snort_alert_reader.py` + `snort_ryu_bridge.py`, from the
+install-runbook PDF) is an *alternative/corroborating* signature pipeline that prints IDS-ALERT
+boxes and can block **external** (non-`10.0.0.0/8`) IPs via `iptables`. You don't need it for tiers
+1–4, but it's documented because the thesis/install runbook uses it. Don't run a *second* Snort for
+it — point the reader at the merged controller's own `alert_json` (Part 9).
+
+> Run **only** `Controller_main_Claude.py` — never also `Controller.py` or `ryu_ips_app.py`
+> (they fight over UDP 9999 / OpenFlow / the REST port).
 
 ---
 
-## PART 2 — Launch the controller (t530, Terminal A)
+## PART 1 — One-time install & verify (skip if already done; just run the CHECKs)
+
+### 1.1 System deps + Snort 3 from source (NOT `apt install snort` — that's v2)
+```bash
+sudo apt update
+sudo apt install -y git curl build-essential cmake flex bison pkg-config autoconf \
+  automake libtool libpcap-dev libpcre3-dev libpcre2-dev libdumbnet-dev zlib1g-dev \
+  libluajit-5.1-dev libhwloc-dev openssl libssl-dev liblzma-dev libunwind-dev uuid-dev \
+  libhyperscan-dev libsafec-dev python3 python3-pip openvswitch-switch tcpdump iproute2 \
+  net-tools hping3
+sudo systemctl enable --now openvswitch-switch
+
+# DAQ + Snort 3 (only if `/usr/local/bin/snort -V` is missing or shows 2.x)
+sudo apt remove -y snort || true ; hash -r
+cd ~/Downloads && git clone https://github.com/snort3/libdaq.git && cd libdaq \
+  && ./bootstrap && ./configure && make -j"$(nproc)" && sudo make install && sudo ldconfig
+cd ~/Downloads && git clone https://github.com/snort3/snort3.git && cd snort3 \
+  && ./configure_cmake.sh --prefix=/usr/local && cd build && make -j"$(nproc)" \
+  && sudo make install && sudo ldconfig
+```
+- **CHECK:** `/usr/local/bin/snort -V` → **`Snort++ 3.x`**. (If it says 2.x, the apt binary is on
+  PATH — always call `/usr/local/bin/snort` explicitly.)
+
+### 1.2 Install the project's Snort config + the canonical 6-attack rules
+```bash
+cd ~/GP
+sudo mkdir -p /etc/snort/rules /var/log/snort
+sudo cp Controller/snort3/sdn_ips.lua            /etc/snort/sdn_ips.lua
+sudo cp Controller/snort3/sdn_ips_local.rules    /etc/snort/rules/sdn_ips_local.rules
+ls -l /etc/snort/sdn_ips.lua /etc/snort/rules/sdn_ips_local.rules
+```
+> Use the **repo** `sdn_ips_local.rules` (canonical project schema: ICMP 1000001, SYN 1000002,
+> UDP 1000003, CPS 1000004; Port Scan = `port_scan` inspector GID 122; ARP = `arp_spoof` GID 112).
+> It is what `snort_monitor.classify_attack()` maps to the ML labels. (The PDF's teaching set with
+> SSH-bruteforce/Ryu-flood SIDs is a different file — don't install it for project tests.)
+
+- **CHECK (config loads):** `sudo /usr/local/bin/snort -T -c /etc/snort/sdn_ips.lua -i enp1s0`
+  → must end with the config validating and loading the local rules.
+
+### 1.3 Mirror path — choose ONE
+- **Simple (default, single-machine):** none needed — the merged controller mirrors to TAP
+  `snort_tap` itself (launch uses `SNORT_IFACES=snort_tap`).
+- **VXLAN `br-snort` (two-VM, matches the install runbook):** replicate the bridge per
+  `t530_bridge_setup.md` (creates `br-snort` + VXLAN ports keys 100/101 + tc mirror; systemd
+  `br-snort.service` on the t530 and `mininet-snort-mirror.service` on the Mininet VM). Then launch
+  the controller with `SNORT_IFACES=ens33,br-snort IPS_NO_TAP=1` and verify
+  `sudo /usr/local/bin/snort -T -c /etc/snort/sdn_ips.lua -i br-snort` passes.
+
+### 1.4 Python deps + models + control tool
+```bash
+python3 -c "import sklearn,numpy,pandas,joblib,ryu; print('ML deps ok')"   # RF needs sklearn 1.6.1
+sudo pip3 install psutil                                                     # dashboard health panel
+ls -l Controller/ml_models/rf_pipeline.joblib Controller/ml_models/ae_bundle.joblib
+ls -l Controller/ipsctl.py                                                   # UDP-9999 sender (nc is unreliable)
+```
+- Ryu 4.34 on Python 3.10 needs the `collections.MutableMapping` shim (already in the launch line),
+  `dnspython>=2.6`, `eventlet 0.41`, and the patched `ryu/app/wsgi.py` (`ALREADY_HANDLED = []`).
+- **Graceful degradation:** a missing model/dep disables only that tier; the rest still run.
+
+---
+
+## PART 2 — Launch the merged controller (t530, Terminal A)
 ```bash
 cd ~/GP/Controller
-sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=snort_tap IPS_V2_FEATURES=1 python3 -c "import collections,collections.abc; collections.MutableMapping=collections.abc.MutableMapping; from ryu.cmd.manager import main; main()" Controller_main_Claude.py --wsapi-port 8081 2>&1 | tee controller_run.log
+sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=snort_tap IPS_V2_FEATURES=1 \
+  python3 -c "import collections,collections.abc; collections.MutableMapping=collections.abc.MutableMapping; from ryu.cmd.manager import main; main()" \
+  Controller_main_Claude.py --wsapi-port 8081 2>&1 | tee controller_run.log
 ```
-- `SNORT_IFACES=snort_tap` keeps Snort on the Mininet data-plane only (no physical-LAN noise).
-- **GATE:** banner shows `ML engine loaded … (7 classes)`, `AE engine loaded … (60 features,
-  threshold=…, 4 layers)`, `Snort … started`, `wsgi starting up on http://0.0.0.0:8081`,
-  `UDP command listener … 9999`. **Leave this terminal running.**
-
-> If `:8081` errors "Address already in use", a stale controller/nginx holds it:
-> `sudo fuser -k 8081/tcp` then relaunch.
+- **GATE (the startup banner must show all tiers up):**
+  `Feature schema mode: v2 (corrected)` · `ML engine loaded … (7 classes)` ·
+  `AE engine loaded …/ae_bundle.joblib (60 features, threshold=0.482…, … layers)` ·
+  `Snort … started` · `wsgi starting up on http://0.0.0.0:8081` · `UDP command listener … 9999`.
+  **Leave this terminal running.** (`controller_run.log` is your master recording — **Figure 5.2**.)
+- If `:8081` is "Address already in use": `sudo fuser -k 8081/tcp` (nginx/stale controller), relaunch.
+- If the AE threshold prints `0.03750`, the **old** bundle is loaded — copy/rebuild the new
+  `ae_bundle.joblib` and relaunch.
 
 ---
 
-## PART 3 — Bring up the topology AND prove data is flowing (the critical part)
+## PART 3 — Topology + the data-flow GATES (the critical part)
 
-**3.1 — Find the t530's current IP** (Terminal B on the t530):
-```bash
-ip -br addr | grep enp1s0          # note the IP, e.g. 192.168.1.4
-```
+**3.1 — t530's current IP** (Terminal B): `ip -br addr | grep enp1s0`  → note it (e.g. 192.168.1.4).
 
 **3.2 — Start the topology (Mininet VM), pointing at that exact IP:**
 ```bash
 cd ~/GP/"SDN Topology"
 sudo mn -c && sudo CONTROLLER_IP=<that-IP> python3 topology.py
 ```
-Then in the Mininet CLI register the IoT devices and ping:
+Then in `mininet-wifi>`:
 ```python
 py net.register_iot_device(net,'TempSensor','10.0.0.5/24','00:00:00:00:00:05','s1','IOT:TempSensor')
 py net.register_iot_device(net,'Cam','10.0.0.6/24','00:00:00:00:00:06','s1','IOT:Camera')
 pingall
+py net.start_background_traffic(net)
 ```
+The last line starts the **normal-traffic simulator** — an HTTP server + iperf server on `h2`, web
+browsing from `sta1/sta2`, periodic iperf, low-rate pings, and realistic IoT telemetry (TempSensor
+HTTP/MQTT-UDP publishes, Cam video-style iperf bursts + heartbeats). It serves three purposes:
+1. keeps `dataset.csv` growing so the GATEs below pass without you hand-pinging,
+2. lets **device baselines mature** — leave it running **≥ 180 s** before judging the AE
+   (`is_baseline_mature`); a cold baseline makes normal traffic look anomalous,
+3. it's the **legitimate traffic that must keep flowing while an attacker is blocked** — your proof
+   (PART 7) that blocking is surgical, not a global outage.
 
-**3.3 — GATE 1: the switch is actually connected.** On the t530 (Terminal B):
+> Leave background traffic running for the **whole** session (all ML/AE/blocking tests). Start every
+> attack *on top of* it.
+
+**3.3 — GATE 1 (switch connected).** On the t530: `curl -s http://127.0.0.1:8081/ips/switches`
+- **Must show `"count": 1`.** If `0`, `CONTROLLER_IP` is wrong (stale t530 IP) → `mn -c` and relaunch
+  3.2 with the IP from 3.1. **`pingall` succeeding does NOT prove the switch connected.**
+
+**3.4 — GATE 2 (features being written).** On the t530:
 ```bash
-curl -s http://127.0.0.1:8081/ips/switches
+ls -l ~/GP/Controller/dataset.csv
+sleep 8 && wc -l ~/GP/Controller/dataset.csv     # must be GROWING after pingall
 ```
-- **Must show `"count": 1`.** If `0`, the switch did NOT connect → `CONTROLLER_IP` is wrong
-  (stale t530 IP). Re-`mn -c` and relaunch the topology with the IP from 3.1. **Do not continue
-  until this is 1** — pingall succeeding does NOT mean the controller is connected.
+- If missing/empty → no `packet_in`. Causes in order: GATE 1 failed · controller restarted after
+  traffic (it rotates `dataset.csv`→`.bak` on launch) · no traffic yet. Fix before any ML test.
 
-**3.4 — GATE 2 (the one that just failed for you): features are being written.** On the t530:
-```bash
-ls -l ~/GP/Controller/dataset.csv      # must EXIST
-sleep 8 && wc -l ~/GP/Controller/dataset.csv   # must be GROWING
-```
-- **`dataset.csv` must exist and grow after `pingall`.** If it's missing/empty, the controller is
-  receiving **no `packet_in`** — that's why ML/AE were silent. Causes, in order: GATE 1 failed
-  (switch not connected) · the controller was restarted after traffic (it rotates `dataset.csv`
-  → `.bak` on launch, so a fresh idle run has none) · no traffic generated yet. Fix and re-check
-  before any ML test.
-
-Only when GATE 1 = 1 **and** `dataset.csv` is growing do RF/AE have anything to score.
+Only with **GATE 1 = 1 and `dataset.csv` growing** do RF/AE have anything to score.
 
 ---
 
-## PART 4 — PRE-ATTACK CHECKLIST (run EVERY one of these, in order, before any attack)
-
-> Needs the OBSERVE-transparency fix (commit after `af708f2`): **`git pull` + restart the
-> controller** so OBSERVE logs *every* window (incl. `verdict=normal` / low AE conf). Before this
-> fix, normal verdicts printed nothing — which looked like "ML/AE silent."
-
-On the **t530, Terminal B** (Terminal A is the running controller):
+## PART 4 — PRE-ATTACK CHECKLIST (run all of these, in order, before any attack)
+On the **t530, Terminal B** (A is the running controller):
 ```bash
 cd ~/GP/Controller
-
-# 1) DATA IS FLOWING (from PART 3) — both must pass or ML/AE have nothing to score
+# 1) data is flowing (from PART 3)
 curl -s http://127.0.0.1:8081/ips/switches            # -> "count": 1
-wc -l dataset.csv ; sleep 6 ; wc -l dataset.csv        # -> line count GROWING
-
-# 2) ARM ML + AE in OBSERVE (no blocking, log everything)
+wc -l dataset.csv ; sleep 6 ; wc -l dataset.csv        # -> GROWING
+# 2) arm ML + AE in OBSERVE (no blocking; log every window)
 python3 ipsctl.py CONTROL:DETECT:OFF                   # isolate ML: no Snort/rate labels interfere
 python3 ipsctl.py CONTROL:ML:OBSERVE                   # RF + AE score + LOG every window
-
-# 3) CONFIRM the mode actually took effect
+# 3) confirm it took effect
 curl -s http://127.0.0.1:8081/ips/status               # -> "ml_mode":"OBSERVE"
-python3 ipsctl.py CONTROL:ML:STATS                     # engines respond (note the scored count)
-
-# 4) WATCH live ML/AE output in a 3rd terminal (leave it running during the attack)
+python3 ipsctl.py CONTROL:ML:STATS                     # engines respond (note scored count)
+# 4) watch live output (3rd terminal; leave running during the attack)
 tail -f controller_run.log | grep -E "ML-OBSERVE|AE-OBSERVE"
 ```
-Only after all four pass do you launch an attack. **Every attack must run ≥ 20 s** (so several
-5-second windows flush). With the fix, you should now see a line **per flow per window** — both
-when it's `normal` and when it's an attack — proving the engines are alive.
+**Every attack must run ≥ 20 s** so several 5-second windows flush. You should see a summary line
+per window for **both** engines — including `normal` / low-conf — proving they're alive.
 
 ---
 
 ## PART 5 — Test the Random Forest (Tier 3)
-Do the PART 4 checklist, then in the Mininet CLI:
+Do PART 4, then in `mininet-wifi>`:
 ```python
 py net.run_attack_session(net,'syn')      # then icmp, udp, scan, arp, cps  (≥20s each)
 ```
-**GATE / RECORD:** the watch terminal streams
-`[ML-OBSERVE] 10.0.0.1 → 10.0.0.4  verdict=SYN Flood  conf=0.xx  band=…` every window.
+**GATE / RECORD:** the watch terminal streams `[ML-OBSERVE] window: N flows scored — <verdict>:N`.
 ```bash
 grep "ML-OBSERVE" controller_run.log | tail -30
 python3 ipsctl.py CONTROL:ML:STATS        # scored count keeps rising
 ```
-- **Now interpret it correctly:** if you see `verdict=normal` during a SYN flood, the RF is
-  *running but misclassifying* (train/serve skew) — that's a model problem to retrain
-  (`ml_ae_confidence_boost_plan.md`), **not** "ML didn't activate." If `ML:STATS` scored count
-  stays 0 while `dataset.csv` grows → RF is erroring per-row; paste the next ~40 log lines.
-- *(Optional, to isolate RF from AE: `mv ml_models/ae_bundle.joblib ml_models/ae_bundle.off` +
-  restart; restore + restart afterwards.)*
+- `verdict=normal` during a real SYN flood ⇒ RF *running but misclassifying* (train/serve skew) →
+  retrain per `ml_ae_confidence_boost_plan.md`, **not** "ML didn't activate."
+- Scored count stays 0 while `dataset.csv` grows ⇒ RF erroring per-row → paste the next ~40 log lines.
+- *Isolate RF from AE (optional):* `mv ml_models/ae_bundle.joblib ml_models/ae_bundle.off` + restart;
+  restore afterward.
 
 ---
 
-## PART 6 — Test the Autoencoder (Tier 4)
-Do the PART 4 checklist (same OBSERVE setup). With the transparency fix, AE now logs **every
-window** (`band=normal` too), so you can watch err/conf live instead of silence.
-1. Let **normal** traffic run ~60 s (no attack). **GATE:** `[AE-OBSERVE] … band=normal` with
-   **low `err`** and conf < 0.60 — proves AE is scoring and (correctly) sees normal as normal.
-2. Run each attack `py net.run_attack_session(net,'<kind>')` (≥ 20 s each). **GATE / RECORD:**
-   `err` jumps and conf crosses into FLAG/BLOCK.
+## PART 6 — Test the Autoencoder (Tier 4 / zero-day)
+Do PART 4 (same OBSERVE setup). AE logs every window (`max conf`, `err`, `flagged`).
+1. Let **normal** traffic run ~60 s (no attack). **GATE:** `[AE-OBSERVE]` with **low err** and
+   max conf < 0.60 — AE correctly sees normal as normal.
+2. Run each attack `py net.run_attack_session(net,'<kind>')` (≥20 s). **GATE / RECORD:** err jumps,
+   conf crosses FLAG (0.60) / BLOCK (0.73).
 ```bash
 grep "AE-OBSERVE" controller_run.log | tail -30
 ```
-- If `err` stays low even during attacks → the AE isn't separating attack from normal in this
-  environment (train/serve skew / threshold) → re-fit per `ml_ae_confidence_boost_plan.md`.
-  Conf = err/(err+threshold): flags at err ≈ 1.5×, blocks at err ≈ 2.7× threshold.
-- Confirm the **right bundle is loaded**: the PART 2 banner threshold should be your new model's
-  (≈ your p99), not the old `0.03750`. If it says `0.03750`, the old `ae_bundle.joblib` is still in
-  place — rebuild/copy the new one and restart.
-- *(Optional isolation: `mv ml_models/rf_pipeline.joblib ml_models/rf_pipeline.off` + restart.)*
+- conf = err/(err+threshold): flags at err ≈ 1.5×, blocks at err ≈ 2.7× threshold.
+- If err stays low even during attacks ⇒ train/serve skew/threshold → re-fit & rebuild the bundle
+  with `ml_models/build_ae_bundle.py` (no controller code change). Confirm the PART-2 banner
+  threshold is your new model's p99, not the old `0.03750`.
+- *Zero-day experiment (for Ch.5 Fig 5.12/5.13):* hold one attack class out of all training, then
+  show the AE still flags it here.
 
 ---
 
-## PART 7 — Full stack: Snort 3 + Rate/DAI + RF + AE (blocking ON)
-Both model files present + restarted.
+## PART 7A — Make the ML models ACTUALLY block (pure-ML blocking)
+This proves **the RF/AE themselves block a host**, with Snort and the rate/DAI tier taken out of the
+picture so the block can only have come from a model. The trick is the **DETECT gate**: with
+`DETECT:OFF` the controller does not rate/Snort-label anything, so RF + AE score **every** flow and
+are the **only** tiers that can decide a block.
+
+Background traffic running (PART 3) and both models loaded (PART 2 banner). On the **t530**:
+```bash
+cd ~/GP/Controller
+python3 ipsctl.py CONTROL:DETECT:OFF          # remove rate/DAI/Snort labeling -> ML is the only decider
+python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80   # RF blocks >=0.80, AE blocks >=0.73 (AE band fixed)
+curl -s http://127.0.0.1:8081/ips/status      # confirm "ml_mode":"AUTHORIZE"
+# optional live watch (Terminal C):
+tail -f controller_run.log | grep -E "\[ML\]|\[AE\]|ATTACKER BLOCKED"
+```
+Now launch an attack from the topology and confirm a model blocks the source:
+```python
+py net.run_attack_session(net,'syn')          # then icmp / udp / scan / cps  (>=20s each)
+```
+- **GATE / RECORD:** Terminal A shows a model verdict crossing its band then the block, e.g.
+  `[ML] ATTACK (block) 10.0.0.1 verdict=SYN Flood conf=0.9x` **or** `[AE] ANOMALY (block) 10.0.0.1
+  conf=0.7x` → `ATTACKER BLOCKED … reason=ml-…/ae-…` (the `reason` names the deciding model).
+- **Verify the block actually took effect (two ways):**
+  ```bash
+  curl -s http://127.0.0.1:8081/ips/blocked | python3 -m json.tool     # attacker IP listed
+  ```
+  ```python
+  # from mininet-wifi>, the attacker can no longer reach the server, but background hosts still can:
+  10.0.0.1 ping -c3 10.0.0.4      # the blocked attacker  -> 100% loss
+  10.0.0.3 ping -c3 10.0.0.4      # an innocent host      -> 0% loss (surgical block)
+  ```
+- **Release between rounds:** `python3 ipsctl.py CONTROL:UNBLOCK:10.0.0.1`
+  (or `CONTROL:CLEAR:10.0.0.1`), confirm the attacker's ping recovers, then test the next class.
+- **Isolate ONE model** (to prove *that* model blocks): rename the other bundle and restart —
+  `mv ml_models/ae_bundle.joblib ml_models/ae_bundle.off` (RF-only) **or**
+  `mv ml_models/rf_pipeline.joblib ml_models/rf_pipeline.off` (AE-only); restore + restart after.
+- **Tune the bar live** without restart: `python3 ipsctl.py CONTROL:ML:BLOCK:0.70` lowers the RF
+  block threshold (more aggressive); `CONTROL:ML:FLAG:0.50` lowers the flag bar. Raise them back up
+  if you see a legitimate host get blocked.
+- This is **Ch.5 Fig 5.16/5.17** evidence (detection→block latency + lateral-movement containment).
+
+> If a model *detects* (you saw it in OBSERVE, PART 5/6) but never blocks here: it's scoring below
+> the block band — lower the bar (`CONTROL:ML:BLOCK`) or, for persistent under-confidence on real
+> attacks, retrain per `ml_ae_confidence_boost_plan.md`. If nothing scores at all, DETECT is still
+> ON or there's no `packet_in` (re-check PART 3 GATEs).
+
+When done, return to the layered configuration for PART 7B:
+```bash
+python3 ipsctl.py CONTROL:DETECT:ON
+```
+
+## PART 7B — Full stack: Snort 3 + Rate/DAI + RF + AE (layered blocking)
+Both model files present + controller restarted (or DETECT just turned back ON).
 ```bash
 python3 ipsctl.py CONTROL:DETECT:ON          # Snort labels + Tier-2 rate/DAI block
 python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80  # RF + AE block on high confidence
 ```
-For each attack `py net.run_attack_session(net,'<kind>')`, capture in Terminal A whichever tiers fire:
-- **T1 Snort:** `🚨 IDS ALERT … SID …`
-- **T2 rate/DAI:** `SUSPECTED … 1/N → CONFIRMED → BLOCKED`
-- **T3 RF:** `[ML] ATTACK (block) … conf=0.xx`
-- **T4 AE:** `[AE] ANOMALY (block) …`
-- then `ATTACKER BLOCKED`.
-
-Confirm end-to-end:
+For each `py net.run_attack_session(net,'<kind>')`, capture in Terminal A whichever tiers fire:
+- **T1 Snort:** `🚨 IDS ALERT … SID …` · **T2 rate/DAI:** `SUSPECTED … → CONFIRMED → BLOCKED` ·
+  **T3 RF:** `[ML] ATTACK (block) … conf=0.xx` · **T4 AE:** `[AE] ANOMALY (block) …` · then
+  `ATTACKER BLOCKED`.
 ```bash
 curl -s http://127.0.0.1:8081/ips/blocked | python3 -m json.tool   # attacker listed
+sudo ovs-ofctl dump-flows s1 | grep drop                           # (on Mininet VM) the DROP rule
 ```
-Dashboard `http://<t530-IP>:8081/` → threat HIGH, blocked table + timeline + health panel.
-Release: `python3 ipsctl.py CONTROL:CLEAR:<attacker-ip>` (or `CONTROL:UNBLOCK:<ip>`).
 - **GATE:** every attack caught by ≥1 tier and blocked; `/ips/blocked` + dashboard reflect it;
-  window compute < 5000 ms, RAM has headroom.
+  window compute < 5000 ms; RAM has headroom. Release: `python3 ipsctl.py CONTROL:UNBLOCK:<ip>`
+  (or `CONTROL:CLEAR:<ip>`).
+- Expected coverage: ICMP/SYN/UDP floods → Snort + rate + RF (+AE); Port Scan → Snort port_scan +
+  RF; ARP → DAI + Snort arp_spoof (+AE); novel/zero-day → AE.
 
-Expected coverage: floods (ICMP/SYN/UDP) → Snort + rate + RF (+AE); Port Scan → Snort port_scan +
-RF; ARP spoof → DAI + Snort arp_spoof (+AE); novel/zero-day → AE.
+---
+
+## PART 8 — REST API block test (the merged `/ips/block` path)
+Proves the HTTP block channel a SIEM/SOAR (or the Part-9 reader) would drive. Second terminal:
+```bash
+curl -s -X POST http://127.0.0.1:8081/ips/block \
+     -H 'Content-Type: application/json' \
+     -d '{"src_ip":"10.0.0.1","reason":"manual REST test"}'
+curl -s http://127.0.0.1:8081/ips/blocked
+# from mininet-wifi>:  sta1 ping -c3 10.0.0.4   ->  now fails
+curl -s -X DELETE http://127.0.0.1:8081/ips/block/10.0.0.1     # unblock -> connectivity returns
+```
+- **CHECK:** POST → `{"status":"blocked",...}`; controller logs `ATTACKER BLOCKED` (MAC) or
+  `[REST-IPS] DROP … (IP-match)`. **RECORD:** POST JSON + `/ips/blocked` + BLOCK log + before/after ping.
+- If `curl` is refused, the WSGI server didn't start — re-check the PART-2 banner for the :8081 line.
 
 ---
 
-## PART 8 — Dashboard + recording
-- Dashboard: `http://<t530-IP>:8081/` (served by the controller, same origin). If "can't be
-  reached": `curl -s http://127.0.0.1:8081/ | head` on the t530 — HTML ⇒ it's an IP/reach issue
-  (use the current enp1s0 IP); 404 ⇒ old code (`git pull` + restart); refused ⇒ controller down.
-  `sudo pip3 install psutil` so the health panel shows CPU/RAM/Disk.
-- Record: `controller_run.log` (the `tee`), `[ML-OBSERVE]`/`[AE-OBSERVE]` tallies, `/ips/blocked`
-  JSON, dashboard screenshots, and an `ls -l dataset.csv` showing rows captured.
+## PART 9 — Standalone Snort reader path (signature-tier corroboration + external-IP blocking)
+Use this when you want the explicit **IDS-ALERT boxes** of `snort_alert_reader.py` and/or to block
+**external** (non-`10.0.0.0/8`) attackers via `iptables`. The merged controller already runs its own
+Snort, so **do not start a second Snort** — point the reader at the controller's `alert_json` and
+point the bridge at the merged REST (:8081).
+
+```bash
+# Confirm where the merged controller's Snort writes alerts (from controller_run.log / SnortManager):
+ls -l /var/log/snort/alert_json.txt
+
+# Terminal C — bridge: forward reader POSTs to the merged controller's REST on :8081
+cd ~/GP/Controller
+RYU_API_URL=http://127.0.0.1:8081/ips/block python3 snort_ryu_bridge.py     # listens on :9000
+
+# Terminal D — reader: tails alert_json, blocks canonical SIDs (internal via bridge→REST,
+# external via iptables). PROTECTED_IPS = controller/Mininet/loopback (never blocked).
+cd ~/GP/Controller
+sudo python3 snort_alert_reader.py
+```
+- The reader blocks on SIDs `1000001` (ICMP), `1000002` (SYN), `1000003` (UDP), `1000004` (CPS);
+  Port Scan/ARP are inspector-based (GID 122/112) and handled by the controller's tiers, not the reader.
+- **CHECK:** during an attack the reader prints its `IDS ALERT … [BLOCKING]` box and the controller
+  logs a matching REST block for the same source. For an **external** test from a third machine
+  (e.g. `hping3 -S -p 8080 <t530-IP>`), confirm `sudo iptables -S INPUT | grep <attacker>` shows a DROP.
+- **RECORD (Ch.5 Fig 5.4 / signature evidence):** the reader's IDS box + the controller's block.
+
+> Edit the reader's `PROTECTED_IPS` / `INTERNAL_SDN_NETWORK` at the top of `snort_alert_reader.py`
+> if your addressing differs (defaults assume the 192.168.1.200/.201 lab + `10.0.0.0/8` SDN net).
 
 ---
+
+## PART 10 — Dashboard: connect, verify, operate
+The controller serves the dashboard same-origin at `GET /`, so just open it:
+```
+http://<t530-current-IP>:8081/
+```
+- **Verify reachability from the t530 first:** `curl -s http://127.0.0.1:8081/ | head`
+  - HTML returned ⇒ working; if a remote browser can't reach it, it's an IP/firewall issue (use the
+    **current** enp1s0 IP; the dashboard auto-uses its own origin).
+  - `404` ⇒ old code → `git pull` + restart. `Connection refused` ⇒ controller down (Part 2).
+- **What you should see** during a Part-7 attack: connection badge **live**, DETECT/ML mode badges,
+  threat level **UNDER ATTACK**, the four **tier tiles** with green "loaded" dots, **attacks-by-type**
+  bars, **blocked-hosts** table (with **Unblock** buttons → `DELETE /ips/block/<ip>`), the **event
+  feed**, and the **system-health** RAM/CPU/disk bars (needs `psutil`).
+- The dashboard is **zero-dependency** (no CDN/build) — it renders offline. It polls every 2 s.
+
+---
+
+## PART 11 — Capturing the thesis figures
+Full lists live in **`Chapter4_figure_capture_guide.md`** (the 21 Ch.4 figures) and
+**`Chapter5_results_outline.md`** (Ch.5 results + the claim→evidence map). The high-value Ch.5
+captures map onto this runbook as:
+
+| Ch.5 figure | Capture from | Command / source |
+|---|---|---|
+| 5.2 tiers loaded | PART 2 banner | screenshot the `ML/AE/Snort … loaded` lines of `controller_run.log` |
+| 5.4 Snort signature hit | PART 9 (or PART 7 T1) | reader IDS-ALERT box / `🚨 IDS ALERT` during an attack |
+| 5.5–5.6 rate/DAI + ARP | PART 7 | `SUSPECTED→CONFIRMED→BLOCKED` / DAI binding-conflict log |
+| 5.10 live RF verdicts | PART 5 | `grep "ML-OBSERVE" controller_run.log` |
+| 5.11–5.13 AE / zero-day | PART 6 | AE notebook eval + `grep "AE-OBSERVE"` + the unseen-class block |
+| 5.14 attacks-by-type | PART 10 | dashboard panel after a multi-attack session |
+| 5.15 flow rule before/after | PART 7A/7B | `sudo ovs-ofctl dump-flows s1` ×2 around a block (Mininet VM) |
+| 5.16 detection→block latency | PART 7A | diff detection-log vs flow-install timestamps |
+| 5.17 lateral-movement containment | PART 7A | blocked attacker ping fails while an innocent host's ping succeeds |
+| 5.18 t530 resource use | PART 10 | dashboard health panel or `curl …/ips/metrics` under load |
+| 5.19 dashboard mid-attack | PART 10 | browser at `http://<t530>:8081/` during PART 7 |
+
+---
+
+## Recording checklist (master = `controller_run.log` from PART 2's `tee`)
+1. Startup banner — Snort + RF + AE + REST all loaded (Fig 5.2).
+2. `/ips/status` + `/ips/switches` (before/after topology connects).
+3. `pingall` 0% + REGISTER lines + GATE 2 `dataset.csv` growing.
+4. `[ML-OBSERVE]` + `[AE-OBSERVE]` summary lines per attack class (Fig 5.10/5.13).
+5. Full-stack BLOCK box per attack + `/ips/blocked` JSON + flow DROP (Fig 5.15).
+6. REST block: POST JSON + `/ips/blocked` + BLOCK log + before/after ping (PART 8).
+7. (opt) Snort-reader IDS box → REST/iptables block (PART 9, Fig 5.4).
+8. Dashboard screenshot mid-attack + health panel (Fig 5.18/5.19).
+9. `dataset.csv` labeled rows (or a `CONTROL:ROTATE:test.csv` `PASS ✅`).
 
 ## Quick gotchas (t530)
-- **ML/AE silent + `dataset.csv` missing** → no `packet_in`. Check GATE 1 (`/ips/switches` = 1)
-  and GATE 2 (`dataset.csv` growing). Root cause is almost always a **stale `CONTROLLER_IP`**
-  (the t530 IP moved) — pingall working does NOT prove the controller is connected.
-- **t530 IP keeps changing** → set a router **DHCP reservation** for its MAC; until then, read
-  `ip -br addr` every launch and pass that IP as `CONTROLLER_IP`.
+- **ML/AE silent + `dataset.csv` missing** → no `packet_in`; check GATE 1 (`/ips/switches`=1) and
+  GATE 2 (growing). Root cause is almost always a **stale `CONTROLLER_IP`** (t530 IP moved).
+- **t530 IP keeps changing** → router **DHCP reservation**; else read `ip -br addr` every launch.
 - **Control command fails / `nc` missing** → `python3 Controller/ipsctl.py CONTROL:…`.
-- **`:8081` in use** → `sudo fuser -k 8081/tcp` (nginx/stale controller).
-- **Snort 2 vs 3** → use `/usr/local/bin/snort` (apt installs v2).
-- **Let attacks run ≥ 20 s** before judging — `[ML/AE-OBSERVE]` only print when a 5-s window flushes.
+- **`:8081` in use** → `sudo fuser -k 8081/tcp`. **Snort 2 vs 3** → `/usr/local/bin/snort`.
+- **Let attacks run ≥ 20 s** — OBSERVE summaries print only when a 5-s window flushes.
+- **Two Snorts** → never run a standalone Snort alongside the merged controller; the reader (PART 9)
+  tails the controller's own `alert_json`.
 
 ## Related docs
+- `AI_Project_Context.md` — current architecture/code reference (absorbs the old `context_claude.md`).
 - `PROJECT_EXPLAINER.md` — full A-Z developer + business explanation.
-- `AI_Project_Context.md` — current architecture/code reference for AI agents.
-- `Controller_main_test_guide.md` — the detailed REST/block test steps.
+- `t530_bridge_setup.md` — VXLAN `br-snort` mirror on the t530 (PART 1.3 option B).
+- `SDN_IPS_Snort_Installation_Runbook.pdf` — original clean-machine/two-VM install (source of PART 1 & 9).
+- `Chapter4_figure_capture_guide.md` / `Chapter5_results_outline.md` — the thesis figures + evidence map.
+- `ml_ae_confidence_boost_plan.md` — train/serve skew remediation (if RF/AE misclassify live traffic).
