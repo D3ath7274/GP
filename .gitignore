@@ -2,3 +2,7 @@ Chapter4_System_Implementation (1).docx
 Chapter4_System_Implementation (1).pdf
 *.pyc
 /Controller/__pycache__
+
+# WSGI access-log flood (dashboard polling) — disposable
+GET_log.txt
+Controller/GET_log.txt
