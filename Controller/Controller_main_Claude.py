@@ -24,6 +24,7 @@ from ryu.controller.handler import MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_0
 from ryu.lib.mac import haddr_to_bin
+from ryu.lib import hub  # eventlet hub primitives (spawn/sleep) — for the block worker
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ipv4
@@ -38,6 +39,7 @@ import os
 import sys
 import time
 import threading
+import queue as _queue_lib  # thread-safe handoff queue (block requests -> hub greenlet)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snort_monitor import SnortManager
 from traffic_mirror import TrafficMirror
@@ -229,6 +231,21 @@ class SimpleSwitch(app_manager.RyuApp):
         # src_ip -> expiry; dedups the instant Snort-alert blocker (Snort fires
         # per-packet, so block a source at most once per DROP-timeout window).
         self._snort_blocked = {}
+
+        # ===================================================================
+        # Block handoff queue (fixes the AUTHORIZE hang)
+        # ===================================================================
+        # OpenFlow I/O (datapath.send_msg) lives in the eventlet hub on the MAIN
+        # thread. But block_attacker() is invoked from OFF-hub OS threads — the
+        # 5s feature-flush thread (RF/AE/rate tiers in traffic_capture.py) and the
+        # Snort monitor thread. Calling send_msg from those threads operates the
+        # hub's GREEN send queue cross-thread and deadlocks the whole controller
+        # (the symptom: it hangs the instant AUTHORIZE first crosses a block band;
+        # OBSERVE never blocks, so it never hung). Fix: off-hub callers ENQUEUE a
+        # block request here (queue.Queue.put is OS-thread-safe) and a hub greenlet
+        # (_block_worker) performs the actual send_msg ON the hub thread.
+        self._block_q = _queue_lib.Queue()
+        self._block_worker_gt = hub.spawn(self._block_worker)
         ml_model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ml_models')
         if os.path.isdir(ml_model_dir):
             self._ml_engine = MLInferenceEngine(ml_model_dir, logger=self.logger)
@@ -610,7 +627,9 @@ class SimpleSwitch(app_manager.RyuApp):
         mac = self._resolve_mac(src_ip)
         if mac:
             try:
-                self.block_attacker(
+                # REST runs on the hub thread (WSGI greenlet) and must return a
+                # synchronous status, so call the real installer directly — safe here.
+                self._do_block_attacker(
                     src_ip=src_ip, src_mac=mac, attack_type='REST/Snort',
                     timeout=hard_timeout or 600, detection_time=time.time(),
                     target_ip='', reason=reason or 'rest-api')
@@ -672,9 +691,56 @@ class SimpleSwitch(app_manager.RyuApp):
     # ===================================================================
     def block_attacker(self, src_ip, src_mac, attack_type, timeout,
                        detection_time=None, target_ip='', reason=''):
+        """Thread-safe entry point: ENQUEUE a block so the actual OpenFlow
+        send_msg runs on the eventlet hub thread (see _block_worker).
+
+        Callable from ANY thread — the RF/AE/rate tiers (flush thread) and the
+        Snort monitor thread all reach this. NEVER calls send_msg here; doing so
+        off the hub thread deadlocks the controller (the AUTHORIZE-mode hang).
+        The REST path is already on the hub thread and calls _do_block_attacker
+        directly for a synchronous result.
+        """
+        now = time.time()
+        # Dedup: skip if this IP already has an unexpired block (prevents the queue
+        # from filling with repeats for the same attacker across flood windows, and
+        # avoids redundant rule re-installs on the weak t530). A provisional marker
+        # is set immediately so concurrent windows see the block before the worker
+        # installs it; _do_block_attacker overwrites it with the full record.
+        existing = self._blocked_ips.get(src_ip)
+        if existing and existing.get('until', 0) > now:
+            return
+        self._blocked_ips[src_ip] = {
+            'mac': src_mac, 'until': now + timeout, 'attack_type': attack_type,
+        }
+        self._block_q.put({
+            'src_ip': src_ip, 'src_mac': src_mac, 'attack_type': attack_type,
+            'timeout': timeout, 'detection_time': detection_time,
+            'target_ip': target_ip, 'reason': reason,
+        })
+
+    def _block_worker(self):
+        """Hub greenlet: drain the block queue and install DROP rules ON the hub
+        thread (where datapath.send_msg is safe). Polls the OS-thread-safe queue
+        non-blockingly and yields cooperatively so the hub keeps serving OpenFlow,
+        the REST API, and the UDP control listener."""
+        while True:
+            try:
+                while True:
+                    req = self._block_q.get_nowait()
+                    try:
+                        self._do_block_attacker(**req)
+                    except Exception as e:
+                        self.logger.error("block worker: _do_block_attacker failed: %s", e)
+            except _queue_lib.Empty:
+                pass
+            hub.sleep(0.05)
+
+    def _do_block_attacker(self, src_ip, src_mac, attack_type, timeout,
+                           detection_time=None, target_ip='', reason=''):
         """
         Install a high-priority OpenFlow DROP rule for an attacker.
-        
+        MUST run on the eventlet hub thread (via _block_worker or the REST path).
+
         Args:
             src_ip: Attacker's IP address
             src_mac: Attacker's MAC address
