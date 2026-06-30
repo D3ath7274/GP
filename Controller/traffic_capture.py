@@ -1158,6 +1158,8 @@ class TrafficCapture:
             ml_engine = self.controller._ml_engine
             ml_blocked_this_window = set()  # Avoid duplicate blocks per IP per window
             ml_counts = {}                  # verdict -> count, for the per-window summary
+            ml_block_count = 0              # actual NEW blocks this window (AUTHORIZE)
+            ml_flag_count = 0               # rows in the flag band this window (AUTHORIZE)
 
             for _si, row in enumerate(score_rows):
                 if _si and _si % 16 == 0:
@@ -1190,9 +1192,6 @@ class TrafficCapture:
                     row['label'] = 2          # attack label (project scheme)
                     row['attack_type'] = ml_type
                     if ml_mode == 'AUTHORIZE':
-                        self._log('warning',
-                            "[ML] ATTACK (block) %s → %s  type=%s conf=%.2f — blocking",
-                            src_ip, dst_ip, ml_type, ml_conf)
                         if (src_ip not in ml_blocked_this_window and
                                 src_ip not in self._confirmed_attackers):
                             attacker_mac = self._ip_to_mac.get(src_ip, '')
@@ -1208,15 +1207,20 @@ class TrafficCapture:
                                         reason=f'ml-{ml_conf:.2f}'
                                     )
                                     ml_blocked_this_window.add(src_ip)
+                                    ml_block_count += 1
+                                    # Log ONLY on an actual NEW block (bounded), never per row:
+                                    # per-row warnings here flood stdout and, through a slow
+                                    # `tee`/SSH pipe, backpressure and FREEZE the controller.
+                                    self._log('warning',
+                                        "[ML] ATTACK (block) %s → %s  type=%s conf=%.2f",
+                                        src_ip, dst_ip, ml_type, ml_conf)
                                 except Exception as e:
                                     self._log('error', "ML block_attacker failed: %s", e)
 
                 elif ml_conf >= flag_thr:
                     # --- FLAG band: capture evidence, never block ---
-                    if ml_mode == 'AUTHORIZE':
-                        self._log('warning',
-                            "[ML] FLAGGED (no block) %s → %s  type=%s conf=%.2f — evidence captured",
-                            src_ip, dst_ip, ml_type, ml_conf)
+                    # Count only; the per-row "[ML] FLAGGED" log was the AUTHORIZE flood source.
+                    ml_flag_count += 1
                     self._capture_evidence(row, ml_type, ml_conf, flag_thr, block_thr)
                 # else conf < flag_thr: ignore (OBSERVE already surfaced it above)
 
@@ -1225,6 +1229,10 @@ class TrafficCapture:
                 self._log('info', "[ML-OBSERVE] window: %d flows scored — %s",
                           sum(ml_counts.values()),
                           ', '.join('%s:%d' % (k, v) for k, v in sorted(ml_counts.items())))
+            elif ml_mode == 'AUTHORIZE' and (ml_block_count or ml_flag_count):
+                # ONE bounded summary per window instead of one line per flow (the flood fix).
+                self._log('warning', "[ML-AUTH] window: %d scored, %d blocked, %d flagged",
+                          sum(ml_counts.values()), ml_block_count, ml_flag_count)
 
         # =====================================================================
         # AE Tier 4: Per-Flow Autoencoder anomaly scoring (CONCURRENT with the RF)
@@ -1251,6 +1259,7 @@ class TrafficCapture:
             ae_max_conf = 0.0
             ae_max_err = 0.0
             ae_flagged = 0
+            ae_block_count = 0           # actual NEW blocks this window (AUTHORIZE)
 
             for _si, row in enumerate(score_rows):
                 if _si and _si % 16 == 0:
@@ -1284,9 +1293,6 @@ class TrafficCapture:
                         row['label'] = 2
                         row['attack_type'] = 'Anomaly (AE)'
                     if ae_mode == 'AUTHORIZE':
-                        self._log('warning',
-                            "[AE] ANOMALY (block) %s → %s  conf=%.2f — blocking (zero-day net)",
-                            src_ip, dst_ip, ae_conf)
                         if (src_ip not in ae_blocked_this_window and
                                 src_ip not in self._confirmed_attackers):
                             attacker_mac = self._ip_to_mac.get(src_ip, '')
@@ -1298,17 +1304,26 @@ class TrafficCapture:
                                         detection_time=time.time(), target_ip=dst_ip,
                                         reason=f'ae-{ae_conf:.2f}')
                                     ae_blocked_this_window.add(src_ip)
+                                    ae_block_count += 1
+                                    # Log ONLY on an actual NEW block (bounded), never per row.
+                                    self._log('warning',
+                                        "[AE] ANOMALY (block) %s → %s  conf=%.2f (zero-day net)",
+                                        src_ip, dst_ip, ae_conf)
                                 except Exception as e:
                                     self._log('error', "AE block_attacker failed: %s", e)
-                elif ae_mode == 'AUTHORIZE':
-                    self._log('warning',
-                        "[AE] FLAGGED (no block) %s → %s  conf=%.2f", src_ip, dst_ip, ae_conf)
+                # FLAG band (ae_flag <= conf < ae_block) is counted via ae_flagged; NO per-row
+                # log under AUTHORIZE — that was the AE flood source that backpressured the hub.
 
             # Per-window summary — proves the AE ran even when nothing crosses the band.
             if ae_mode == 'OBSERVE' and ae_scored:
                 self._log('info',
                     "[AE-OBSERVE] window: %d flows scored — max conf=%.2f (err=%.4f), flagged=%d",
                     ae_scored, ae_max_conf, ae_max_err, ae_flagged)
+            elif ae_mode == 'AUTHORIZE' and (ae_block_count or ae_flagged):
+                # ONE bounded summary per window instead of one line per flow (the flood fix).
+                self._log('warning',
+                    "[AE-AUTH] window: %d scored, %d blocked, %d flagged (max conf=%.2f)",
+                    ae_scored, ae_block_count, ae_flagged, ae_max_conf)
 
         # Drop the raw-frame evidence buffer for this window (bounded memory).
         if self._raw_frames:
