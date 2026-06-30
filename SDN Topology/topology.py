@@ -546,6 +546,50 @@ def topology():
         print('*** FULL HIGH-YIELD COLLECTION complete — 7 sessions saved + validated. '
               'Merge into the bigger master with dataset_merge.py.')
 
+    def run_full_attack_demo(net, duration=40, settle=25, baseline_secs=150,
+                             threshold=0.80, classes=None):
+        """WALK-AWAY LIVE DEMO — PROVES the system detects AND blocks (this is NOT a
+        dataset run). Unlike run_full_collection_hy (which forces ML OFF and never
+        blocks), this ARMS THE FULL STACK (DETECT ON + ML AUTHORIZE) so Snort +
+        rate/DAI + RF + AE all score and block, then launches each attack type once
+        from sta1 -> the server. Every block prints an 'ATTACKER BLOCKED' box.
+
+        Walk away, then collect the proof from the controller side:
+            grep -E "ATTACKER BLOCKED|SNORT] BLOCKED|[ML]|[AE]" controller_run.log
+            curl -s http://127.0.0.1:8081/ips/blocked | python3 -m json.tool
+            + the dashboard timeline / blocked-hosts table.
+
+            py net.run_full_attack_demo(net)              # ~10 min, walk away
+            py net.run_full_attack_demo(net, duration=60) # longer attacks
+        """
+        classes = classes or ['syn', 'icmp', 'udp', 'scan', 'cps', 'arp']
+        eta = int((baseline_secs + len(classes) * (duration + settle + 9)) / 60) + 1
+        print('*** LIVE BLOCK DEMO — full stack (DETECT ON + ML AUTHORIZE:%.2f), %d attacks '
+              'from sta1. Walk away (~%d min). This BLOCKS — it is NOT a clean dataset run.'
+              % (threshold, len(classes), eta))
+        # 1) Warm up FIRST so device baselines mature BEFORE blocking is armed —
+        #    otherwise the AE flags/locks legitimate hosts the instant AUTHORIZE is on.
+        _send_to_controller('CONTROL:ML:OFF')
+        detect_off(net)
+        start_background_traffic(net)
+        wait(net, baseline_secs)
+        # 2) Arm the full stack (all four tiers now score; RF/AE/Snort block).
+        detect_on(net)
+        _send_to_controller('CONTROL:ML:AUTHORIZE:%.2f' % threshold)
+        time.sleep(2)
+        # 3) One attack per type. CLEAR between attacks so a still-active block from the
+        #    previous type does not pre-empt the next (each type gets a clean shot).
+        for i, kind in enumerate(classes, start=1):
+            _send_to_controller('CONTROL:CLEAR')
+            time.sleep(2)
+            print('*** [%d/%d] DEMO %s: sta1 -> 10.0.0.4  (expect ATTACKER BLOCKED in the log)'
+                  % (i, len(classes), kind.upper()))
+            launch_attack(net, 'sta1', kind, target='10.0.0.4',
+                          duration=duration, settle=settle)
+        _send_to_controller('CONTROL:CLEAR')
+        print('*** LIVE BLOCK DEMO complete. PROOF: grep "ATTACKER BLOCKED" controller_run.log ; '
+              'curl -s http://127.0.0.1:8081/ips/blocked ; and the dashboard.')
+
     def run_full_collection(net, normal_secs=600, baseline_secs=300):
         """FULLY AUTOMATED 7-session capture in ONE command. Walk away (~1.5-2 h).
 
@@ -606,6 +650,7 @@ def topology():
     net.run_full_topup = run_full_topup
     net.run_full_collection_hy = run_full_collection_hy
     net.run_full_collection = run_full_collection
+    net.run_full_attack_demo = run_full_attack_demo
 
     # --- Send hostname registrations to the controller ---
     # Sends REGISTER:NAME:hostname:ip directly to controller over physical network
@@ -630,6 +675,7 @@ def topology():
     print("*** HIGH-YIELD top-up (one class): py net.run_topup_session(net,'syn',rotate_as='dataset_topup_syn.csv')")
     print("*** ONE-COMMAND AUTOMATED TOP-UP (thin classes): py net.run_full_topup(net)  (walk away; auto-saves + validates each)")
     print("*** HIGH-YIELD full collection (all types, good row counts): py net.run_full_collection_hy(net)  (walk away; auto-saves + validates each)")
+    print("*** LIVE BLOCK DEMO (proves detection+blocking, NOT a dataset): py net.run_full_attack_demo(net)  (walk away ~10 min; arms AUTHORIZE, blocks each attack)")
     print("*** FULLY AUTOMATED 7-session capture (sequential): py net.run_full_collection(net)  (walk away ~1.5-2 h; auto-saves + validates each)")
 
     # --- HANDS-FREE recollection: AUTO_COLLECT=1 runs the whole high-yield capture
