@@ -73,28 +73,70 @@ COLLECTION_MODE = True
 
 def _route_wsgi_access_log_to_file(path=None):
     """Send eventlet's WSGI access log — the 'GET /ips/status … 200' flood the
-    dashboard generates by polling four endpoints every ~2s — to a file instead of
-    the controller's terminal, so the console shows only IPS events (IDS alerts,
-    blocks, ML/AE window summaries). Eventlet's wsgi server logs through the
-    'eventlet.wsgi' / 'eventlet.wsgi.server' Python loggers; we point those at the
-    file and turn OFF propagation so nothing reaches the root logger / terminal.
+    dashboard generates by polling four endpoints every ~2s — to GET_log.txt instead
+    of the controller's terminal, so the console shows only IPS events.
 
-    File defaults to GET_log.txt in the CWD (override with env IPS_GET_LOG). Opened
-    in 'w' so each run starts fresh (these are disposable access logs, not evidence).
-    Called early in __init__, before the WSGI server starts serving.
+    Eventlet's wsgi server writes each access line to its `log` object, which — across
+    eventlet versions — is EITHER a file-like (`.write`) OR a Python logger (`.info`),
+    and Ryu starts the server without handing us a reference to it. The earlier
+    logger-only approach failed because this eventlet writes access lines to a file-like
+    object, not through the logging module. So we now BOTH (1) point the
+    'eventlet.wsgi[.server]' loggers at the file (logger-based versions) AND
+    (2) monkey-patch `eventlet.wsgi.server` to force the access `log` to our own sink
+    (file-based versions). Called early in __init__, before the WSGI server starts.
+
+    Override the path with env IPS_GET_LOG. Best-effort — never fatal.
     """
     import logging as _logging
     path = path or os.environ.get('IPS_GET_LOG', 'GET_log.txt')
     try:
-        handler = _logging.FileHandler(path, mode='w')
-        handler.setFormatter(_logging.Formatter('%(message)s'))
+        _f = open(path, 'a', buffering=1)          # line-buffered append
+    except Exception:
+        return
+
+    class _FileLog(object):
+        """Access-log sink satisfying BOTH eventlet APIs: file `.write` and logger `.info`."""
+        def write(self, msg):
+            try:
+                _f.write(msg if msg.endswith('\n') else msg + '\n')
+            except Exception:
+                pass
+        def info(self, msg, *args):
+            self.write((msg % args) if args else str(msg))
+        debug = warning = error = exception = info
+        def flush(self):
+            try:
+                _f.flush()
+            except Exception:
+                pass
+    sink = _FileLog()
+
+    # (1) logger-based eventlet: route the named loggers to the file.
+    try:
+        h = _logging.StreamHandler(_f)
+        h.setFormatter(_logging.Formatter('%(message)s'))
         for _name in ('eventlet.wsgi', 'eventlet.wsgi.server'):
             lg = _logging.getLogger(_name)
-            lg.handlers[:] = [handler]
+            lg.handlers[:] = [h]
             lg.setLevel(_logging.INFO)
-            lg.propagate = False          # do NOT bubble up to the terminal
+            lg.propagate = False
     except Exception:
-        pass                              # logging redirect is best-effort, never fatal
+        pass
+
+    # (2) file-based eventlet (this deployment): force the wsgi server's access `log`
+    # to our sink so the GET flood lands in GET_log.txt instead of the terminal.
+    try:
+        import eventlet.wsgi as _ewsgi
+        if not getattr(_ewsgi, '_ips_get_log_patched', False):
+            _orig_server = _ewsgi.server
+
+            def _server(sock, site, log=None, *a, **kw):
+                return _orig_server(sock, site, sink, *a, **kw)
+
+            _ewsgi.server = _server
+            _ewsgi._ips_get_log_patched = True
+    except Exception:
+        pass
 
 
 class SimpleSwitch(app_manager.RyuApp):

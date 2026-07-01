@@ -31,6 +31,7 @@ standalone `snort_alert_reader.py` signature path, the merged-controller REST/bl
 | 9 | **Standalone Snort reader** path (`snort_alert_reader.py`) | explicit IDS boxes + external-IP iptables block |
 | 10 | **Dashboard** — connect, verify, operate | visibility + screenshots |
 | 11 | **Capture the thesis figures** (Ch.4 + Ch.5 map) | writing the thesis |
+| 12 | **Outsider (external) attack** — from a Windows/LAN host at the controller | prove defence vs. external threats |
 
 ---
 
@@ -125,8 +126,12 @@ sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=snort_tap IPS_V2_FEATURES=1 \
   `Snort … started` · `wsgi starting up on http://0.0.0.0:8081` · `UDP command listener … 9999`.
   **Leave this terminal running.** (`controller_run.log` is your master recording — **Figure 5.2**.)
 - If `:8081` is "Address already in use": `sudo fuser -k 8081/tcp` (nginx/stale controller), relaunch.
-- If the AE threshold prints `0.03750`, the **old** bundle is loaded — copy/rebuild the new
-  `ae_bundle.joblib` and relaunch.
+- If the AE threshold prints `0.03750`, the **old** bundle is loaded — `git pull` (the current
+  bundle is `threshold=0.48213`, bottleneck-16) or rebuild it (PART 6) and relaunch.
+- **To also watch the physical NIC** (needed for the outsider test, PART 12): add `enp1s0` to the
+  interface list — `SNORT_IFACES=enp1s0,snort_tap`. The banner then reads
+  `Snort alert monitor started — watching 2 interface(s): enp1s0, snort_tap`. Keep `snort_tap` for
+  the internal SDN and add `enp1s0` for external traffic.
 
 ---
 
@@ -327,12 +332,18 @@ Snort, so **do not start a second Snort** — point the reader at the controller
 point the bridge at the merged REST (:8081).
 
 ```bash
-# Confirm where the merged controller's Snort writes alerts (from controller_run.log / SnortManager):
+# Confirm the merged controller's Snort is actually writing alerts. It must EXIST and grow,
+# or the reader waits forever ("Waiting for file to appear"). If it's missing, an attack
+# hasn't hit a signature yet, or Snort's log dir differs — check controller_run.log.
 ls -l /var/log/snort/alert_json.txt
 
-# Terminal C — bridge: forward reader POSTs to the merged controller's REST on :8081
+# Terminal C — bridge: forward reader POSTs to the merged controller's REST on :8081.
+# ⚠️ sudo STRIPS env vars, so `sudo RYU_API_URL=… python3` is LOST and the bridge falls back
+#    to :8080 (you'll see "Forwarding to Ryu: …:8080"). Use `sudo -E` and export the var, OR
+#    `sudo env RYU_API_URL=…`. The bridge also needs sudo to create /var/log/snort_ryu_bridge.
 cd ~/GP/Controller
-RYU_API_URL=http://127.0.0.1:8081/ips/block python3 snort_ryu_bridge.py     # listens on :9000
+sudo -E env RYU_API_URL=http://127.0.0.1:8081/ips/block python3 snort_ryu_bridge.py   # :9000
+#   confirm it prints "Forwarding to Ryu: http://127.0.0.1:8081/ips/block"
 
 # Terminal D — reader: tails alert_json, blocks canonical SIDs (internal via bridge→REST,
 # external via iptables). PROTECTED_IPS = controller/Mininet/loopback (never blocked).
@@ -386,6 +397,71 @@ captures map onto this runbook as:
 | 5.17 lateral-movement containment | PART 7A | blocked attacker ping fails while an innocent host's ping succeeds |
 | 5.18 t530 resource use | PART 10 | dashboard health panel or `curl …/ips/metrics` under load |
 | 5.19 dashboard mid-attack | PART 10 | browser at `http://<t530>:8081/` during PART 7 |
+
+---
+
+## PART 12 — Outsider (external) attack test
+Everything above is the **insider** model (compromised devices *inside* the SDN, whose packets the
+OVS switches mirror to the controller). This part tests an **outsider**: a host on the physical LAN
+(e.g. your **Windows** machine) attacking the controller/edge directly.
+
+### 12.0 What can actually be reached, and who defends it (read first)
+- Your Windows box (192.168.1.x) can reach the **t530's physical IP**, but **not** the `10.0.0.x`
+  Mininet devices — that subnet lives inside the Mininet VM and isn't routed from the LAN. So the
+  realistic external target is **the controller itself** (its services / physical NIC).
+- **The RF/AE tiers do NOT see external traffic** — they're fed by OpenFlow `packet_in` from the
+  Mininet switches, and traffic to the t530's NIC never generates a `packet_in`. So the outsider
+  defence is **Tier 1 (Snort on `enp1s0`) + iptables blocking of the external IP** via
+  `snort_alert_reader.py` (`block_external_ip()` DROPs any non-`10.0.0.0/8` source). State it this
+  way in the thesis — outsider = signature + iptables; insider = full 4-tier.
+
+### 12.1 Set up (t530)
+1. **Launch the controller with Snort watching the NIC** (PART 2, NIC variant):
+   ```bash
+   sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=enp1s0,snort_tap IPS_V2_FEATURES=1 \
+     python3 -c "import collections,collections.abc; collections.MutableMapping=collections.abc.MutableMapping; from ryu.cmd.manager import main; main()" \
+     Controller_main_Claude.py --wsapi-port 8081 > controller_run.log 2>&1 &
+   ```
+   Banner must read `… watching 2 interface(s): enp1s0, snort_tap`.
+2. **Start the external-block pipeline** (PART 9, with the `sudo -E` fix):
+   ```bash
+   cd ~/GP/Controller
+   sudo -E env RYU_API_URL=http://127.0.0.1:8081/ips/block python3 snort_ryu_bridge.py &   # :9000
+   sudo python3 snort_alert_reader.py &
+   ```
+   Confirm your **Windows IP is not** in `PROTECTED_IPS` at the top of `snort_alert_reader.py`
+   (that set = controller/Mininet/loopback; edit it to match your real LAN if needed).
+
+### 12.2 Attack from Windows (target = the t530's IP)
+Windows has no native `hping3`. Pick one:
+- **nmap for Windows** (from nmap.org; bundles `nping`/`ncat`):
+  ```powershell
+  nmap -sS -p 1-1000 <t530-ip>                                    # port scan  -> port_scan inspector
+  nping --tcp --flags syn -p 8081 --rate 2000 -c 20000 <t530-ip>  # SYN flood  -> SYN Flood rule
+  ```
+- **or WSL2 (Ubuntu on Windows)** for the real tool:
+  ```bash
+  sudo hping3 -S --flood -p 8081 <t530-ip>       # SYN flood at the REST port
+  sudo hping3 --icmp --flood <t530-ip>           # ICMP flood
+  ```
+
+### 12.3 Confirm the block (the evidence)
+```bash
+grep -E "IDS ALERT|BLOCKING|External attacker blocked" controller_run.log   # Snort saw the external src
+sudo iptables -S INPUT | grep <windows-ip>                                  # -> "-A INPUT -s <win> -j DROP"
+# from Windows: the attack traffic to the t530 now stops (re-run nping -> no responses)
+```
+- **RECORD:** the reader's `IDS ALERT … [BLOCKING]` box for the external IP + the `iptables … DROP`
+  line + the attack dying. This is your outsider-threat figure for Ch.5.
+
+### 12.4 Caveats / tuning
+- The repo `sdn_ips_local.rules` is tuned for the 6 internal attacks; the generic **SYN Flood** rule
+  (`flags:S`, any→any) and the **port_scan** inspector fire on the external attacker once Snort
+  watches `enp1s0`. For a dedicated "flood the controller's REST port" signature, add a rule on
+  port 8081 and re-run `sudo /usr/local/bin/snort -T -c /etc/snort/sdn_ips.lua -i enp1s0`.
+- To make the **RF/AE also cover outsiders**, the controller must be **inline** on the physical
+  segment (bridge the external host through an OVS switch it manages, so external packets traverse
+  the SDN and generate `packet_in`). That's a topology change, not just a flag — out of scope here.
 
 ---
 
