@@ -256,6 +256,15 @@ class SimpleSwitch(app_manager.RyuApp):
         #   conf < ae_flag   -> silent.  (AE blocks lower than RF: it is the zero-day net.)
         self._ae_block_threshold = 0.73
         self._ae_flag_threshold = 0.60
+        # Runtime engine toggles — let the operator isolate tiers (RF alone, then AE alone):
+        #   CONTROL:ML:RF:ON|OFF     enable/disable the Random Forest (Tier 3)
+        #   CONTROL:ML:AE:ON|OFF     enable/disable the Autoencoder (Tier 4)
+        self._rf_enabled = True
+        self._ae_enabled = True
+        # AE DEFERS to the RF: on a row the RF already called a KNOWN attack, the AE stays
+        # silent, so the RF is the sole decider for known attacks and the AE only fires on
+        # true unknowns (zero-day). CONTROL:ML:DEFER:ON|OFF.
+        self._ae_defer_to_rf = True
         # src_ip -> expiry; dedups the instant Snort-alert blocker (Snort fires
         # per-packet, so block a source at most once per DROP-timeout window).
         self._snort_blocked = {}
@@ -547,6 +556,27 @@ class SimpleSwitch(app_manager.RyuApp):
                                                     self._ml_block_threshold)
                             except ValueError:
                                 pass
+                        elif ml_cmd in ('AE', 'RF', 'DEFER') and len(parts) >= 4:
+                            # CONTROL:ML:RF:ON|OFF   — isolate/disable the Random Forest
+                            # CONTROL:ML:AE:ON|OFF   — isolate/disable the Autoencoder
+                            # CONTROL:ML:DEFER:ON|OFF — AE stays silent on RF-known attacks
+                            val = parts[3].strip().upper() == 'ON'
+                            if ml_cmd == 'RF':
+                                self._rf_enabled = val
+                                self.logger.warning(
+                                    "🤖 Random Forest (Tier 3) %s",
+                                    'ENABLED' if val else 'DISABLED')
+                            elif ml_cmd == 'AE':
+                                self._ae_enabled = val
+                                self.logger.warning(
+                                    "🤖 Autoencoder (Tier 4) %s",
+                                    'ENABLED' if val else 'DISABLED')
+                            else:  # DEFER
+                                self._ae_defer_to_rf = val
+                                self.logger.warning(
+                                    "🤖 AE-defers-to-RF %s",
+                                    'ON — AE silent on RF-known attacks'
+                                    if val else 'OFF — AE + RF fire concurrently')
 
                 elif message.startswith("LABEL_OVERRIDE:"):
                     # Format: LABEL_OVERRIDE:ip:attack_type

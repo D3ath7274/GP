@@ -562,10 +562,13 @@ def topology():
             py net.run_full_attack_demo(net)              # ~10 min, walk away
             py net.run_full_attack_demo(net, duration=60) # longer attacks
         """
+        import random
         classes = classes or ['syn', 'icmp', 'udp', 'scan', 'cps', 'arp']
+        # Pool of possible attackers (the server h2/10.0.0.4 is the TARGET, not an attacker).
+        attacker_pool = ['sta1', 'sta2', 'h1', 'Cam', 'TempSensor']
         eta = int((baseline_secs + len(classes) * (duration + settle + 9)) / 60) + 1
         print('*** LIVE BLOCK DEMO — full stack (DETECT ON + ML AUTHORIZE:%.2f), %d attacks '
-              'from sta1. Walk away (~%d min). This BLOCKS — it is NOT a clean dataset run.'
+              'from RANDOM attackers. Walk away (~%d min). This BLOCKS — NOT a clean dataset run.'
               % (threshold, len(classes), eta))
         # 1) Warm up FIRST so device baselines mature BEFORE blocking is armed —
         #    otherwise the AE flags/locks legitimate hosts the instant AUTHORIZE is on.
@@ -582,9 +585,10 @@ def topology():
         for i, kind in enumerate(classes, start=1):
             _send_to_controller('CONTROL:CLEAR')
             time.sleep(2)
-            print('*** [%d/%d] DEMO %s: sta1 -> 10.0.0.4  (expect ATTACKER BLOCKED in the log)'
-                  % (i, len(classes), kind.upper()))
-            launch_attack(net, 'sta1', kind, target='10.0.0.4',
+            attacker = random.choice(attacker_pool)   # random attacker per attack type
+            print('*** [%d/%d] DEMO %s: %s -> 10.0.0.4  (expect ATTACKER BLOCKED in the log)'
+                  % (i, len(classes), kind.upper(), attacker))
+            launch_attack(net, attacker, kind, target='10.0.0.4',
                           duration=duration, settle=settle)
         _send_to_controller('CONTROL:CLEAR')
         print('*** LIVE BLOCK DEMO complete. PROOF: grep "ATTACKER BLOCKED" controller_run.log ; '
