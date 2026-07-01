@@ -6,3 +6,4 @@ Chapter4_System_Implementation (1).pdf
 # WSGI access-log flood (dashboard polling) — disposable
 GET_log.txt
 Controller/GET_log.txt
+*.pyc
