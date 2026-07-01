@@ -594,6 +594,67 @@ def topology():
         print('*** LIVE BLOCK DEMO complete. PROOF: grep "ATTACKER BLOCKED" controller_run.log ; '
               'curl -s http://127.0.0.1:8081/ips/blocked ; and the dashboard.')
 
+    def expose_service(net, host='h2', ports='8080', host_port=80,
+                       protos=('tcp',), ext_iface=None, gw_ip='10.0.0.254'):
+        """Route EXTERNAL LAN traffic INTO the SDN so an outsider (e.g. a Windows box)
+        transits s1 -> packet_in -> ALL 4 tiers (Snort + rate/DAI + RF + AE). The
+        controller then sees the REAL external source IP and blocks it with an OpenFlow
+        DROP — the full-stack 'attack from outside the environment' proof (vs PART 12's
+        management-plane hit, which only Snort+iptables catch).
+
+        Mechanism: add a gateway port on s1 in the ROOT namespace (gw_ip on 10.0.0.0/24)
+        and DNAT  <this-VM-ip>:<ports>  ->  <host>. `ports` is a single port ('8080' ->
+        host:host_port) or a RANGE ('1-1000', dport preserved) so an external PORT SCAN
+        also transits the SDN.
+
+          py net.expose_service(net)                        # h2:80 as <vm-ip>:8080  (SYN flood test)
+          py net.expose_service(net, ports='1-1000')        # forward a range (external port scan)
+          py net.expose_service(net, ports='8053', host_port=53, protos=('udp',))  # UDP flood
+        Tear down with: py net.unexpose_service(net)
+        """
+        import subprocess as _sp
+        h = net.get(host); host_ip = h.IP()
+        if ext_iface is None:
+            ext_iface = (_sp.getoutput("ip route show default | awk '{print $5; exit}'").strip()
+                         or 'ens33')
+        vm_ip = _sp.getoutput("ip -4 addr show %s | awk '/inet /{print $2}' | cut -d/ -f1"
+                              % ext_iface).strip()
+        dport = ports.replace('-', ':'); is_range = (':' in dport)
+        dest = host_ip if is_range else ('%s:%d' % (host_ip, host_port))
+
+        def sh(c): _sp.run(c, shell=True)
+        # 1) gateway interface for the ROOT namespace ON s1 (routes into 10.0.0.0/24)
+        sh("ovs-vsctl --may-exist add-port s1 sdn-gw -- set interface sdn-gw type=internal")
+        sh("ip addr flush dev sdn-gw 2>/dev/null; ip addr add %s/24 dev sdn-gw; "
+           "ip link set sdn-gw up" % gw_ip)
+        sh("sysctl -w net.ipv4.ip_forward=1 >/dev/null")
+        # 2) DNAT external :<ports> -> host, and allow forwarding into the SDN
+        for p in protos:
+            sh("iptables -t nat -A PREROUTING -i %s -p %s --dport %s -j DNAT --to-destination %s"
+               % (ext_iface, p, dport, dest))
+            sh("iptables -A FORWARD -p %s -d %s -j ACCEPT" % (p, host_ip))
+        # 3) return path: the target host sends replies back via the root gateway
+        h.cmd("ip route replace default via %s" % gw_ip)
+        p0 = ports.split('-')[0]
+        print("*** EXPOSED %s (%s) to the LAN as %s:%s [%s] — external traffic now transits s1 "
+              "(packet_in -> all 4 tiers)." % (host, host_ip, vm_ip, ports, ','.join(protos)))
+        print("*** Attack from an EXTERNAL host (Windows) at %s :" % vm_ip)
+        print("      nping --tcp --flags syn -p %s --rate 3000 -c 30000 %s   # SYN flood -> RF/AE/Snort"
+              % (p0, vm_ip))
+        print("      nmap  -sS -p %s %s                        # port scan (use a RANGE) -> port_scan"
+              % (ports, vm_ip))
+        print("      (WSL) sudo hping3 -S --flood -p %s %s" % (p0, vm_ip))
+        print("*** Expect ATTACKER BLOCKED with the REAL external src IP (OpenFlow DROP). "
+              "Teardown: py net.unexpose_service(net)")
+
+    def unexpose_service(net):
+        """Remove the external-exposure gateway/NAT added by expose_service."""
+        import subprocess as _sp
+        def sh(c): _sp.run(c, shell=True)
+        sh("iptables -t nat -F PREROUTING"); sh("iptables -F FORWARD")
+        sh("ovs-vsctl --if-exists del-port s1 sdn-gw")
+        print("*** Un-exposed: removed sdn-gw + DNAT/FORWARD rules.")
+
     def run_full_collection(net, normal_secs=600, baseline_secs=300):
         """FULLY AUTOMATED 7-session capture in ONE command. Walk away (~1.5-2 h).
 
@@ -655,6 +716,8 @@ def topology():
     net.run_full_collection_hy = run_full_collection_hy
     net.run_full_collection = run_full_collection
     net.run_full_attack_demo = run_full_attack_demo
+    net.expose_service = expose_service
+    net.unexpose_service = unexpose_service
 
     # --- Send hostname registrations to the controller ---
     # Sends REGISTER:NAME:hostname:ip directly to controller over physical network
@@ -680,6 +743,7 @@ def topology():
     print("*** ONE-COMMAND AUTOMATED TOP-UP (thin classes): py net.run_full_topup(net)  (walk away; auto-saves + validates each)")
     print("*** HIGH-YIELD full collection (all types, good row counts): py net.run_full_collection_hy(net)  (walk away; auto-saves + validates each)")
     print("*** LIVE BLOCK DEMO (proves detection+blocking, NOT a dataset): py net.run_full_attack_demo(net)  (walk away ~10 min; arms AUTHORIZE, blocks each attack)")
+    print("*** EXTERNAL attack into the SDN (outsider hits all 4 tiers): py net.expose_service(net)  then attack <vm-ip>:8080 from Windows; teardown: py net.unexpose_service(net)")
     print("*** FULLY AUTOMATED 7-session capture (sequential): py net.run_full_collection(net)  (walk away ~1.5-2 h; auto-saves + validates each)")
 
     # --- HANDS-FREE recollection: AUTO_COLLECT=1 runs the whole high-yield capture
