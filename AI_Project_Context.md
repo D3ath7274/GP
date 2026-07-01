@@ -25,6 +25,40 @@ Two machines on one LAN:
 
 ---
 
+## 1A. System model & operation (thesis summary)
+
+**System model.** The system is modelled as a software-defined network in which a logically
+centralised controller mediates all data-plane forwarding for a set of IoT/edge devices. Formally
+there are three planes: (i) a **data plane** of OpenFlow switches (Open vSwitch) to which end
+devices — IoT sensors, cameras, wired/wireless hosts, and any external client reaching the network
+through the gateway — attach; (ii) a **control plane** consisting of the Ryu controller that installs
+forwarding rules and holds the global network view; and (iii) a **security/management plane** layered
+onto the controller, comprising the four detection tiers, the policy/enforcement logic, and the
+REST + dashboard interface. The trust model assumes the controller and switches are trusted, while
+**any host — internal or external — is a potential adversary**; threats considered are the six
+canonical attack classes (ICMP/SYN/UDP floods, connection-per-second exhaustion, port scanning, and
+ARP spoofing) plus **unknown/zero-day** anomalies. Because every packet that crosses a
+controller-managed switch is mirrored to the controller, the detection engine observes flows
+regardless of whether the source is inside the SDN or an outsider transiting the gateway, making the
+model applicable to generic networks (IoT, SD-WAN, campus/ATM) rather than a single testbed.
+
+**System operation.** Operation follows a continuous *observe → decide → enforce* loop. (1) **Observe:**
+each `packet_in` is aggregated by `traffic_capture.py` into 5-second per-flow windows and reduced to a
+fixed feature vector — the *same* code path feeds both the recorded dataset and live inference, so
+there is no train/serve skew. (2) **Decide:** every window is evaluated by the four tiers in parallel
+— signature (Snort 3), rate/ARP-inspection counters, the supervised Random Forest (known classes),
+and the unsupervised Autoencoder (open-world anomalies). Each tier emits a confidence, and outputs are
+combined under a confidence-banding policy (*silent → flag → block*); a flow is actioned if **any**
+tier crosses its block band. (3) **Enforce:** in `AUTHORIZE` mode the controller installs an
+OpenFlow **DROP** rule against the offending source, cutting the attack at the ingress switch within
+a fraction of a second; in `OBSERVE` mode the same decision is logged but not enforced, allowing
+accuracy to be validated before authority is granted. Operators supervise and retune the system out
+of band (UDP-9999 control channel + REST/dashboard), toggling detection, switching modes, adjusting
+per-tier thresholds, and clearing or unblocking hosts — so the IPS is *adaptive*: its policy and
+sensitivity change at runtime without restarting the control plane.
+
+---
+
 ## 2. The merged controller — `Controller/Controller_main_Claude.py`
 A single Ryu app (OpenFlow 1.0 learning switch) that combines everything (it merged the old
 `Controller.py` + `ryu_ips_app.py`). Run as ONE process:

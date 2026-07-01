@@ -388,12 +388,16 @@ class SimpleSwitch(app_manager.RyuApp):
         if hasattr(self, 'traffic_capture') and self.traffic_capture:
             self.traffic_capture.record_alert(alert)
 
-            # Fast-tier mitigation: INSTANT block on a CANONICAL Snort alert in
-            # AUTHORIZE mode. Snort fires sub-second on the packet stream — the only
-            # truly real-time tier. Guards: only canonical attack classes (filters
-            # BAD-TRAFFIC/MISC/SNMP noise and victim-response SIDs), and at most once
-            # per source per DROP-timeout window (Snort fires per-packet).
-            if getattr(self, '_ml_mode', 'OFF') == 'AUTHORIZE':
+            # Fast-tier mitigation: INSTANT block on a CANONICAL Snort alert.
+            # Snort is a signature/detection tier (Tier 1), so its enforcement is
+            # gated by DETECT — not by the ML mode. This lets DETECT:OFF isolate the
+            # ML/AE tiers (RF/AE can still block in AUTHORIZE while signatures stay
+            # silent), and lets DETECT:ON + ML:OFF test Snort alone. Snort fires
+            # sub-second on the packet stream — the only truly real-time tier. Guards:
+            # only canonical attack classes (filters BAD-TRAFFIC/MISC/SNMP noise and
+            # victim-response SIDs), and at most once per source per DROP-timeout
+            # window (Snort fires per-packet).
+            if getattr(self, '_detection_enabled', False):
                 atype = alert.get('attack_type', '')
                 src = alert.get('src_ip', '')
                 if src and atype in getattr(self.traffic_capture, 'CANONICAL_ATTACKS', set()):

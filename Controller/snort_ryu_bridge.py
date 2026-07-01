@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 BRIDGE_HOST          = "127.0.0.1"
 BRIDGE_PORT          = 9000
-RYU_API_URL          = "http://127.0.0.1:8080/ips/block"
+RYU_API_URL          = os.environ.get("RYU_API_URL", "http://127.0.0.1:8081/ips/block")
 MIN_PRIORITY         = 2
 DEDUP_WINDOW_SECONDS = 60
 IDLE_TIMEOUT         = 300
