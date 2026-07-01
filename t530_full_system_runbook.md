@@ -472,27 +472,33 @@ sudo iptables -S INPUT | grep <windows-ip>                                  # ->
 
 ### 12.5 External attacker through the SDN — the full-4-tier outsider test
 To have the **RF/AE (not just Snort/iptables) catch an outsider**, route the external traffic *into*
-the data plane so it crosses `s1` and generates `packet_in`. Expose an internal service to the LAN
-with a NAT/port-forward on the Mininet VM, then attack that from Windows:
-```bash
-# On the Mininet VM (h2 = 10.0.0.4 is the HTTP/iperf server). Forward LAN:8080 -> h2:80 so an
-# external SYN flood to the Mininet-VM IP is delivered THROUGH s1 to h2:
-MININET_VM_IP=192.168.1.201
-sudo iptables -t nat -A PREROUTING -p tcp -d $MININET_VM_IP --dport 8080 -j DNAT --to-destination 10.0.0.4:80
-sudo iptables -t nat -A POSTROUTING -j MASQUERADE
-sudo sysctl -w net.ipv4.ip_forward=1
+the data plane so it crosses `s1` → `packet_in` → all four tiers. `topology.py` now automates this
+with `expose_service`: it adds a gateway port on `s1` in the root namespace and DNATs the Mininet
+VM's LAN traffic to an internal host, **preserving the real external source IP**.
+
+**On the Mininet VM** (in `mininet-wifi>`), first arm the controller (PART 7A/7B: `DETECT:ON`,
+`ML:AUTHORIZE:0.80`, background traffic running), then:
+```python
+py net.expose_service(net)                 # h2:80 reachable as <vm-ip>:8080 (TCP)  — for SYN flood
+# for an external PORT SCAN, forward a range instead (dport preserved):
+py net.expose_service(net, ports='1-1000')
+# for a UDP flood:
+py net.expose_service(net, ports='8053', host_port=53, protos=('udp',))
 ```
+It prints the exact `<vm-ip>` and the attack commands. **From Windows** (nmap/nping, or WSL hping3):
 ```powershell
-# From Windows — attack the exposed service (traffic now transits s1 -> packet_in -> RF/AE/Snort):
-nping --tcp --flags syn -p 8080 --rate 3000 -c 30000 192.168.1.201
+nping --tcp --flags syn -p 8080 --rate 3000 -c 30000 <vm-ip>   # SYN flood  -> RF/AE/Snort
+nmap  -sS -p 1-1000 <vm-ip>                                    # port scan  -> port_scan (needs the range expose)
 ```
-- **Expected:** the flood reaches `h2` **through the SDN**, so the controller scores it with the
-  full stack and installs an **OpenFlow DROP** (an `ATTACKER BLOCKED … reason=ml-/ae-/snort-` box),
-  exactly like an insider — proving the IPS inspects external-in-transit traffic with all four tiers,
-  not just Snort+iptables. (This is the honest "detects attacks from outside the environment" claim.)
-- Note the source IP the tiers see will be the **NAT/gateway** address after MASQUERADE; if you want
-  the tiers to see the true external IP, forward without SNAT (route, don't masquerade) so `s1` sees
-  the real 192.168.1.x source. Adjust per your topology.
+- **Expected:** the attack reaches `h2` **through `s1`**, so the controller scores it with the full
+  stack and installs an **OpenFlow DROP** — an `ATTACKER BLOCKED … reason=ml-/ae-/snort-` box
+  showing the **real external `192.168.1.x` source IP**. That's the honest "detects attacks from
+  outside the environment, with the ML/AE models" proof (contrast PART 12's mgmt-plane hit, which
+  only Snort+iptables catch).
+- The block is a `dl_src` DROP on the gateway port (the external IP's L2 source on `s1`), so it cuts
+  the external ingress at the edge. Tear down with `py net.unexpose_service(net)`.
+- **One-by-one testing:** run each attack type at the exposed service separately (SYN flood → scan →
+  UDP), and watch which tier fires each time (`reason=` names it) — the external analogue of PART 5/6/7.
 
 ---
 
