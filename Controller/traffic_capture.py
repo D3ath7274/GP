@@ -1149,6 +1149,7 @@ class TrafficCapture:
         # =====================================================================
         if (rows and self.controller and
                 getattr(self.controller, '_ml_mode', 'OFF') in ('OBSERVE', 'AUTHORIZE') and
+                getattr(self.controller, '_rf_enabled', True) and
                 getattr(self.controller, '_ml_engine', None) and
                 self.controller._ml_engine.is_loaded):
 
@@ -1247,6 +1248,7 @@ class TrafficCapture:
         # =====================================================================
         if (rows and self.controller and
                 getattr(self.controller, '_ml_mode', 'OFF') in ('OBSERVE', 'AUTHORIZE') and
+                getattr(self.controller, '_ae_enabled', True) and
                 getattr(self.controller, '_ae_engine', None) and
                 self.controller._ae_engine.is_loaded):
 
@@ -1274,6 +1276,14 @@ class TrafficCapture:
                     ae_max_err = ae_err
                 src_ip = row.get('src_ip', '?')
                 dst_ip = row.get('dst_ip', '?')
+
+                # AE DEFERS to the known-attack tiers: if the RF (or rate/DAI/Snort) already
+                # labeled this row an attack, the AE stays SILENT — a KNOWN attack is handled
+                # by the RF alone, and the AE only fires on rows every other tier called normal
+                # (true zero-day / unknown). Toggle with CONTROL:ML:DEFER:OFF (_ae_defer_to_rf).
+                if (getattr(self.controller, '_ae_defer_to_rf', True)
+                        and str(row.get('label', '0')) != '0'):
+                    continue
 
                 # Below the flag band: no action; rolled into the per-window summary only
                 # (logging every normal window floods stdout and can stall the controller).
