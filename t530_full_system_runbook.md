@@ -405,15 +405,25 @@ Everything above is the **insider** model (compromised devices *inside* the SDN,
 OVS switches mirror to the controller). This part tests an **outsider**: a host on the physical LAN
 (e.g. your **Windows** machine) attacking the controller/edge directly.
 
-### 12.0 What can actually be reached, and who defends it (read first)
-- Your Windows box (192.168.1.x) can reach the **t530's physical IP**, but **not** the `10.0.0.x`
-  Mininet devices — that subnet lives inside the Mininet VM and isn't routed from the LAN. So the
-  realistic external target is **the controller itself** (its services / physical NIC).
-- **The RF/AE tiers do NOT see external traffic** — they're fed by OpenFlow `packet_in` from the
-  Mininet switches, and traffic to the t530's NIC never generates a `packet_in`. So the outsider
-  defence is **Tier 1 (Snort on `enp1s0`) + iptables blocking of the external IP** via
-  `snort_alert_reader.py` (`block_external_ip()` DROPs any non-`10.0.0.0/8` source). State it this
-  way in the thesis — outsider = signature + iptables; insider = full 4-tier.
+### 12.0 Data-plane vs management-plane — which tiers see what (read first)
+`traffic_capture.py` (→ RF/AE) is fed by OpenFlow `packet_in`: it sees every packet that crosses an
+**OVS switch the controller manages** (mirrored via `output:CONTROLLER`). It is an SDN flow monitor,
+**not** a raw sniffer on `enp1s0`. So the right split is **not** insider-vs-outsider, it's
+**data-plane vs management-plane**:
+
+| Traffic | Path | Inspected by |
+|---|---|---|
+| Any flow through a managed OVS switch — internal, **or an external attacker in transit to a target** | → `packet_in` | **all 4 tiers** (Snort + rate/DAI + RF + AE), block = OpenFlow DROP |
+| Direct hit on the controller's **own** NIC / mgmt port (e.g. flooding `:8081`) | Linux stack, no OVS | **Snort on `enp1s0` + iptables** (no `packet_in`, so RF/AE never see it) |
+
+- **This PART (12.1–12.3)** is the *management-plane* case: Windows floods the controller's own
+  `:8081` — that bypasses the SDN, so only Snort + iptables catch it (which is correct; no IPS
+  inspects its own mgmt interface via its data plane).
+- **For the RF/AE to catch an external attacker (12.5)** the external traffic must *transit the SDN*
+  — NAT/expose an internal `10.0.0.x` service to the LAN so Windows attacks *that*; the flow crosses
+  `s1` → `packet_in` → all four tiers fire.
+- Your Windows box (192.168.1.x) reaches the **t530's IP** directly, but **not** `10.0.0.x` (inside
+  the Mininet VM) unless you add NAT/routing (12.5).
 
 ### 12.1 Set up (t530)
 1. **Launch the controller with Snort watching the NIC** (PART 2, NIC variant):
@@ -459,9 +469,30 @@ sudo iptables -S INPUT | grep <windows-ip>                                  # ->
   (`flags:S`, any→any) and the **port_scan** inspector fire on the external attacker once Snort
   watches `enp1s0`. For a dedicated "flood the controller's REST port" signature, add a rule on
   port 8081 and re-run `sudo /usr/local/bin/snort -T -c /etc/snort/sdn_ips.lua -i enp1s0`.
-- To make the **RF/AE also cover outsiders**, the controller must be **inline** on the physical
-  segment (bridge the external host through an OVS switch it manages, so external packets traverse
-  the SDN and generate `packet_in`). That's a topology change, not just a flag — out of scope here.
+
+### 12.5 External attacker through the SDN — the full-4-tier outsider test
+To have the **RF/AE (not just Snort/iptables) catch an outsider**, route the external traffic *into*
+the data plane so it crosses `s1` and generates `packet_in`. Expose an internal service to the LAN
+with a NAT/port-forward on the Mininet VM, then attack that from Windows:
+```bash
+# On the Mininet VM (h2 = 10.0.0.4 is the HTTP/iperf server). Forward LAN:8080 -> h2:80 so an
+# external SYN flood to the Mininet-VM IP is delivered THROUGH s1 to h2:
+MININET_VM_IP=192.168.1.201
+sudo iptables -t nat -A PREROUTING -p tcp -d $MININET_VM_IP --dport 8080 -j DNAT --to-destination 10.0.0.4:80
+sudo iptables -t nat -A POSTROUTING -j MASQUERADE
+sudo sysctl -w net.ipv4.ip_forward=1
+```
+```powershell
+# From Windows — attack the exposed service (traffic now transits s1 -> packet_in -> RF/AE/Snort):
+nping --tcp --flags syn -p 8080 --rate 3000 -c 30000 192.168.1.201
+```
+- **Expected:** the flood reaches `h2` **through the SDN**, so the controller scores it with the
+  full stack and installs an **OpenFlow DROP** (an `ATTACKER BLOCKED … reason=ml-/ae-/snort-` box),
+  exactly like an insider — proving the IPS inspects external-in-transit traffic with all four tiers,
+  not just Snort+iptables. (This is the honest "detects attacks from outside the environment" claim.)
+- Note the source IP the tiers see will be the **NAT/gateway** address after MASQUERADE; if you want
+  the tiers to see the true external IP, forward without SNAT (route, don't masquerade) so `s1` sees
+  the real 192.168.1.x source. Adjust per your topology.
 
 ---
 
