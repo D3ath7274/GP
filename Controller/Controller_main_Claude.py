@@ -310,6 +310,10 @@ class SimpleSwitch(app_manager.RyuApp):
         # src_ip -> expiry; dedups the instant Snort-alert blocker (Snort fires
         # per-packet, so block a source at most once per DROP-timeout window).
         self._snort_blocked = {}
+        # DROP-rule lifetime for every tier block (Snort/RF/AE/DAI). 0 = PERMANENT:
+        # the OpenFlow DROP has no hard_timeout and stays until CONTROL:UNBLOCK.
+        # Override with IPS_BLOCK_SECONDS=<n> to restore auto-expiring blocks.
+        self._block_duration = int(os.environ.get('IPS_BLOCK_SECONDS', '0'))
 
         # ===================================================================
         # Block handoff queue (fixes the AUTHORIZE hang)
@@ -518,6 +522,10 @@ class SimpleSwitch(app_manager.RyuApp):
                                                       fname, e)
                     elif len(parts) >= 3 and parts[1] == 'UNBLOCK':
                         target_ip = parts[2].strip()
+                        # Delete the OpenFlow DROP rule (hub-safe, via the block queue)
+                        # AND clear the software attacker/rate state. Both are needed:
+                        # blocks are permanent, so the rule must be actively removed.
+                        self.unblock_attacker(target_ip)
                         if hasattr(self, 'traffic_capture') and self.traffic_capture:
                             self.traffic_capture.manual_unblock(target_ip)
                             self.logger.info("ADMIN: Unblocked attacker %s", target_ip)
@@ -600,6 +608,22 @@ class SimpleSwitch(app_manager.RyuApp):
                                 self._ml_block_threshold = float(parts[3])
                                 self.logger.warning("ML block threshold set to %.2f",
                                                     self._ml_block_threshold)
+                            except ValueError:
+                                pass
+                        elif ml_cmd == 'AE' and len(parts) >= 5 and parts[3].strip().upper() in ('BLOCK', 'FLAG'):
+                            # CONTROL:ML:AE:BLOCK:<thr> / CONTROL:ML:AE:FLAG:<thr>
+                            # Tune the Autoencoder confidence bands live (independent of
+                            # the RF bands). Raise BLOCK to suppress AE false positives on
+                            # out-of-distribution normal traffic (e.g. an IoT device the
+                            # AE under-fits); the real attackers sit well above it.
+                            sub = parts[3].strip().upper()
+                            try:
+                                thr = float(parts[4])
+                                if sub == 'BLOCK':
+                                    self._ae_block_threshold = thr
+                                else:
+                                    self._ae_flag_threshold = thr
+                                self.logger.warning("🤖 AE %s band set to %.2f", sub, thr)
                             except ValueError:
                                 pass
                         elif ml_cmd in ('AE', 'RF', 'DEFER') and len(parts) >= 4:
@@ -765,13 +789,15 @@ class SimpleSwitch(app_manager.RyuApp):
     def rest_unblock_ip(self, src_ip):
         """Remove a REST/tier block for src_ip (both MAC- and IP-based DROPs)."""
         info = self._rest_blocked_ips.pop(src_ip, None)
-        # MAC-based unblock (deletes the dl_src DROP installed by block_attacker)
+        # MAC-based unblock: actively delete the dl_src DROP (priority 65000) installed
+        # by _do_block_attacker — required now that blocks are permanent. On the hub
+        # thread already (WSGI), so call the installer directly.
+        self._do_unblock_attacker(src_ip)
         if hasattr(self, 'traffic_capture') and self.traffic_capture:
             try:
                 self.traffic_capture.manual_unblock(src_ip)
             except Exception:
                 pass
-        self._blocked_ips.pop(src_ip, None)
         # IP-based DROP cleanup (fallback rules)
         for dpid, datapath in self._datapaths.items():
             ofproto = datapath.ofproto
@@ -813,14 +839,28 @@ class SimpleSwitch(app_manager.RyuApp):
         existing = self._blocked_ips.get(src_ip)
         if existing and existing.get('until', 0) > now:
             return
+        block_secs = getattr(self, '_block_duration', 0)
         self._blocked_ips[src_ip] = {
-            'mac': src_mac, 'until': now + timeout, 'attack_type': attack_type,
+            'mac': src_mac,
+            'until': (now + block_secs) if block_secs else float('inf'),
+            'attack_type': attack_type,
         }
         self._block_q.put({
+            'op': 'block',
             'src_ip': src_ip, 'src_mac': src_mac, 'attack_type': attack_type,
             'timeout': timeout, 'detection_time': detection_time,
             'target_ip': target_ip, 'reason': reason,
         })
+
+    def unblock_attacker(self, src_ip):
+        """Thread-safe entry point: ENQUEUE removal of an attacker's DROP rule so
+        the OpenFlow send_msg runs on the hub thread (see _block_worker). Callable
+        from the UDP listener thread (CONTROL:UNBLOCK) — never sends here directly."""
+        info = self._blocked_ips.get(src_ip)
+        src_mac = info.get('mac', '') if info else ''
+        if not src_mac and hasattr(self, 'traffic_capture') and self.traffic_capture:
+            src_mac = self.traffic_capture._ip_to_mac.get(src_ip, '')
+        self._block_q.put({'op': 'unblock', 'src_ip': src_ip, 'src_mac': src_mac})
 
     def _block_worker(self):
         """Hub greenlet: drain the block queue and install DROP rules ON the hub
@@ -831,10 +871,14 @@ class SimpleSwitch(app_manager.RyuApp):
             try:
                 while True:
                     req = self._block_q.get_nowait()
+                    op = req.pop('op', 'block')
                     try:
-                        self._do_block_attacker(**req)
+                        if op == 'unblock':
+                            self._do_unblock_attacker(**req)
+                        else:
+                            self._do_block_attacker(**req)
                     except Exception as e:
-                        self.logger.error("block worker: _do_block_attacker failed: %s", e)
+                        self.logger.error("block worker: %s failed: %s", op, e)
             except _queue_lib.Empty:
                 pass
             hub.sleep(0.05)
@@ -858,6 +902,9 @@ class SimpleSwitch(app_manager.RyuApp):
         now = time.time()
         now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         latency = (now - detection_time) if detection_time else 0.0
+        # Effective DROP lifetime: the single controller-wide knob overrides the
+        # per-caller timeout. 0 => permanent (no hard_timeout, until UNBLOCK).
+        block_secs = getattr(self, '_block_duration', 0)
 
         # Resolve device name: discovered names → IoT registry → gateways → Host IP
         device_name = self._discovered_names.get(src_ip, None)
@@ -889,7 +936,7 @@ class SimpleSwitch(app_manager.RyuApp):
                 cookie=0,
                 command=ofproto.OFPFC_ADD,
                 idle_timeout=0,
-                hard_timeout=timeout,
+                hard_timeout=block_secs,   # 0 = permanent DROP (until UNBLOCK)
                 priority=65000,  # Higher than any learning rule
                 flags=ofproto.OFPFF_SEND_FLOW_REM,
                 actions=[]  # Empty = DROP
@@ -899,7 +946,7 @@ class SimpleSwitch(app_manager.RyuApp):
 
         self._blocked_ips[src_ip] = {
             'mac': src_mac,
-            'until': now + timeout,
+            'until': (now + block_secs) if block_secs else float('inf'),
             'attack_type': attack_type,
         }
 
@@ -930,9 +977,33 @@ class SimpleSwitch(app_manager.RyuApp):
             target_ip,
             attack_type,
             reason,
-            f"{timeout}s",
+            ('PERMANENT (until UNBLOCK)' if block_secs == 0 else f"{block_secs}s"),
             f"{rules_installed} switch(es)",
         )
+
+    def _do_unblock_attacker(self, src_ip, src_mac=''):
+        """Remove the dl_src DROP rule (priority 65000) installed by
+        _do_block_attacker. MUST run on the hub thread (via _block_worker or the
+        REST path). Needed because blocks are now permanent (hard_timeout=0), so an
+        UNBLOCK must actively delete the rule — it no longer self-expires."""
+        if not src_mac:
+            info = self._blocked_ips.get(src_ip)
+            src_mac = info.get('mac', '') if info else ''
+        removed = 0
+        if src_mac:
+            for dpid, datapath in self._datapaths.items():
+                ofproto = datapath.ofproto
+                parser = datapath.ofproto_parser
+                match = parser.OFPMatch(dl_src=haddr_to_bin(src_mac))
+                mod = parser.OFPFlowMod(
+                    datapath=datapath, match=match, cookie=0,
+                    command=ofproto.OFPFC_DELETE, out_port=ofproto.OFPP_NONE,
+                    priority=65000)
+                datapath.send_msg(mod)
+                removed += 1
+        self._blocked_ips.pop(src_ip, None)
+        self.logger.info("[UNBLOCK] removed DROP for %s (%s) on %d switch(es)",
+                         src_ip, src_mac or '?', removed)
 
     def add_flow(self, datapath, in_port, dst, src, actions, idle_timeout=0, hard_timeout=0, priority=None):
         ofproto = datapath.ofproto
