@@ -314,6 +314,18 @@ class SimpleSwitch(app_manager.RyuApp):
         # the OpenFlow DROP has no hard_timeout and stays until CONTROL:UNBLOCK.
         # Override with IPS_BLOCK_SECONDS=<n> to restore auto-expiring blocks.
         self._block_duration = int(os.environ.get('IPS_BLOCK_SECONDS', '0'))
+        # --- External-attacker defence (management plane) ---------------------
+        # OpenFlow DROP only stops traffic that crosses an OVS switch. A scan/flood
+        # aimed at the CONTROLLER'S OWN NIC (e.g. a Kali host on the LAN) bypasses the
+        # SDN entirely; Snort on the physical iface sees it, but it must be dropped with
+        # a host iptables rule instead. Opt-in (root + lock-out risk) via
+        # IPS_EXTERNAL_BLOCK=1. Never firewall ourselves, the Mininet VM, the gateway,
+        # loopback, or the 10.0.0.0/8 data plane (that is OpenFlow's job).
+        self._ext_block_enabled = os.environ.get('IPS_EXTERNAL_BLOCK', '0') == '1'
+        self._ext_blocked = {}            # external ip -> timestamp (dedup + audit)
+        self._ext_whitelist = {'127.0.0.1', '::1', '192.168.1.200', '192.168.1.201'}
+        self._ext_whitelist |= {ip.strip() for ip in
+                                os.environ.get('IPS_MGMT_WHITELIST', '').split(',') if ip.strip()}
 
         # ===================================================================
         # Block handoff queue (fixes the AUTHORIZE hang)
@@ -407,20 +419,26 @@ class SimpleSwitch(app_manager.RyuApp):
                 if src and atype in getattr(self.traffic_capture, 'CANONICAL_ATTACKS', set()):
                     now = time.time()
                     if now >= self._snort_blocked.get(src, 0):
-                        mac = self.traffic_capture._ip_to_mac.get(src, '')
-                        if mac:
-                            try:
-                                self.block_attacker(
-                                    src_ip=src, src_mac=mac, attack_type=atype,
-                                    timeout=30, detection_time=now,
-                                    target_ip=alert.get('dst_ip', ''),
-                                    reason=f"snort-{alert.get('sid', '?')}")
+                        # External source (LAN scanner hitting the controller NIC):
+                        # OpenFlow cannot stop it — drop at the host firewall instead.
+                        if self._is_external_ip(src):
+                            if self._block_external_ip(src, reason=f"snort-{alert.get('sid', '?')}"):
                                 self._snort_blocked[src] = now + 30
-                                self.logger.warning(
-                                    "[SNORT] BLOCKED %s (%s) — instant signature match",
-                                    src, atype)
-                            except Exception as e:
-                                self.logger.error("Snort block_attacker failed: %s", e)
+                        else:
+                            mac = self.traffic_capture._ip_to_mac.get(src, '')
+                            if mac:
+                                try:
+                                    self.block_attacker(
+                                        src_ip=src, src_mac=mac, attack_type=atype,
+                                        timeout=30, detection_time=now,
+                                        target_ip=alert.get('dst_ip', ''),
+                                        reason=f"snort-{alert.get('sid', '?')}")
+                                    self._snort_blocked[src] = now + 30
+                                    self.logger.warning(
+                                        "[SNORT] BLOCKED %s (%s) — instant signature match",
+                                        src, atype)
+                                except Exception as e:
+                                    self.logger.error("Snort block_attacker failed: %s", e)
 
     def close(self):
         """Clean up: stop Snort, traffic mirror, and UDP listener when the controller shuts down."""
@@ -526,6 +544,7 @@ class SimpleSwitch(app_manager.RyuApp):
                         # AND clear the software attacker/rate state. Both are needed:
                         # blocks are permanent, so the rule must be actively removed.
                         self.unblock_attacker(target_ip)
+                        self._unblock_external_ip(target_ip)   # host-firewall rule, if any
                         if hasattr(self, 'traffic_capture') and self.traffic_capture:
                             self.traffic_capture.manual_unblock(target_ip)
                             self.logger.info("ADMIN: Unblocked attacker %s", target_ip)
@@ -1004,6 +1023,56 @@ class SimpleSwitch(app_manager.RyuApp):
         self._blocked_ips.pop(src_ip, None)
         self.logger.info("[UNBLOCK] removed DROP for %s (%s) on %d switch(es)",
                          src_ip, src_mac or '?', removed)
+
+    # ===================================================================
+    # External-attacker enforcement (host iptables — management plane)
+    # ===================================================================
+    def _is_external_ip(self, ip):
+        """True for a source reachable only via the controller's own NIC — i.e. NOT
+        the 10.0.0.0/8 SDN data plane (OpenFlow's job) and NOT a whitelisted management
+        host. These are what an outside attacker (e.g. a LAN scanner) looks like."""
+        if not ip or ip == '?' or ip in self._ext_whitelist:
+            return False
+        if ip.startswith('10.'):          # SDN data plane — OpenFlow DROP handles it
+            return False
+        return True
+
+    def _block_external_ip(self, src_ip, reason=''):
+        """Drop an external attacker at the host firewall (iptables INPUT+FORWARD).
+        Safe to call from the Snort monitor thread: it only shells out to iptables and
+        never touches an eventlet primitive. Returns True if a rule was installed."""
+        if not self._ext_block_enabled or src_ip in self._ext_blocked \
+                or not self._is_external_ip(src_ip):
+            return False
+        import subprocess
+        installed = 0
+        for chain in ('INPUT', 'FORWARD'):
+            try:
+                chk = subprocess.run(['iptables', '-C', chain, '-s', src_ip, '-j', 'DROP'],
+                                     capture_output=True)
+                if chk.returncode != 0:   # rule not already present
+                    subprocess.run(['iptables', '-I', chain, '-s', src_ip, '-j', 'DROP'],
+                                   capture_output=True, check=True)
+                installed += 1
+            except Exception as e:
+                self.logger.error("iptables block failed for %s on %s: %s", src_ip, chain, e)
+        if installed:
+            self._ext_blocked[src_ip] = time.time()
+            self.logger.warning(
+                "[EXT-BLOCK] host-firewall DROP for external attacker %s (%s)", src_ip, reason)
+            return True
+        return False
+
+    def _unblock_external_ip(self, src_ip):
+        """Remove the host-firewall DROP for an external attacker (both chains)."""
+        if src_ip not in self._ext_blocked:
+            return
+        import subprocess
+        for chain in ('INPUT', 'FORWARD'):
+            subprocess.run(['iptables', '-D', chain, '-s', src_ip, '-j', 'DROP'],
+                           capture_output=True)
+        self._ext_blocked.pop(src_ip, None)
+        self.logger.info("[EXT-UNBLOCK] removed host-firewall DROP for %s", src_ip)
 
     def add_flow(self, datapath, in_port, dst, src, actions, idle_timeout=0, hard_timeout=0, priority=None):
         ofproto = datapath.ofproto

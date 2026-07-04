@@ -304,3 +304,56 @@ Snort must *see* the data-plane traffic. There are two mirror paths and two ways
   skew remediation if RF predicts `normal` on real attacks.
 - Optional: operator-initiated `CONTROL:BLOCK:<ip>`; CUSUM low-and-slow on the AE error stream;
   real-data AE threshold re-baselining.
+
+## 18. Enforcement, defence & confidence hardening (current)
+This block records changes made after the merged-controller baseline. All verified with
+`py_compile`; deploy = commit + `git pull` on the t530 + restart.
+
+**AI confidence — retrain on v4 (RF drift fix).** Chapter 5 showed the deployed RF was trained
+on **v2** but the live/eval data is **v4** (`dataset_v4_master_training.csv`, 110,839 rows, 7
+classes — verified by `value_counts`), so recall on the minority flood/scan/spoof classes fell
+(macro-F1 dropped from the 0.9349 20-fold CV to ~0.60 on the fresh v4 split; per-class precision
+stayed high). Fix: **`Controller/ml_models/retrain_rf_v4.py`** — inherits the EXACT schema from the
+deployed pipeline (11 drop cols, 86 one-hot cols, 66 selected cols, RF hyperparams
+`n_estimators=200, max_depth=25, min_samples_leaf=2, class_weight=balanced`), re-fits only the
+StandardScaler + RF on v4, and re-pickles `[RFPreprocessor → RF]` against `ml_inference.RFPreprocessor`
+(module-level, so it loads on the controller). `--smote` optional. **Run on the training machine with
+scikit-learn 1.6.1** (a newer sklearn pickle may not load on the controller's 1.6.1). AE side: re-run
+`build_ae_bundle.py --csv …v4… --h5 autoencoder_tighter_bottleneck_16units.h5 --percentile <p>`;
+lowering `--percentile` below 99 raises attack sensitivity/confidence (at some normal-FP cost). The
+AE block band is also tunable **live** now — see below.
+
+**Outsider defence (management plane).** OpenFlow DROP only stops traffic crossing an OVS switch; a
+scan/flood aimed at the **controller's own NIC** (e.g. a Kali host on the LAN) bypasses the SDN.
+Snort on the physical iface (`SNORT_IFACES=enp1s0,…`) sees it, and `_handle_snort_alert` now routes
+**external** sources to a **host iptables DROP** (`_block_external_ip`, INPUT+FORWARD) instead of the
+useless OpenFlow path. Guards: opt-in **`IPS_EXTERNAL_BLOCK=1`** (root + lock-out risk); whitelist =
+`127.0.0.1`, `192.168.1.200/.201`, plus `IPS_MGMT_WHITELIST=<csv>`; `10.0.0.0/8` is never
+iptables-blocked (that's OpenFlow's job). `_is_external_ip()` decides; `CONTROL:UNBLOCK:<ip>` removes
+the iptables rule too (`_unblock_external_ip`). A Kali attack **through** the SDN (via
+`net.expose_service`, §7/topology) still transits `s1` → all 4 tiers → OpenFlow DROP with the real
+external IP. Defending the **Mininet VM's own** NIC needs a host firewall / the standalone
+`snort_alert_reader.py` (its `PROTECTED_IPS` + external-IP iptables path) on that VM — the controller
+can't firewall another host.
+
+**Permanent blocks + real unblock.** Tier blocks are now **permanent** by default (OpenFlow DROP with
+`hard_timeout=0`, `until=inf`); `IPS_BLOCK_SECONDS=<n>` restores timed blocks. Because they no longer
+self-expire, UNBLOCK had to actually delete the rule: `_do_unblock_attacker` (deletes the dl_src
+priority-65000 DROP) + a hub-safe `unblock_attacker` shim routed through `_block_q` (op-tagged;
+`_block_worker` dispatches block/unblock). REST/UDP unblock both call it. **Rule: `CONTROL:CLEAR`
+alone no longer lifts a DROP — use `CONTROL:UNBLOCK:<ip>`.**
+
+**Snort gated by DETECT (not ML mode).** The Snort instant-block in `_handle_snort_alert` now checks
+`self._detection_enabled` instead of `_ml_mode=='AUTHORIZE'`. So the tier-isolation matrix works:
+`DETECT:OFF + ML:AUTHORIZE` = RF/AE only (Snort silent); `DETECT:ON + ML:OFF` = Snort/rate only;
+`DETECT:ON + ML:AUTHORIZE` = full stack. DAI (ARP box) is detection-only — it logs + `record_alert`,
+never blocks.
+
+**New live controls (`ipsctl.py`).** `CONTROL:ML:RF:ON|OFF`, `CONTROL:ML:AE:ON|OFF`,
+`CONTROL:ML:DEFER:ON|OFF` (AE stays silent on RF-known attacks), and
+`CONTROL:ML:AE:BLOCK:<x>` / `CONTROL:ML:AE:FLAG:<x>` (tune the AE bands live — raise BLOCK ~0.85 to
+suppress the known IoT-camera false positive while real attacks at ≥0.95 still block).
+
+**New docs/scripts:** `retrain_rf_v4.py` (RF retrain), `demo_video_runbook.md` (90-s operational
+video shot list), `Chapter5_figure_capture_runbook.md` (9-figure capture guide). `snort_ryu_bridge.py`
+default REST URL corrected to `:8081` (was `:8080`=nginx) and now honours `RYU_API_URL`.
