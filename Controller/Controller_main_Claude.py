@@ -314,6 +314,10 @@ class SimpleSwitch(app_manager.RyuApp):
         # the OpenFlow DROP has no hard_timeout and stays until CONTROL:UNBLOCK.
         # Override with IPS_BLOCK_SECONDS=<n> to restore auto-expiring blocks.
         self._block_duration = int(os.environ.get('IPS_BLOCK_SECONDS', '0'))
+        # JSON-safe "permanent" sentinel for a block's 'until' — float('inf') serialises
+        # to `Infinity`, which is invalid JSON and makes the dashboard's JSON.parse throw
+        # (blocked table silently empty). ~2100-01-01, i.e. effectively until UNBLOCK.
+        self._permanent_until = 4102444800.0
         # --- External-attacker defence (management plane) ---------------------
         # OpenFlow DROP only stops traffic that crosses an OVS switch. A scan/flood
         # aimed at the CONTROLLER'S OWN NIC (e.g. a Kali host on the LAN) bypasses the
@@ -861,7 +865,7 @@ class SimpleSwitch(app_manager.RyuApp):
         block_secs = getattr(self, '_block_duration', 0)
         self._blocked_ips[src_ip] = {
             'mac': src_mac,
-            'until': (now + block_secs) if block_secs else float('inf'),
+            'until': (now + block_secs) if block_secs else self._permanent_until,
             'attack_type': attack_type,
         }
         self._block_q.put({
@@ -965,7 +969,7 @@ class SimpleSwitch(app_manager.RyuApp):
 
         self._blocked_ips[src_ip] = {
             'mac': src_mac,
-            'until': (now + block_secs) if block_secs else float('inf'),
+            'until': (now + block_secs) if block_secs else self._permanent_until,
             'attack_type': attack_type,
         }
 

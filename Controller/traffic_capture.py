@@ -1056,12 +1056,14 @@ class TrafficCapture:
                         f"    Action  : Host represents a persistent threat. Label locked-in indefinitely.\n"
                     )
 
-                    # Fast-tier mitigation: in AUTHORIZE mode the rate-counter
-                    # confirmation now BLOCKS (previously only the ML tier did).
-                    # Principled fast blocker — correct source + canonical class,
-                    # low FP, and it honours the consecutive-window requirement.
+                    # Fast-tier mitigation: the rate-counter is a signature/rate
+                    # DETECTION tier (Tier 2), so its enforcement is gated by DETECT —
+                    # not by the ML mode. With DETECT:ON a confirmed attacker is BLOCKED
+                    # automatically (same as the Snort tier), independent of ML OFF/
+                    # OBSERVE/AUTHORIZE. Principled fast blocker — correct source +
+                    # canonical class, low FP, honours the consecutive-window requirement.
                     if (self.controller is not None and
-                            getattr(self.controller, '_ml_mode', 'OFF') == 'AUTHORIZE'):
+                            getattr(self.controller, '_detection_enabled', False)):
                         attacker_mac = self._ip_to_mac.get(src_ip, '')
                         if attacker_mac:
                             try:

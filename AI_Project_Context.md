@@ -343,11 +343,14 @@ priority-65000 DROP) + a hub-safe `unblock_attacker` shim routed through `_block
 `_block_worker` dispatches block/unblock). REST/UDP unblock both call it. **Rule: `CONTROL:CLEAR`
 alone no longer lifts a DROP — use `CONTROL:UNBLOCK:<ip>`.**
 
-**Snort gated by DETECT (not ML mode).** The Snort instant-block in `_handle_snort_alert` now checks
-`self._detection_enabled` instead of `_ml_mode=='AUTHORIZE'`. So the tier-isolation matrix works:
-`DETECT:OFF + ML:AUTHORIZE` = RF/AE only (Snort silent); `DETECT:ON + ML:OFF` = Snort/rate only;
-`DETECT:ON + ML:AUTHORIZE` = full stack. DAI (ARP box) is detection-only — it logs + `record_alert`,
-never blocks.
+**Snort + rate counters gated by DETECT (not ML mode).** Both signature/rate DETECTION tiers now
+auto-block on `self._detection_enabled` instead of `_ml_mode=='AUTHORIZE'`: the Snort instant-block in
+`_handle_snort_alert`, AND the Tier-2 rate-counter confirmation in `traffic_capture.py`
+(`~:1063`, the `[RATE] BLOCKED` path — was gated on AUTHORIZE). So **DETECT:ON automatically blocks a
+confirmed attacker via Snort *and* the rate counters**, independent of ML OFF/OBSERVE/AUTHORIZE. Tier
+matrix: `DETECT:OFF + ML:AUTHORIZE` = RF/AE only (signatures/rate silent); `DETECT:ON + ML:OFF` =
+Snort+rate only; `DETECT:ON + ML:AUTHORIZE` = full stack. DAI (ARP box) is detection-only — it logs +
+`record_alert`, never blocks.
 
 **New live controls (`ipsctl.py`).** `CONTROL:ML:RF:ON|OFF`, `CONTROL:ML:AE:ON|OFF`,
 `CONTROL:ML:DEFER:ON|OFF` (AE stays silent on RF-known attacks), and
