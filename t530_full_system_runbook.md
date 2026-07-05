@@ -132,6 +132,16 @@ sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=snort_tap IPS_V2_FEATURES=1 \
   interface list — `SNORT_IFACES=enp1s0,snort_tap`. The banner then reads
   `Snort alert monitor started — watching 2 interface(s): enp1s0, snort_tap`. Keep `snort_tap` for
   the internal SDN and add `enp1s0` for external traffic.
+- **To auto-block outside attackers** (LAN scanner hitting the t530's own NIC — PART 12): add
+  `IPS_EXTERNAL_BLOCK=1` to the launch line. On a canonical Snort alert whose source is *external*
+  (not `10.0.0.0/8`, not whitelisted), the controller installs a **host iptables DROP** itself
+  (log: `[EXT-BLOCK] …`) — no reader/bridge needed. ⚠ Opt-in because it can lock out SSH: the
+  whitelist is loopback + `192.168.1.200/.201`; add your own admin IP with
+  `IPS_MGMT_WHITELIST=<ip>,<ip>`.
+- **Block lifetime:** blocks are **PERMANENT** by default (`Action: DROP rule for PERMANENT (until
+  UNBLOCK)`). Set `IPS_BLOCK_SECONDS=<n>` to restore auto-expiring blocks. Release a permanent block
+  only with `CONTROL:UNBLOCK:<ip>` — **`CONTROL:CLEAR` no longer lifts a DROP** (it only resets
+  detection state).
 
 ---
 
@@ -246,7 +256,7 @@ Background traffic running (PART 3) and both models loaded (PART 2 banner). On t
 ```bash
 cd ~/GP/Controller
 python3 ipsctl.py CONTROL:DETECT:OFF          # remove rate/DAI/Snort labeling -> ML is the only decider
-python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80   # RF blocks >=0.80, AE blocks >=0.73 (AE band fixed)
+python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80   # RF blocks >=0.80, AE blocks >=0.73 (both bands tunable live)
 curl -s http://127.0.0.1:8081/ips/status      # confirm "ml_mode":"AUTHORIZE"
 # optional live watch (Terminal C):
 tail -f controller_run.log | grep -E "\[ML\]|\[AE\]|ATTACKER BLOCKED"
@@ -267,14 +277,16 @@ py net.run_attack_session(net,'syn')          # then icmp / udp / scan / cps  (>
   10.0.0.1 ping -c3 10.0.0.4      # the blocked attacker  -> 100% loss
   10.0.0.3 ping -c3 10.0.0.4      # an innocent host      -> 0% loss (surgical block)
   ```
-- **Release between rounds:** `python3 ipsctl.py CONTROL:UNBLOCK:10.0.0.1`
-  (or `CONTROL:CLEAR:10.0.0.1`), confirm the attacker's ping recovers, then test the next class.
-- **Isolate ONE model** (to prove *that* model blocks): rename the other bundle and restart —
-  `mv ml_models/ae_bundle.joblib ml_models/ae_bundle.off` (RF-only) **or**
-  `mv ml_models/rf_pipeline.joblib ml_models/rf_pipeline.off` (AE-only); restore + restart after.
-- **Tune the bar live** without restart: `python3 ipsctl.py CONTROL:ML:BLOCK:0.70` lowers the RF
-  block threshold (more aggressive); `CONTROL:ML:FLAG:0.50` lowers the flag bar. Raise them back up
-  if you see a legitimate host get blocked.
+- **Release between rounds (blocks are PERMANENT):** `python3 ipsctl.py CONTROL:UNBLOCK:10.0.0.1`,
+  confirm the attacker's ping recovers, then test the next class. `CONTROL:CLEAR` alone will **not**
+  restore connectivity anymore — it only clears detection state, the DROP stays.
+- **Isolate ONE model, live — no restart:** `python3 ipsctl.py CONTROL:ML:AE:OFF` (RF-only) **or**
+  `CONTROL:ML:RF:OFF` (AE-only); re-enable with `:ON`. This replaces the old rename-and-restart trick.
+  `CONTROL:ML:DEFER:ON` also keeps the AE silent on attacks the RF already names (so you see the RF
+  alone, then flip DEFER off to see the AE add zero-day coverage).
+- **Tune the bars live:** RF — `CONTROL:ML:BLOCK:0.70` / `CONTROL:ML:FLAG:0.50`; AE —
+  `CONTROL:ML:AE:BLOCK:0.85` / `CONTROL:ML:AE:FLAG:0.70`. Raise a bar back up if a legitimate host
+  gets blocked (e.g. raise the AE block band to ~0.85 to suppress an over-eager IoT-camera flag).
 - This is **Ch.5 Fig 5.16/5.17** evidence (detection→block latency + lateral-movement containment).
 
 > If a model *detects* (you saw it in OBSERVE, PART 5/6) but never blocks here: it's scoring below
@@ -290,9 +302,21 @@ python3 ipsctl.py CONTROL:DETECT:ON
 ## PART 7B — Full stack: Snort 3 + Rate/DAI + RF + AE (layered blocking)
 Both model files present + controller restarted (or DETECT just turned back ON).
 ```bash
-python3 ipsctl.py CONTROL:DETECT:ON          # Snort labels + Tier-2 rate/DAI block
-python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80  # RF + AE block on high confidence
+python3 ipsctl.py CONTROL:DETECT:ON          # Snort + Tier-2 rate counters now AUTO-BLOCK
+python3 ipsctl.py CONTROL:ML:AUTHORIZE:0.80  # RF + AE also block on high confidence
 ```
+**Gating model (who blocks when):** the signature/rate DETECTION tiers are gated by **DETECT**, the
+learning tiers by **ML mode** — so you can isolate any layer:
+
+| DETECT | ML mode | Blocks come from |
+|---|---|---|
+| ON | OFF | **Snort + rate counters only** (Tier 1/2) — the pure-signature/rate test |
+| OFF | AUTHORIZE | **RF / AE only** (PART 7A) — signatures & rate stay silent |
+| ON | AUTHORIZE | **all four tiers** (this section) |
+
+> `DETECT:ON` blocks a confirmed attacker automatically via Snort *and* the rate counters, even with
+> `ML:OFF` — you no longer need AUTHORIZE for the signature/rate tiers to act. (DAI/ARP is
+> detection-only: it prints the `⚠ ARP SPOOFING DETECTED` box but does not itself block.)
 For each `py net.run_attack_session(net,'<kind>')`, capture in Terminal A whichever tiers fire:
 - **T1 Snort:** `🚨 IDS ALERT … SID …` · **T2 rate/DAI:** `SUSPECTED … → CONFIRMED → BLOCKED` ·
   **T3 RF:** `[ML] ATTACK (block) … conf=0.xx` · **T4 AE:** `[AE] ANOMALY (block) …` · then
@@ -302,8 +326,8 @@ curl -s http://127.0.0.1:8081/ips/blocked | python3 -m json.tool   # attacker li
 sudo ovs-ofctl dump-flows s1 | grep drop                           # (on Mininet VM) the DROP rule
 ```
 - **GATE:** every attack caught by ≥1 tier and blocked; `/ips/blocked` + dashboard reflect it;
-  window compute < 5000 ms; RAM has headroom. Release: `python3 ipsctl.py CONTROL:UNBLOCK:<ip>`
-  (or `CONTROL:CLEAR:<ip>`).
+  window compute < 5000 ms; RAM has headroom. Release (permanent blocks): `python3 ipsctl.py
+  CONTROL:UNBLOCK:<ip>` — **not** `CONTROL:CLEAR`, which no longer removes the DROP.
 - Expected coverage: ICMP/SYN/UDP floods → Snort + rate + RF (+AE); Port Scan → Snort port_scan +
   RF; ARP → DAI + Snort arp_spoof (+AE); novel/zero-day → AE.
 
@@ -426,21 +450,27 @@ OVS switches mirror to the controller). This part tests an **outsider**: a host 
   the Mininet VM) unless you add NAT/routing (12.5).
 
 ### 12.1 Set up (t530)
-1. **Launch the controller with Snort watching the NIC** (PART 2, NIC variant):
-   ```bash
-   sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=enp1s0,snort_tap IPS_V2_FEATURES=1 \
-     python3 -c "import collections,collections.abc; collections.MutableMapping=collections.abc.MutableMapping; from ryu.cmd.manager import main; main()" \
-     Controller_main_Claude.py --wsapi-port 8081 > controller_run.log 2>&1 &
-   ```
-   Banner must read `… watching 2 interface(s): enp1s0, snort_tap`.
-2. **Start the external-block pipeline** (PART 9, with the `sudo -E` fix):
-   ```bash
-   cd ~/GP/Controller
-   sudo -E env RYU_API_URL=http://127.0.0.1:8081/ips/block python3 snort_ryu_bridge.py &   # :9000
-   sudo python3 snort_alert_reader.py &
-   ```
-   Confirm your **Windows IP is not** in `PROTECTED_IPS` at the top of `snort_alert_reader.py`
-   (that set = controller/Mininet/loopback; edit it to match your real LAN if needed).
+**Launch the controller with Snort watching the NIC AND external auto-block on** — the merged
+controller now blocks outside attackers itself (built-in `iptables`), so no reader/bridge is needed:
+```bash
+sudo IPS_EXTERNAL_BLOCK=1 SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=enp1s0,snort_tap IPS_V2_FEATURES=1 \
+  python3 -c "import collections,collections.abc; collections.MutableMapping=collections.abc.MutableMapping; from ryu.cmd.manager import main; main()" \
+  Controller_main_Claude.py --wsapi-port 8081 2>&1 | tee controller_run.log
+```
+- Banner must read `… watching 2 interface(s): enp1s0, snort_tap`.
+- Then `CONTROL:DETECT:ON` (the Snort tier that feeds the external block is DETECT-gated).
+- ⚠ The whitelist is loopback + `192.168.1.200/.201`; **add your admin/SSH host** so you don't lock
+  yourself out: relaunch with `IPS_MGMT_WHITELIST=<your-admin-ip>`. Your **attacker** (Kali/Windows)
+  IP must **not** be whitelisted.
+
+*Optional alternative — the standalone reader/bridge (PART 9)* if you want the explicit
+`IDS-ALERT [BLOCKING]` boxes instead of the built-in path:
+```bash
+cd ~/GP/Controller
+sudo -E env RYU_API_URL=http://127.0.0.1:8081/ips/block python3 snort_ryu_bridge.py &   # :9000
+sudo python3 snort_alert_reader.py &     # confirm your attacker IP is not in its PROTECTED_IPS
+```
+Run **one** external-block path at a time (built-in *or* reader), not both.
 
 ### 12.2 Attack from Windows (target = the t530's IP)
 Windows has no native `hping3`. Pick one:
@@ -457,12 +487,16 @@ Windows has no native `hping3`. Pick one:
 
 ### 12.3 Confirm the block (the evidence)
 ```bash
-grep -E "IDS ALERT|BLOCKING|External attacker blocked" controller_run.log   # Snort saw the external src
-sudo iptables -S INPUT | grep <windows-ip>                                  # -> "-A INPUT -s <win> -j DROP"
-# from Windows: the attack traffic to the t530 now stops (re-run nping -> no responses)
+grep -E "IDS ALERT|EXT-BLOCK|External attacker blocked" controller_run.log  # Snort saw the external src
+sudo iptables -S INPUT | grep <attacker-ip>                                 # -> "-A INPUT -s <ip> -j DROP"
+# from the attacker: the traffic to the t530 now stops (re-run the scan/flood -> no responses)
 ```
-- **RECORD:** the reader's `IDS ALERT … [BLOCKING]` box for the external IP + the `iptables … DROP`
-  line + the attack dying. This is your outsider-threat figure for Ch.5.
+- **RECORD:** the controller's `[EXT-BLOCK] host-firewall DROP for external attacker <ip>` line (or
+  the reader's `IDS ALERT … [BLOCKING]` box) + the `iptables … DROP` rule + the attack dying. This is
+  your outsider-threat figure for Ch.5.
+- **Release afterwards:** `python3 ipsctl.py CONTROL:UNBLOCK:<attacker-ip>` also removes the
+  host-firewall rule (built-in path). For the reader path, delete it by hand:
+  `sudo iptables -D INPUT -s <attacker-ip> -j DROP`.
 
 ### 12.4 Caveats / tuning
 - The repo `sdn_ips_local.rules` is tuned for the 6 internal attacks; the generic **SYN Flood** rule
@@ -522,6 +556,15 @@ nmap  -sS -p 1-1000 <vm-ip>                                    # port scan  -> p
 - **Let attacks run ≥ 20 s** — OBSERVE summaries print only when a 5-s window flushes.
 - **Two Snorts** → never run a standalone Snort alongside the merged controller; the reader (PART 9)
   tails the controller's own `alert_json`.
+- **`ATTACKER BLOCKED` box prints but the dashboard blocked table stays empty** → old code with the
+  `float('inf')` bug (invalid `Infinity` JSON breaks `/ips/blocked`). `git pull` the fix (now a finite
+  `_permanent_until`), restart. The OpenFlow DROP was installed regardless — confirm on the Mininet VM
+  with `sudo ovs-ofctl dump-flows s1 | grep drop`.
+- **Blocked host never recovers after `CLEAR`** → blocks are **permanent**; use `CONTROL:UNBLOCK:<ip>`.
+- **Your SSH drops when testing outsider attacks** → `IPS_EXTERNAL_BLOCK=1` firewalled your admin IP;
+  add it to `IPS_MGMT_WHITELIST`, and `sudo iptables -D INPUT -s <your-ip> -j DROP` to recover.
+- **RF says `normal` on real attacks / AE under-fires** → v2-trained model on v4 traffic (drift);
+  retrain with `Controller/ml_models/retrain_rf_v4.py` (run on the training box, sklearn **1.6.1**).
 
 ## Related docs
 - `AI_Project_Context.md` — current architecture/code reference (absorbs the old `context_claude.md`).
@@ -529,4 +572,8 @@ nmap  -sS -p 1-1000 <vm-ip>                                    # port scan  -> p
 - `t530_bridge_setup.md` — VXLAN `br-snort` mirror on the t530 (PART 1.3 option B).
 - `SDN_IPS_Snort_Installation_Runbook.pdf` — original clean-machine/two-VM install (source of PART 1 & 9).
 - `Chapter4_figure_capture_guide.md` / `Chapter5_results_outline.md` — the thesis figures + evidence map.
+- `Chapter5_figure_capture_runbook.md` — how to capture the in-scope Ch.5 figures (5.1/2/4/5/6/10/15/16/19).
+- `demo_video_runbook.md` — 90-second operational demo shot list (block → surgical → zero-day → outsider).
 - `ml_ae_confidence_boost_plan.md` — train/serve skew remediation (if RF/AE misclassify live traffic).
+- `Controller/ml_models/retrain_rf_v4.py` — retrain the RF on the v4 dataset (drop-in `rf_pipeline.joblib`).
+- `QoS/README.md` — companion SD-WAN adaptive traffic-steering app (fast/backup path by policy).

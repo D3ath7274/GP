@@ -80,6 +80,11 @@ sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=enp1s0,snort_tap IPS_V2_FEATURES=1 \
 banner should confirm all four tiers loaded (AE threshold ≈ 0.482, RF pipeline, Snort PID,
 `Forced n_jobs=1`).
 
+Optional launch flags: `SNORT_IFACES=enp1s0,snort_tap` (also watch the physical NIC, for the
+outsider test); `IPS_EXTERNAL_BLOCK=1` (auto-block outside attackers on the NIC via host iptables —
+whitelist your admin IP with `IPS_MGMT_WHITELIST=<ip>`); `IPS_BLOCK_SECONDS=<n>` (timed instead of
+permanent blocks).
+
 **2. Topology node** — targets the controller's IP:
 ```bash
 cd "SDN Topology"
