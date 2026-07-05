@@ -337,11 +337,15 @@ external IP. Defending the **Mininet VM's own** NIC needs a host firewall / the 
 can't firewall another host.
 
 **Permanent blocks + real unblock.** Tier blocks are now **permanent** by default (OpenFlow DROP with
-`hard_timeout=0`, `until=inf`); `IPS_BLOCK_SECONDS=<n>` restores timed blocks. Because they no longer
-self-expire, UNBLOCK had to actually delete the rule: `_do_unblock_attacker` (deletes the dl_src
-priority-65000 DROP) + a hub-safe `unblock_attacker` shim routed through `_block_q` (op-tagged;
-`_block_worker` dispatches block/unblock). REST/UDP unblock both call it. **Rule: `CONTROL:CLEAR`
-alone no longer lifts a DROP — use `CONTROL:UNBLOCK:<ip>`.**
+`hard_timeout=0`); `IPS_BLOCK_SECONDS=<n>` restores timed blocks. Because they no longer self-expire,
+UNBLOCK had to actually delete the rule: `_do_unblock_attacker` (deletes the dl_src priority-65000
+DROP) + a hub-safe `unblock_attacker` shim routed through `_block_q` (op-tagged; `_block_worker`
+dispatches block/unblock). REST/UDP unblock both call it. **Rule: `CONTROL:CLEAR` alone no longer lifts
+a DROP — use `CONTROL:UNBLOCK:<ip>`.** GOTCHA fixed: the permanent block's `_blocked_ips['until']` was
+`float('inf')`, which `json.dumps` emits as `Infinity` — invalid JSON that made the dashboard's
+`/ips/blocked` `JSON.parse` throw, so the blocked table looked empty even though the DROP was installed.
+Now a finite `self._permanent_until` (2100-01-01). **If the box prints `ATTACKER BLOCKED` but the
+dashboard shows nothing, suspect a non-JSON value in a REST payload, not a missing block.**
 
 **Snort + rate counters gated by DETECT (not ML mode).** Both signature/rate DETECTION tiers now
 auto-block on `self._detection_enabled` instead of `_ml_mode=='AUTHORIZE'`: the Snort instant-block in
@@ -360,3 +364,19 @@ suppress the known IoT-camera false positive while real attacks at ≥0.95 still
 **New docs/scripts:** `retrain_rf_v4.py` (RF retrain), `demo_video_runbook.md` (90-s operational
 video shot list), `Chapter5_figure_capture_runbook.md` (9-figure capture guide). `snort_ryu_bridge.py`
 default REST URL corrected to `:8081` (was `:8080`=nginx) and now honours `RYU_API_URL`.
+
+## 19. QoS / adaptive traffic steering (`QoS/`)
+The "predictive traffic steering" that Chapter 5 scoped as **future work** now exists as a **separate
+module** (extracted from the `Quality Of Service  part/` folder — only the 3 custom files, not its
+vendored mininet-wifi/ryu/hostapd trees). `QoS/smart_controller.py` is an **OpenFlow 1.3** Ryu app on a
+**4-switch dual-path SD-WAN** (`smart_topology.py`, controller port **6653**): edge `s1` (dpid 0x11) →
+**fast path** `s1→s2→s4` (100 Mbit/2 ms, s1 port 4) or **backup** `s1→s3→s4` (50 Mbit/15 ms, s1 port 5),
+plus an **IPS mirror** on s1 port 6 → server `10.0.0.99`. It classifies flows by L4 dst port (IoT =
+1883/5683/9000, web = 80/443; fallback: 10.0.0.1/2/3 → IoT), reads `config.json`
+(`priority_traffic`, `threshold_mbps`), and steers the priority class to the fast path (per-flow rules
+use `idle_timeout=3` so a policy edit auto-reloads in ~3 s). **Two caveats:** (1) it is a *separate*
+controller from the OF-1.0 IPS — unifying them (OF version + topology) is future work; the current
+integration point is the IPS mirror. (2) The **rate threshold is not wired**: the controller reads a
+boolean `traffic_is_high` (defaults `True`), so `threshold_mbps` is dead config until per-flow
+byte-rate sampling (`OFPFlowStats`/`OFPMeterMod`) sets `traffic_is_high = rate ≥ threshold_mbps`. Full
+detail in `QoS/README.md`. Also set `CONTROLLER_IP` in `smart_topology.py`.

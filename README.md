@@ -160,6 +160,16 @@ A secondary Z-score check (threshold 8.0) catches attacks that stay just below t
 
 ---
 
+## Traffic steering (QoS) — `QoS/`
+
+A companion **SD-WAN traffic-steering** app (`QoS/smart_controller.py`, OpenFlow 1.3) routes
+priority traffic (e.g. IoT: MQTT/CoAP) down a **fast path** and everything else down a
+**backup path**, per a customer policy in `config.json`, on a 4-switch dual-path topology
+(`smart_topology.py`). It mirrors all edge traffic to the IPS server for inspection, so
+steering and intrusion prevention compose. It runs as its own controller (separate from the
+OF 1.0 IPS). See [QoS/README.md](QoS/README.md) for the path map, run commands, and the note
+on wiring the real data-rate threshold.
+
 ## REST API (`:8081`)
 
 `GET /` (dashboard) · `/ips/status` · `/ips/metrics` (per-tier + per-attack counts, confirmed
@@ -194,6 +204,10 @@ GP/
 │   ├── ml_models/                 # rf_pipeline.joblib, ae_bundle.joblib, build_ae_bundle.py
 │   └── snort3/                    # sdn_ips_local.rules, sdn_ips.lua
 ├── SDN Topology/topology.py       # Mininet-WiFi lab + attack/collection helpers
+├── QoS/                           # adaptive traffic steering (SD-WAN fast/backup path)
+│   ├── smart_controller.py        # OF 1.3 steering app (classify → policy → path + IPS mirror)
+│   ├── smart_topology.py          # 4-switch dual-path SD-WAN topology
+│   └── config.json                # customer policy (priority class + rate threshold)
 ├── Dashboard/index.html           # operator dashboard (zero-dependency, served at :8081/)
 ├── ML dataset/                    # dataset_v2/v4 master + training CSVs
 ├── AI_Project_Context.md          # dense technical index of the whole system

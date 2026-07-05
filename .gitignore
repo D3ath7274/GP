@@ -8,3 +8,6 @@ GET_log.txt
 Controller/GET_log.txt
 *.pyc
 *.pyc
+
+# Vendored mininet-wifi/ryu/hostapd build tree — only QoS/*.py were integrated into QoS/
+Quality Of Service  part/
