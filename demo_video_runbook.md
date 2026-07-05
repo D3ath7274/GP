@@ -2,8 +2,9 @@
 
 Goal: prove the system is **operational** — it detects, names, and **blocks** known
 attacks, catches a **zero-day** with the Autoencoder, and defends against an **outside**
-attacker — all live, in 90 seconds. Legend: **[t530]** controller · **[mn]** Mininet CLI ·
-**[dash]** browser dashboard · **[kali]** external attacker.
+attacker — all live, in 90 seconds. An **optional extended segment** adds the adaptive
+SD-WAN traffic-steering (QoS) capability for a ~2-minute cut. Legend: **[t530]** controller ·
+**[mn]** Mininet CLI · **[dash]** browser dashboard · **[kali]** external attacker.
 
 ---
 
@@ -22,6 +23,15 @@ attacker — all live, in 90 seconds. Legend: **[t530]** controller · **[mn]** 
 3. **[dash]** `http://<t530>:8081/` open, zoomed ~125%, showing the idle (green) state.
 4. Arrange the screen: **dashboard on the left**, **controller log on the right** (both visible).
 5. Confirm reset: `python3 ipsctl.py CONTROL:CLEAR` and no hosts in the blocked table.
+6. **Dashboard smoke test (do this once, off-camera).** The blocked table only renders if you're on
+   the commit with the `Infinity`→finite `until` fix — older code returns invalid JSON and the table
+   stays empty *even though blocks work*. Verify:
+   ```bash
+   curl -s -X POST http://127.0.0.1:8081/ips/block -H 'Content-Type: application/json' -d '{"src_ip":"10.0.0.9","reason":"smoke"}'
+   curl -s http://127.0.0.1:8081/ips/blocked        # must be valid JSON listing 10.0.0.9 (no "Infinity")
+   python3 ipsctl.py CONTROL:UNBLOCK:10.0.0.9
+   ```
+   If `/ips/blocked` shows `Infinity` or the dashboard table won't populate, `git pull` + restart.
 
 > Rehearse once. Between takes, reset with `CONTROL:UNBLOCK:<ip>` for every blocked host
 > (blocks are **permanent**) + `CONTROL:CLEAR`, and clear the browser event timeline (reload).
@@ -73,10 +83,34 @@ real owner). Notes:
 
 ---
 
-## If you only have time for 3 beats
-Keep **0:16–0:32 (block)**, **0:32–0:48 (surgical)**, and **0:48–1:04 (zero-day)** — those
-three prove detection, enforcement, and the headline zero-day claim. The outsider beat
-(1:04) is the strongest "wow" if the Kali box is ready; drop it first if a take runs long.
+## Optional extended segment — Adaptive traffic steering (QoS, ~30 s)
+Shows the "adaptive SD-WAN" claim beyond security: the controller steers **priority** traffic onto
+a fast path and best-effort traffic onto a backup path. **This is a *separate* controller +
+topology** (OpenFlow 1.3, 4-switch) from the IPS above, so record it as its **own segment** and cut
+it in — don't try to run it in the same live session as the IPS topology.
+
+**Setup (off-camera):**
+```bash
+# controller host:  cd QoS && ryu-manager smart_controller.py     # OF 1.3, port 6653, reads ./config.json
+# Mininet VM:       set CONTROLLER_IP in QoS/smart_topology.py, then: sudo python3 QoS/smart_topology.py
+```
+**Shot (~30 s):** frame the `smart_controller.py` log.
+| On screen | Command ([mn]) | Say |
+|---|---|---|
+| Log prints `>>> [FAST PATH - VIP]` | `sta1 iperf -c 10.0.0.3 -p 1883` (IoT/MQTT port) | "Priority IoT traffic is steered onto the fast, low-latency path." |
+| Log prints `>>> [BACKUP PATH]` | `sta1 iperf -c 10.0.0.3 -p 8080` (best-effort port) | "Ordinary traffic takes the backup path — the controller adapts the route to the application." |
+
+Narrate by **application priority** (IoT vs best-effort), not raw Mbps — the data-rate threshold is
+policy-driven, not yet measured live (see `QoS/README.md`). Every s1 flow is also mirrored to the
+IPS, so steering and inspection run together.
+
+## Cuts
+- **90-second core:** the shot-list beats as written (block → surgical → zero-day → outsider → wrap).
+- **~2-minute extended cut:** insert the **QoS traffic-steering** segment right before the wrap
+  (after the outsider beat), and end on a wrap that also says "…and steers traffic by policy."
+- **If you only have time for 3 beats:** keep **0:16–0:32 (block)**, **0:32–0:48 (surgical)**, and
+  **0:48–1:04 (zero-day)** — detection, enforcement, and the headline zero-day claim. The outsider
+  beat is the strongest "wow" if the Kali box is ready; drop it first if a take runs long.
 
 ## Fallback if a live attack misbehaves on camera
 Pre-record each attack segment separately, then cut together — every beat above is
