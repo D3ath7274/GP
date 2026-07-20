@@ -327,9 +327,30 @@ class SimpleSwitch(app_manager.RyuApp):
         # loopback, or the 10.0.0.0/8 data plane (that is OpenFlow's job).
         self._ext_block_enabled = os.environ.get('IPS_EXTERNAL_BLOCK', '0') == '1'
         self._ext_blocked = {}            # external ip -> timestamp (dedup + audit)
-        self._ext_whitelist = {'127.0.0.1', '::1', '192.168.1.200', '192.168.1.201'}
+        # --- Deployment config (ips_config.json) ------------------------------
+        # Absent/invalid keys fall back to testbed-safe defaults, so the Mininet
+        # testbed keeps working unchanged. See real_world_deployment_plan.md.
+        cfg = self._load_ips_config()
+        # "Internal" LAN = the network the controller's OVS manages (OpenFlow's job);
+        # anything outside it is "external" (host iptables). Default 10.0.0.0/8 = the
+        # Mininet data plane. On a real LAN set lan_cidr to e.g. "192.168.1.0/24".
+        self._lan_network = None
+        try:
+            self._lan_network = ipaddress.ip_network(
+                cfg.get('lan_cidr', '10.0.0.0/8'), strict=False)
+        except Exception as e:
+            self.logger.warning("ips_config: bad lan_cidr (%s) — treating all IPs as internal", e)
+        # Never firewall these mgmt hosts (loopback, gateway, admin). Config + env + default.
+        self._ext_whitelist = set(cfg.get(
+            'ext_whitelist', ['127.0.0.1', '::1', '192.168.1.200', '192.168.1.201']))
         self._ext_whitelist |= {ip.strip() for ip in
                                 os.environ.get('IPS_MGMT_WHITELIST', '').split(',') if ip.strip()}
+        # Never DROP these device MACs (router, owner's phone, critical factory sensors).
+        self._protected_macs = {m.strip().lower()
+                                for m in cfg.get('protected_macs', []) if m.strip()}
+        if self._protected_macs:
+            self.logger.info("Protected MACs (never blocked): %s",
+                             ', '.join(sorted(self._protected_macs)))
 
         # ===================================================================
         # Block handoff queue (fixes the AUTHORIZE hang)
@@ -854,6 +875,11 @@ class SimpleSwitch(app_manager.RyuApp):
         directly for a synchronous result.
         """
         now = time.time()
+        # Never-block list (router, owner's phone, critical sensors): drop the request.
+        if self._is_protected_mac(src_mac):
+            self.logger.info("[PROTECTED] skip block of %s (%s) — MAC on never-block list",
+                             src_ip, src_mac)
+            return
         # Dedup: skip if this IP already has an unexpired block (prevents the queue
         # from filling with repeats for the same attacker across flood windows, and
         # avoids redundant rule re-installs on the weak t530). A provisional marker
@@ -921,6 +947,11 @@ class SimpleSwitch(app_manager.RyuApp):
             target_ip: Target of the attack
             reason: 'rate-limit' or 'block'
         """
+        # Never-block list — also guard the installer (the REST path calls this directly).
+        if self._is_protected_mac(src_mac):
+            self.logger.info("[PROTECTED] refusing to block %s (%s) — never-block list",
+                             src_ip, src_mac)
+            return
         import datetime
         now = time.time()
         now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -1031,14 +1062,39 @@ class SimpleSwitch(app_manager.RyuApp):
     # ===================================================================
     # External-attacker enforcement (host iptables — management plane)
     # ===================================================================
+    def _load_ips_config(self):
+        """Load ips_config.json from the controller directory. Returns {} if absent or
+        invalid — every caller falls back to a testbed-safe default, so a missing or
+        broken config never stops the controller."""
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ips_config.json')
+        try:
+            with open(path) as f:
+                cfg = json.load(f)
+            self.logger.info("Loaded deployment config: %s", path)
+            return cfg if isinstance(cfg, dict) else {}
+        except FileNotFoundError:
+            return {}
+        except Exception as e:
+            self.logger.warning("ips_config.json present but invalid (%s) — using defaults", e)
+            return {}
+
+    def _is_protected_mac(self, mac):
+        """Never-block list (router, owner's phone, critical sensors) — protected_macs
+        in ips_config.json. Guards both the tier path and the REST path."""
+        return bool(mac) and mac.strip().lower() in self._protected_macs
+
     def _is_external_ip(self, ip):
         """True for a source reachable only via the controller's own NIC — i.e. NOT
-        the 10.0.0.0/8 SDN data plane (OpenFlow's job) and NOT a whitelisted management
-        host. These are what an outside attacker (e.g. a LAN scanner) looks like."""
+        inside the managed LAN (OpenFlow's job) and NOT a whitelisted management host.
+        The LAN is `lan_cidr` in ips_config.json (default 10.0.0.0/8 = the testbed data
+        plane). These are what an outside attacker (e.g. a LAN scanner) looks like."""
         if not ip or ip == '?' or ip in self._ext_whitelist:
             return False
-        if ip.startswith('10.'):          # SDN data plane — OpenFlow DROP handles it
-            return False
+        try:
+            if self._lan_network is not None and ipaddress.ip_address(ip) in self._lan_network:
+                return False              # inside the managed LAN — OpenFlow DROP handles it
+        except ValueError:
+            return False                  # unparseable -> treat as internal (never iptables-block)
         return True
 
     def _block_external_ip(self, src_ip, reason=''):

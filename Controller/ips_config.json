@@ -1,0 +1,9 @@
+{
+  "_comment": "Deployment config for Controller_main_Claude.py. Missing or invalid keys fall back to testbed-safe defaults, so the Mininet testbed keeps working unchanged. For a real LAN, set lan_cidr to your subnet, list the router/admin in ext_whitelist, and add any never-block devices to protected_macs. See real_world_deployment_plan.md.",
+
+  "lan_cidr": "10.0.0.0/8",
+
+  "ext_whitelist": ["127.0.0.1", "::1", "192.168.1.200", "192.168.1.201"],
+
+  "protected_macs": []
+}

@@ -574,6 +574,8 @@ nmap  -sS -p 1-1000 <vm-ip>                                    # port scan  -> p
 - `Chapter4_figure_capture_guide.md` / `Chapter5_results_outline.md` — the thesis figures + evidence map.
 - `Chapter5_figure_capture_runbook.md` — how to capture the in-scope Ch.5 figures (5.1/2/4/5/6/10/15/16/19).
 - `demo_video_runbook.md` — 90-second operational demo shot list (block → surgical → zero-day → outsider).
+- `red_team_test_runbook.md` — adversarial test: all 4 tiers (incl. Snort as a blocker) vs real attacks.
+- `DEVELOPER_LEARNING_GUIDE.md` — skills (Python/Ryu/Mininet/security) mapped to files, to extend the project.
 - `ml_ae_confidence_boost_plan.md` — train/serve skew remediation (if RF/AE misclassify live traffic).
 - `Controller/ml_models/retrain_rf_v4.py` — retrain the RF on the v4 dataset (drop-in `rf_pipeline.joblib`).
 - `QoS/README.md` — companion SD-WAN adaptive traffic-steering app (fast/backup path by policy).
