@@ -30,7 +30,12 @@ commercial product.
 The repo contains the **deployment set only** — the IPS runtime, models, dashboard, and
 the operation/test runbooks. The Mininet testbed (`SDN Topology/topology.py`), the QoS
 traffic-steering app, the training notebooks, and the raw datasets were removed in
-`8a07efc` and remain recoverable from the git history before that commit.
+`8a07efc`. They remain recoverable from `0904966`, the last commit before the prune, which
+is tagged `pre-deployment-cleanup`:
+
+```bash
+git checkout pre-deployment-cleanup -- "SDN Topology/"    # restore one path from before the prune
+```
 
 ---
 
@@ -46,9 +51,20 @@ block at all.
 | **B. t530 as the Wi-Fi AP** | t530 runs `hostapd` + OVS; devices associate directly to it | ✅ OpenFlow DROP, per-device MAC | **"attach any device"**, smart-home |
 | C. SPAN / mirror | a managed switch mirrors to the t530 | ❌ detect-only (enforce via switch ACL / RADIUS) | when you can't touch the switch |
 
-**Mode B is the recommended starting point** — the t530 becomes the AP everything joins,
-so it sees every device's real MAC and every packet, and MAC-based `dl_src` DROP works
-natively. Setup: [`t530_mode_b_ap_setup.md`](t530_mode_b_ap_setup.md).
+**Pick the mode your hardware allows — the stock t530 supports neither inline mode out of
+the box.** It has a single wired NIC (Realtek GbE, `enp1s0`), and on the validated unit
+`iw dev` reports **no Wi-Fi radio at all** (the M.2 Wi-Fi module is optional on thin clients
+and is often absent or BIOS-disabled). So:
+
+- **Mode A** needs a second NIC — a **USB-to-Gigabit-Ethernet adapter** (RTL8153 / AX88179
+  chipsets are in-kernel and reliable). Devices keep their existing IPs, DHCP, and gateway;
+  the t530 is invisible at L2. Best fit when you want to splice into an existing router/AP.
+- **Mode B** needs an **AP-capable USB Wi-Fi adapter** (Atheros AR9271 / MediaTek MT7612U).
+  Then the t530 becomes the AP everything joins, sees every device's real MAC, and `dl_src`
+  DROP works natively. Setup: [`t530_mode_b_ap_setup.md`](t530_mode_b_ap_setup.md).
+- **With neither adapter, only Mode C is possible** — detection without prevention.
+
+Check before you start: `iw dev` (any wireless interface?) and `ip -br link` (how many NICs?).
 
 Note the visibility limit that follows: two devices on the same dumb switch behind the
 t530 talk **east-west** without crossing it, and are invisible to every tier.
@@ -108,9 +124,11 @@ threshold ≈ 0.482).
 
 Ubuntu 22.04, Python 3.10, Ryu 4.34, **Snort 3 built from source**
 (`/usr/local/bin/snort` — *not* the apt v2 package), scikit-learn 1.6.1,
-imbalanced-learn, NumPy, `psutil`, Open vSwitch. Mode B additionally needs `hostapd`,
+imbalanced-learn, NumPy, `psutil`, Open vSwitch. Mode A additionally needs a **second
+wired NIC** (USB-GbE adapter on a single-NIC t530). Mode B additionally needs `hostapd`,
 `dnsmasq`, `iw`, `iptables`, and an **AP-capable** Wi-Fi radio (Intel AC 3168/8265 often
-cannot do AP mode — a USB adapter with an Atheros/MediaTek chipset is the reliable path).
+cannot do AP mode, and many t530 units have no Wi-Fi module at all — a USB adapter with an
+Atheros/MediaTek chipset is the reliable path).
 
 nginx typically holds :8080, so the controller serves on **:8081**.
 
@@ -167,9 +185,18 @@ fail-mode forwards on its own.)
 | `SNORT_PHYS_IFACE` / `SNORT_IFACES` | Physical NIC / the interface list Snort watches. |
 | `IPS_NO_TAP=1` | Skip the TAP injection path (when Snort reads a real bridge). |
 | `IPS_EXTERNAL_BLOCK=1` | Auto-block off-LAN attackers via host `iptables`. |
-| `IPS_MGMT_WHITELIST=<ip>` | Extra never-iptables-block address (whitelist your admin host). |
+| `IPS_MGMT_WHITELIST=<ip>[,<ip>]` | Extra never-iptables-block addresses (whitelist your admin host). |
 | `IPS_BLOCK_SECONDS=<n>` | Timed blocks instead of permanent. |
-| `IPS_HOST` / `IPS_PORT` | Bind address / port for REST + dashboard. |
+| `IPS_MAX_SCORE_ROWS=<n>` | Max flows ML-scored per 5 s window, loudest (by pps) first. Default `60` — keeps a heavy window from starving the eventlet hub on the t530. |
+| `IPS_GET_LOG=<path>` | Where dashboard `GET` requests are logged. Default `GET_log.txt`. |
+
+The REST/dashboard port is set with `--wsapi-port`, not an env var. Two client-side variables
+belong to the helper tools, not the controller:
+
+| Variable | Read by | Effect |
+|---|---|---|
+| `IPS_HOST` / `IPS_PORT` | `ipsctl.py` | Where to send UDP control commands. Default `127.0.0.1:9999`. |
+| `RYU_API_URL` | `snort_ryu_bridge.py` | Block endpoint for the standalone bridge. Default `http://127.0.0.1:8081/ips/block`. |
 
 ---
 
@@ -282,6 +309,25 @@ attackers, CPU/RAM/disk via psutil) · `/ips/alerts` · `/ips/blocked` · `/ips/
 
 ---
 
+## Positioning & next phase
+
+Judged as an **NGFW replacement, this system loses** — it has no stateful policy engine, no
+App-ID, no TLS decryption, no VPN, and no HA. Its real peer group is **IoT network detection
+& response** (Armis, Claroty, Nozomi, Darktrace), and its natural place is **beside** a
+firewall rather than instead of one. Where it genuinely leads: unsupervised zero-day detection
+trained per site on normal-only traffic, L2 (ARP/DAI) attack detection inside the detection
+stack, and payload-free privacy. Full feature-by-feature breakdown:
+[`NGFW_feature_comparison.md`](NGFW_feature_comparison.md).
+
+**Next phase (agreed direction):** turn the system into a **firewall-audit plugin** that
+reconciles a vendor firewall's policy (FortiGate, PAN-OS, Cisco, Check Point, iptables/
+nftables) against the per-flow traffic it actually observes — dead rules, traffic no rule
+explains, and anomalies the firewall permitted. Static auditors read configs in isolation;
+this system already holds the live ground truth. Direction, open decisions, and a ranked
+detection-gap list are in [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
+
+---
+
 ## Documentation map
 
 | Doc | Read it when |
@@ -294,6 +340,8 @@ attackers, CPU/RAM/disk via psutil) · `/ips/alerts` · `/ips/blocked` · `/ips/
 | `SDN_IPS_Snort_Installation_Runbook.pdf` | Full clean-machine install incl. the Snort 3 source build. |
 | [`AI_Project_Context.md`](AI_Project_Context.md) | Dense technical index of the whole system. |
 | [`docs/SNORT_RYU_INTEGRATION.md`](docs/SNORT_RYU_INTEGRATION.md) | The standalone Snort→Ryu path (separate from the merged controller). |
+| [`NGFW_feature_comparison.md`](NGFW_feature_comparison.md) | Positioning against 2026 NGFWs: what's covered, what's a config gap vs. an engineering gap. |
+| [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) | Starting the firewall-audit phase: agreed direction, open decisions, ranked detection gaps. |
 
 ---
 
@@ -324,6 +372,8 @@ GP/
 ├── t530_bridge_setup.md           # temporary VXLAN mirror for lab testing
 ├── red_team_test_runbook.md       # per-tier blocking validation
 ├── production_readiness_test_plan.md / _results.md   # POC campaign + KPI scorecard
+├── NGFW_feature_comparison.md     # feature-by-feature positioning vs. industry NGFWs
+├── SESSION_HANDOFF.md             # firewall-audit phase: direction + open decisions
 └── README.md                      # this file
 ```
 
@@ -333,11 +383,12 @@ GP/
 
 | Limitation | What it means |
 |---|---|
+| **Snort 3 runs at a fraction of its capability** | `sdn_ips_local.rules` holds **4 rules** (SIDs 1000001–1000004) plus the `port_scan` and `arp_spoof` inspectors. Commercial NGFWs run tens of thousands of signatures. Snort 3's own L7 inspectors (`http_inspect`, `ssl`, `dns`, `appid`) and OT inspectors (`modbus`, `dnp3`, `s7commplus`, `cip`, `iec104`) are not enabled in `sdn_ips.lua`, and the free community / Talos registered rulesets are not loaded. Much of the L7/OT gap is **configuration and rule-feed work, not new engineering** — but every payload inspector forfeits the privacy-preserving property, so enable them behind an explicit policy decision. |
 | **No application-layer (L7) inspection** | Blind to SQLi, XSS, RCE, path traversal — they ride valid TCP flows. Pair with a WAF. |
 | **Encrypted traffic is opaque** | No TLS payload inspection; metadata and behavior only. |
 | **East-west blind spot** | Devices on the same dumb switch behind the t530 never cross it. |
 | **Single controller = SPOF** | No HA or clustering. Decide fail-open (no protection) vs fail-closed (no traffic) deliberately. |
-| **Scale ceiling** | Ryu on one thin client, packet-in-to-controller ML, RF forced to `n_jobs=1` — SMB/branch scale, not datacenter. |
+| **Scale ceiling** | Ryu on one thin client, packet-in-to-controller ML, RF forced to `n_jobs=1`, and ML scoring capped at `IPS_MAX_SCORE_ROWS` (60) flows per window — SMB/branch scale, not datacenter. Flows past the cap still hit the rate counters but skip RF/AE that window, so a quiet flow hiding behind louder ones can go unscored. Throughput is not yet measured. |
 | **Legacy OpenFlow 1.0** | Limited match fields and IPv6 richness; MAC/IP DROP can be evaded by spoofing the identifier. |
 | **Models need retraining per site** | Shipped models are testbed-trained; RF only recognizes labeled classes and drifts as traffic evolves. |
 | **Adversarial robustness untested** | Low-and-slow, traffic mimicry, spoofing, and baseline poisoning during the learning window are not specifically hardened against. |
