@@ -1,5 +1,7 @@
 # Preview and publish
 
+These are the documentation sources for **Adaptive IPS framework**. Product requirements and current implementation limits are tracked in [final service scope](roadmap/final-service-scope.mdx) and [delivery phases](roadmap/delivery-phases.mdx).
+
 On Windows, run `.\scripts\start_docs.ps1` from the repository root, then open **http://localhost:3333/**. The launcher starts Mintlify in a hidden background process, verifies an HTTP 200 response and reuses an already healthy preview. Logs are in the Git-ignored `.local/docs-preview/` directory. It runs without the controller or sensor. After a Windows restart, run the launcher again.
 
 For a foreground preview, use `.\scripts\start_docs.ps1 -Foreground` or run `mint dev --port 3333 --no-open` from docs-site. Keep that terminal open. Port 3333 is explicit; `mint dev` alone uses its default port. A refused connection means the local preview is not listening at the requested address. Localhost refers to the computer running your browser.

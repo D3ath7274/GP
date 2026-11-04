@@ -19,5 +19,7 @@
 | Loopback documentation reader from Mintlify sources | Documentation access and updates |
 | scripts/start_docs.ps1, background Mintlify preview and readiness logs | Documentation access and updates |
 | Documentation map, Git hook, staged guard and push/PR validation | Develop and verify changes |
+| User-supplied 70-capability product specification and current-source assessment | Final service scope and competitor coverage |
+| apf_implementation_roadmap.md, P0–P6 IPS gates and P7–P13 policy-management services | Delivery phases and service release gates |
 
 Advanced lab and setup steps remain in the repository runbooks.

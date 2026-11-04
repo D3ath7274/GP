@@ -10,11 +10,19 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $docsRoot = Join-Path $repoRoot 'docs-site'
 $url = "http://localhost:$Port/"
+$configPath = Join-Path $docsRoot 'docs.json'
+if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+    throw "Missing docs.json in $docsRoot"
+}
+$siteName = (Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json).name
+if ([string]::IsNullOrWhiteSpace($siteName)) { throw 'docs.json must declare a site name' }
+$encodedSiteName = [System.Net.WebUtility]::HtmlEncode($siteName)
 
 function Test-DocsResponse {
     try {
         $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 3
-        return $response.StatusCode -eq 200 -and $response.Content -match 'Adaptive IoT IPS'
+        return $response.StatusCode -eq 200 -and
+            ($response.Content.Contains($siteName) -or $response.Content.Contains($encodedSiteName))
     } catch {
         return $false
     }
@@ -33,9 +41,6 @@ if (-not $mint) {
 $mintEntry = Join-Path (Split-Path -Parent $mint.Source) 'node_modules/mint/index.js'
 if (-not (Test-Path -LiteralPath $mintEntry -PathType Leaf)) {
     throw "Cannot locate the Mintlify entry point beside $($mint.Source). Reinstall mint with npm."
-}
-if (-not (Test-Path -LiteralPath (Join-Path $docsRoot 'docs.json'))) {
-    throw "Missing docs.json in $docsRoot"
 }
 if ($Foreground) {
     Push-Location -LiteralPath $docsRoot
@@ -62,7 +67,7 @@ try {
     }
     $listener = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue
     if ($listener) {
-        throw "Port $Port is occupied but is not serving APF documentation. Inspect it before restarting."
+        throw "Port $Port is occupied but is not serving this documentation site. Inspect it before restarting."
     }
     $stdout = Join-Path $runtime "mint-$Port.stdout.log"
     $stderr = Join-Path $runtime "mint-$Port.stderr.log"

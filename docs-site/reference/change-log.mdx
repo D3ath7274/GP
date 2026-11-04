@@ -2,6 +2,10 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-04 · Adaptive IPS framework name and complete final service scope
+
+Renamed the documentation site, landing page, API display titles and current project guides to Adaptive IPS framework while preserving runtime identifiers, paths and contracts. The Windows launcher now reads the site identity from docs.json so the rename does not break readiness checks. Added a [70-capability service matrix](/roadmap/final-service-scope) with source-section traceability, code evidence, limits and acceptance criteria. Extended the [delivery plan](/roadmap/delivery-phases) and repository roadmap with explicit read-only policy collection, deterministic rule/object audit, topology/reachability, risk/compliance, recertification, application services, change management and qualified automation. Most enterprise services remain planned; current home collection/shadow policy and legacy lab paths are identified separately. Vendor references support service-family comparisons rather than a feature-parity claim. Existing collection and enforcement behavior is unchanged.
+
 ## 2026-11-04 · Restore local docs and require affected-page updates
 
 Restored the Mintlify preview at localhost:3333 after finding no listener. Added a Windows background launcher with explicit working directory/port, readiness verification, existing-preview reuse and Git-ignored logs. The [access guide](/deployment/documentation-access) now distinguishes the local preview, sensor reader and hosted deployment. Strengthened the documentation guard to require both a dated entry and an affected MDX page from a versioned source map, using staged or committed files. Added guard regression tests and push/PR Mintlify checks. [Developer instructions](/developers/maintenance) explain the map, internal-change requirements and remaining branch-rule configuration. Verified launch and HTTP responses locally; GitHub-hosted checks and required branch settings need remote confirmation.

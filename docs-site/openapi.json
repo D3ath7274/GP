@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "IPS Management API",
+    "title": "Adaptive IPS framework Ryu management API",
     "description": "Legacy Ryu management contract. Home collection has a separate contract in collection-openapi.json, including the read-only /ips/policy route. Those additional routes are not implemented by Ryu.",
     "version": "1.0.0"
   },

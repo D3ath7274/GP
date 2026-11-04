@@ -118,7 +118,7 @@ sudo install -d -o apf -g apf -m 700 /var/lib/apf
 sudo chown -R apf:apf /var/lib/apf/collection
 ```
 
-Run the chown command only when that APF collection directory already exists. For a fresh service installation, the service creates it inside its state directory.
+Run the chown command only when that collection directory already exists. For a fresh service installation, the service creates it inside its state directory.
 
 In home.env set APF_INTERFACE and APF_LAN to the actual interface/subnet, one assignment per line. APF_FEATURE_ARGS can enable the optional parsers. For example, APF_FEATURE_ARGS=--metadata enables DNS/TLS measurements. Use APF_FEATURE_ARGS="--metadata --http" to also measure complete cleartext HTTP/1 headers. Leaving it unset selects header-only collection. Additional subnets can be configured using a systemd ExecStart override. Use a new collection directory when parser or network settings change.
 

@@ -1,5 +1,7 @@
 # Session Handoff — 2026-08-19
 
+Historical handoff: the current project name is **Adaptive IPS framework**. Earlier names and direction below describe the assessment at that time. Current scope and implementation status are maintained in [the service matrix](docs-site/roadmap/final-service-scope.mdx), [delivery phases](docs-site/roadmap/delivery-phases.mdx) and AI_Project_Context.md.
+
 Context carry-over for continuing this work in a new session. Written after a remote
 Claude Code session (cloud container, fresh clone). Read this first, then
 `AI_Project_Context.md` for the technical index.

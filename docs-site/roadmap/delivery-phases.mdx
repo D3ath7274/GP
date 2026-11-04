@@ -1,0 +1,142 @@
+---
+title: "Delivery phases and service release gates"
+description: "Extend the IPS roadmap with read-only policy analysis, governance, application services and verified automation."
+---
+
+This is the service-delivery plan for **Adaptive IPS framework**. The [70-capability matrix](/roadmap/final-service-scope) defines final scope and current-code limits. Phases P0–P6 retain the behavioral IPS qualification work. P7–P13 add explicit deliverables for the FireMon/AlgoSec-inspired services. Phase labels express work and evidence gates; they are not completion claims or delivery dates.
+
+## Execution order and current position
+
+The implemented home collector and shadow policy are foundations for P1/P2/P6. The legacy Ryu detectors and operator-run nftables adapter provide lab references for P0/P3/P4. Actual t530 observation quality, site-v3 models, production decision confidence and commercial firewall interoperability remain unqualified.
+
+| Track | Work and dependencies | Required result |
+| --- | --- | --- |
+| P0 | Freeze legacy code, feature settings and artifact/schema hashes | Repeatable replay and independently measured forwarding/enforcement baseline. |
+| P1 | Qualify passive capture, timing, bounded state and identity | Correct observations with loss/missingness and explicit coverage, including IPv6 and address changes. |
+| P2 | Complete and evaluate behavioral feature groups and evidence contracts | Mechanism-specific evidence with benign lookalikes and no hidden skipped observations. |
+| P3 | Review site data, run isolated attack campaigns, retrain/calibrate | Qualified decisions on independent later-time/campaign/site tests with reported uncertainty. |
+| P4 | Durable scoped action lifecycle and SOC reversal | Idempotent temporary containment, independent verification, expiry and restart recovery. |
+| P5 | First commercial adapter and restricted pilot | Read-only semantic import first; then qualified narrow response on supported targets. |
+| P6 | Guarded adaptation and model lifecycle | Candidate/approved separation, poisoning/drift tests, shadow promotion and rollback. |
+| P7 | Policy snapshots, canonical model, search and usage | Reliable read-only policy evidence for audit services. Can begin after P1 interfaces stabilize. |
+| P8 | Deterministic rule/object audit and optimization candidates | Correct cleanup findings and semantic proofs on supported policy subsets. Depends on P7. |
+| P9 | Routing, NAT, VPN and effective reachability | Versioned path answers and segmentation evidence. Depends on P7, with P8 policy evaluation. |
+| P10 | Behavioral-policy joins, risk, compliance and reporting | Explainable contextual findings and tested pre/post-state analysis. Depends on P3/P7–P9 as applicable. |
+| P11 | Ownership, recertification, application services and workflows | Auditable business context and review lifecycle. Ownership starts in P7; full services need P8–P10. |
+| P12 | Exact plans and controlled policy/object automation | Verified, reversible changes with authorization, backup and concurrency handling. Depends on P4/P5/P8–P11. |
+| P13 | Additional qualified vendors and enterprise delivery | Published compatibility, scale, tenant/security and operational-support evidence. Expand each adapter read-only first. |
+
+Read-only audit work can proceed alongside IPS qualification. No model-confidence milestone automatically authorizes a policy-management write. A vendor's first use is configuration import/normalization with independent fixtures; the narrow P5 action lane and broad P12 change lane both require their own adapter gates.
+
+P1/P2 identity work includes supported ARP/NDP/DHCP binding evidence, spoofing/conflict fixtures and clock/address reassignment tests. The present static IP/VLAN/MAC inventory is a smaller consistency check and does not provide authenticated identity or full neighbor-discovery protection.
+
+## Next work: qualify the home pilot
+
+1. Inventory the workstation and three phones with private aliases and validity-bound identities. Use suitable personal-device roles; do not reuse the example camera allow list. Expected household activity is not independent proof of benignness.
+2. Prove the sensor sees owned transactions in both directions from each segment. Record local-to-local blind paths separately from Internet access. Run a short capture, compare independent packet/byte/timing evidence and inspect loss/omission counters.
+3. Run the [home collection guide](/deployment/home-collection) for a first 14-day operating cycle, extending for missing workflows. Include gaming/work, streaming, updates, backups, reconnects and idle activity. Keep ambient observations UNKNOWN and independently review training eligibility.
+4. Add a disposable target and a bridged test client in an isolated test segment. Separate new-device reconnaissance from a previously familiar test client's change in behavior. Reserve attack tools/rates/campaigns for later evaluation and freeze approved baselines before those tests.
+5. Test an external boundary in a controlled WAN/LAN firewall lab with visibility before/after filtering. A LAN sensor cannot score probes discarded upstream. Record traffic arrival, forwarding, observation, finding and enforcement as separate outcomes.
+6. Define the first read-only adapter against available lab hardware or a versioned configuration export. Build fixtures and the P7 contract while capture qualification continues. Keep the existing collection path operational.
+
+## P7 — Read-only firewall policy data plane
+
+**Requirements:** stable observation/evidence identifiers; private sanitized exports or read-only credentials for one qualified platform; representative policy, object, NAT, route and virtual-context fixtures. First commercial vendor selection follows actual lab access. The specification's suggested vendor order is a candidate sequence rather than assumed availability.
+
+**Build:**
+
+- Define versioned PolicySnapshot, NormalizedRule, AddressObject, ServiceObject, Group, Interface, Zone, Route, NATRule, Tunnel and RuleUsageWindow contracts. Include tenant/site/device/context, raw vendor IDs, ordering, inheritance, time validity, schedules, applications/users, security profiles, logging, parser version and unsupported constructs.
+- Retain protected raw exports and canonical snapshots with hashes and immutable revision lineage. Use a local transactional store for a prototype and a scalable control-plane database when concurrency requires it. Source-of-truth imports carry their own authority and conflict/freshness rules.
+- Keep collection adapters separate from inference and write adapters. Normalize nested groups/ranges/exclusions without discarding unresolved dynamic or FQDN behavior. Credential references belong in secret storage, not exported snapshots.
+- Implement rule search with explicit context/time filters and usage ingestion from vendor logs/counters/flow exports. Distinguish packets, sessions, hits and bytes; handle resets, rollover, reboot, sampling and missing intervals.
+- Introduce owner/application/ticket/justification/expiry metadata, stable logical object IDs and baseline snapshot diffing. Attribution to an administrator requires authoritative audit evidence.
+
+**Exit:** fixtures preserve native semantics; unsupported cases return an explicit limitation. A query finds the expected rules/objects/context and revision. Snapshot comparisons and counter-reset tests are reproducible. No firewall writes are needed. Covers S09, S13–S18, S44, foundations for S46/S56/S65.
+
+## P8 — Deterministic rule and object analysis
+
+**Requirements:** P7 policy/object fidelity, explicit supported match/action semantics, temporal usage coverage and an independently reviewed audit-fixture corpus.
+
+**Build:** start with bounded IPv4/IPv6 address sets, protocol and port intervals, rule order and explicit default behavior. Extend with schedules, zones, identity/application and security profiles only when their semantics can be represented. Use set/interval algebra or a qualified symbolic representation; unsupported predicates yield indeterminate findings rather than an invented match.
+
+Implement duplicate, redundant, fully shadowed and partially overlapping rule analysis. Record effective/residual match regions and witness tuples. Assess disabled/expired rules, missing logging and business documentation. Analyze object reference graphs across rules, nested groups, NAT, VPN, profiles and applications; detect cycles, unreferenced/duplicate objects and intended cross-vendor inconsistencies.
+
+Produce review candidates for unused rules, broad permissions, consolidation and ordering. Add observation horizons and exceptions for intermittent, disaster-recovery and monthly workloads. Evaluate changes against complete effective behavior, including logging/profile differences. Frequency alone does not establish a safe reorder or retirement.
+
+**Exit:** compare each supported analyzer with an independent exhaustive oracle on small rule spaces and adversarial fixtures. Include unions of prior rules, partial coverage, equal ports with different schedules/profiles and dynamic-object uncertainty. Each optimization has a proof or counterexample plus unresolved assumptions. No autonomous cleanup occurs at this phase. Covers S20–S34 and initial S19.
+
+## P9 — Topology and reachability
+
+**Requirements:** versioned policy, route, interface, NAT, VPN and cloud/SD-WAN context from P7; qualified effective-policy evaluation from P8; controlled connectivity transactions.
+
+**Build:** construct a revisioned graph of physical/logical forwarding contexts, VLAN/VRF, zones, subnets, routes, tunnel selectors and supported cloud controls. Resolve routing separately from policy; include alternate/ECMP paths and policy routing when supported. Preserve the order and lookup stage of source/destination translation and reverse/stateful behavior for each adapter.
+
+Return ALLOWED, BLOCKED or INDETERMINATE with candidate path, rule witness, translated tuples, timestamp, configuration freshness and unsupported assumptions. Expose policy/device selection for a requested application flow. Evaluate segmentation constraints across supported feasible paths. Route/tunnel configuration does not establish live forwarding or tunnel health; attach current observations separately.
+
+**Exit:** differential fixtures and controlled live transactions agree for supported IPv4/IPv6, NAT, VPN and multi-firewall cases. Test asymmetric routes, stale snapshots, missing devices, failover, implicit/inherited policy and incomplete cloud routes. Unknown paths cannot be reported compliant or safely optimized. Covers S35–S40 and the path prerequisites of S50/S54/S61.
+
+## P10 — Behavioral-policy correlation, risk and compliance
+
+**Requirements:** calibrated behavioral evidence for decision claims; P7 revisions/usage; P8 audit and P9 path results; versioned asset/vulnerability context and selected technical control definitions.
+
+**Build:**
+
+- Join a time-valid identity/session/evidence record to its actual policy context and revision, including NAT. Report ambiguous/multiple possible matches explicitly. A device-window row is not a firewall rule-hit counter.
+- Store reviewed-normal, unknown, suspicious, high-risk and independently confirmed malicious usage separately. Add rule-abuse findings when permitted behavior changes; a rule can be risky even without an observed attack.
+- Define customizable risk profiles combining exposure, asset importance, vulnerabilities, behavior and business context with explainable evidence. Track detector dependence and distinguish anomaly strength, risk priority and calibrated action confidence.
+- Add vulnerability/reachability joins and hypothetical attack-path analysis with exploit prerequisites and evidence age. Do not convert a possible path into a verified compromise.
+- Implement a versioned control catalog for selected network requirements and internal policies, including mappings to named standards where supported. Schedule evaluations and rerun after changes. Preserve exceptions, unavailable controls, stale sources and report history. The service supplies evidence, not an organization-wide compliance certificate.
+- Produce search/filter/report/API views for audit findings, objects, usage, changes, risk, compliance and behavior-policy associations. Include snapshot IDs, source/model versions, assumptions and evidence references. Add JSON/CSV and human-readable exports first.
+- Define policy-controlled inspection escalation, metadata/retention budgets and authorized application-log sources. Inspect encrypted content only at an explicitly supported and authorized point; current header features do not establish payload or authorization safety.
+
+The planned inspection ladder is flow metadata, protocol metadata, protocol behavior, signature inspection, authorized selective decryption and bounded forensic capture. Each escalation needs a permitted observation point, duration, resource/privacy budget and audit record. Levels are not progressively stronger proof of maliciousness, and missing authorization does not authorize decryption.
+
+**Exit:** a scripted scenario traces an anomaly to a contemporaneous effective permitting rule and exposure finding. Tests distinguish unknown rule attribution, benign backups, low-rate recon and correlated detector evidence. Custom controls run reproducibly on unchanged snapshots and detect defined changes. Reported recommendations include coverage/maturity/exception evidence and are evaluated at a fixed false-action budget. Covers S19, S27, S32, S41–S43, S51–S53, S60–S61, S66–S70, plus specification Sections 37/40/75/76.
+
+## P11 — Governance, applications and change workflow
+
+**Requirements:** persistent identities/ownership, P8 audit findings, P9 flow/path evidence and P10 contextual reports. Build the authenticated management boundary before exposing these services beyond local trusted access.
+
+**Build:** separate viewer/operator/approver/administrator permissions, tenant/site scopes and durable actor/time audit history. Integrate a source of truth and ITSM through explicit adapters. Request/analyze/design/risk-check/approve/apply/verify stages must survive restarts, duplicate events and reassignment. Reconcile out-of-band and emergency changes with approved requests and effective revisions.
+
+Add owner-routed scheduled/event-driven rule recertification, certify/decertify decisions, exceptions, reminders and escalation. Create application/flow/rule/object associations with owner-reviewed dependency graphs. Extend profiles to application behavior only where valid application evidence exists. Recertify individual flows and full applications; application decommissioning must preserve shared infrastructure and other owners' access. Maintain central logical objects with vendor/context mapping and controlled propagation.
+
+**Exit:** an owner can review an application flow, trace all supporting rules, record a decision and prepare a reviewed retirement without removing another application's dependency. Test role boundaries, cross-tenant denial, orphaned owners, workflow retries, revision drift, emergency changes and an unresolved review. Covers S09, S28, S31, S44–S49, S62–S65 and specification Section 60.
+
+## P12 — Exact change plans and verified policy automation
+
+**Requirements:** qualified P4/P5 action lifecycle and target adapter, P8/P9 semantics, P10 pre-change risk/compliance evaluation, P11 authorization/business exceptions and a tested backup/recovery method.
+
+**Build:** determine whether existing effective policy already satisfies the request. Identify every enforcement target and context requiring a change. Generate a version-bound plan with object IDs, rule insertion position, affected predicates, commit/install/HA steps, backup, expiry or withdrawal procedure, verification and compensating actions. Run before/after path, segmentation, compliance and behavioral-context checks on the same frozen input revisions.
+
+Introduce two explicitly authorized execution lanes. Qualified temporary containment uses constrained selectors, evidence, identity, action limits, native expiry or a proven cleanup mechanism, independent verification and SOC reversal. Broader rule/object/schedule optimization starts with reviewed changes; later automatic execution is limited to separately qualified and pre-authorized change classes. A high model score cannot bypass capability or change-approval requirements.
+
+Separate apply acknowledgement, effective policy read-back and independently verified traffic impact. Test retries through reconciliation rather than blind reapplication. A rollback restores owned changes while preserving concurrent administrator changes; unsafe compensation leaves a visible unresolved state for operator recovery. Post-change observation checks intended containment, legitimate application continuity and unintended effects. Findings, feedback and enforcement outcome remain distinct from training ground truth.
+
+**Exit:** staged multi-device and HA lab changes demonstrate correct placement/NAT, intended behavior, benign continuity, TTL/withdrawal, backup/recovery, partial failure, lost acknowledgement, revision conflict and SOC reversal. A wrong-device or out-of-scope action fails the release. Unsupported operations stay advisory. Covers S32–S34, S50–S59, S64–S65 and S67.
+
+## P13 — Multi-vendor and enterprise expansion
+
+**Requirements:** one end-to-end qualified reference path and a representative lab for each additional vendor/firmware/manager/context. Keep edge sensors and central policy-management services separately deployable; the t530's capacity must be measured rather than assumed to cover an enterprise control plane.
+
+**Build:** publish a capability matrix covering inventory/read/search/NAT/routing/VPN/application/user semantics, write operations, commits/installs, verification, expiry, revocation and HA. Run the same semantic/transaction fixtures for each adapter. Expand according to actual equipment, using the specification's Palo Alto/Fortinet/Check Point/Cisco/Juniper families and cloud firewalls as target families, not a universal-support claim.
+
+Add authenticated encrypted sensor/control-plane transport, secret rotation, tenant isolation, retention/export controls, bounded queues, backup/recovery, observable failed jobs, supported upgrade paths and supply-chain/artifact provenance. Measure device/rule/query counts, CPU/RAM/disk, capture/scoring omissions, analysis latency, action completion/recovery and operator burden. Test SD-WAN route/failover changes and cloud-policy visibility. Train candidates off-appliance and retain an approved rollback bundle/profile snapshot.
+
+**Exit:** each published supported combination passes its read-only and applicable write gates. A failed/unknown capability degrades explicitly without falsely certifying a path, silently dropping evidence or changing uncontrolled rules. Multi-site/tenant and outage tests preserve scope and recovery. Provide operator documentation, release evidence, upgrade procedures and supported-limit statements.
+
+## Shared contracts and proof obligations
+
+| Contract family | Required evidence |
+| --- | --- |
+| Observation / Session / FeatureFrame | Identity validity, sensor/clock context, feature/schema version, capture quality, visibility and evidence lineage. |
+| PolicySnapshot / NormalizedRule / Object / TopologySnapshot | Native/canonical revision, context, ordering, NAT stage, unresolved semantics and collection freshness. |
+| Finding / RiskAssessment | Detector/audit version, exact mechanism, independent ground truth where known, dependent evidence, uncertainty and scope. |
+| Recommendation / ChangeRequest / ChangePlan | Owner/business intent, prior/proposed revisions, rule/object/path witnesses, risk/compliance results and authorization. |
+| ActionIntent / Receipt / Verification / Reversal | Idempotency, target/capability/revision, effective state, independent traffic outcome, partial failures, expiry and compensation. |
+
+These are target contracts; current home shadow records implement a smaller separate versioned contract. Do not label them as the enterprise API. Keep detector verdicts, reviewed labels, recommendation confidence and action state separate. An enforcement acknowledgement is never a malicious label.
+
+## How to maintain service coverage
+
+Every delivery PR identifies the S IDs it advances, links implementation and fixtures, updates current status/limitations in the service matrix, and records actual checks in the changelog/validation page. A requirement is not complete until code, negative cases, operator workflow, API/report behavior and its exit evidence are available. Record scope reductions or unsupported semantics visibly rather than deleting the original requirement. Keep API contracts and documentation navigation synchronized through the repository guard.

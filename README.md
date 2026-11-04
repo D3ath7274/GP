@@ -1,4 +1,6 @@
-# Adaptive Multi-Tier IPS for IoT over SD-WAN
+# Adaptive IPS framework
+
+The project combines behavioral intrusion prevention with a planned multi-vendor firewall-policy management layer. Its final service scope now includes all 70 capabilities in the supplied FireMon/AlgoSec-inspired specification, with current-code evidence, delivery phases and acceptance criteria in the [service coverage matrix](docs-site/roadmap/final-service-scope.mdx) and [delivery plan](docs-site/roadmap/delivery-phases.mdx). Most enterprise policy services remain planned. Existing APF identifiers and runtime paths remain compatible.
 
 **Local documentation:** open http://localhost:3333/ after running `.\scripts\start_docs.ps1` from the repository root in PowerShell. The preview runs in the background and reloads documentation changes. See [documentation access](docs-site/deployment/documentation-access.mdx). Implementation commits must include an affected documentation page and a dated changelog entry; the Git hook and push/PR checks enforce inclusion.
 
@@ -15,8 +17,10 @@ dependency-free operator dashboard, and runs on constrained, edge-class hardware
 (validated on an HP t530 thin client).
 
 Detection is **agentless** (nothing installed on the IoT devices) and
-**privacy-preserving** — the tiers score flow statistics and entropy, never packet
-payloads.
+uses header/timing statistics by default in the home collector. Optional DNS/TLS metadata
+and cleartext HTTP measurements have explicit switches and documented privacy limits.
+Snort inspection depends on enabled rules and inspectors. Content inspection and retention
+must follow the site's authorization and privacy policy.
 
 ---
 
@@ -317,20 +321,22 @@ attackers, CPU/RAM/disk via psutil) · `/ips/alerts` · `/ips/blocked` · `/ips/
 
 ## Positioning & next phase
 
-Judged as an **NGFW replacement, this system loses** — it has no stateful policy engine, no
-App-ID, no TLS decryption, no VPN, and no HA. Its real peer group is **IoT network detection
-& response** (Armis, Claroty, Nozomi, Darktrace), and its natural place is **beside** a
-firewall rather than instead of one. Where it genuinely leads: unsupervised zero-day detection
-trained per site on normal-only traffic, L2 (ARP/DAI) attack detection inside the detection
-stack, and payload-free privacy. Full feature-by-feature breakdown:
-[`NGFW_feature_comparison.md`](NGFW_feature_comparison.md).
+The current implementation provides lab intrusion prevention and passive behavioral
+collection. Its planned policy-management layer can complement supported commercial
+firewalls through qualified telemetry and management adapters. Current scope does not
+establish full NGFW functionality, competitive superiority, production attack recall or
+enterprise scalability. The [NGFW comparison](NGFW_feature_comparison.md) retains the earlier
+lab assessment; the service matrix records the current source review and final product goals.
 
-**Next phase (agreed direction):** turn the system into a **firewall-audit plugin** that
-reconciles a vendor firewall's policy (FortiGate, PAN-OS, Cisco, Check Point, iptables/
-nftables) against the per-flow traffic it actually observes — dead rules, traffic no rule
-explains, and anomalies the firewall permitted. Static auditors read configs in isolation;
-this system already holds the live ground truth. Direction, open decisions, and a ranked
-detection-gap list are in [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
+**Final direction:** combine behavioral IPS evidence with multi-vendor policy collection,
+normalization, deterministic rule/object auditing, topology/reachability, risk/compliance,
+recertification, application context and verified change workflows. Qualified automatic
+containment remains a goal. Traffic observations remain distinct from independently reviewed
+ground truth. Most enterprise services are planned; the current collector and reference
+adapter do not establish commercial firewall interoperability. See the
+[70-service scope](docs-site/roadmap/final-service-scope.mdx),
+[delivery phases](docs-site/roadmap/delivery-phases.mdx) and
+[implementation roadmap](apf_implementation_roadmap.md).
 
 ---
 

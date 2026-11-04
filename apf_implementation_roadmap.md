@@ -1,12 +1,16 @@
-# APF implementation roadmap
+# Adaptive IPS framework implementation roadmap
 
-APF will observe an SD-WAN, learn device behavior, flag suspicious activity, and request a scoped temporary quarantine from a qualified firewall when the evidence meets the enforcement threshold. The SOC can inspect and reverse the action. Firewall feedback establishes enforcement state. Independently reviewed evidence establishes whether the behavioral decision was correct.
+Adaptive IPS framework will observe an SD-WAN, learn device behavior, flag suspicious activity, and request a scoped temporary quarantine from a qualified firewall when the evidence meets the enforcement threshold. The SOC can inspect and reverse the action. Firewall feedback establishes enforcement state. Independently reviewed evidence establishes whether the behavioral decision was correct.
+
+The final scope now includes all 70 capabilities from Section 85 of the supplied Behavioral_IPS_FireMon_AlgoSec_Project_Specification.md. The [service coverage matrix](docs-site/roadmap/final-service-scope.mdx) identifies current evidence, missing work and acceptance criteria for every requirement. [Delivery phases](docs-site/roadmap/delivery-phases.mdx) is the canonical detailed plan for the new P7–P13 policy-management work. The behavioral IPS and qualified automatic response remain central; read-only integration is a rollout stage. Existing APF identifiers remain compatible.
+
+**Current position, 2026-11-04:** standalone home collection, limited G11–G17 measurements, shadow inventory/role checks, reviewed descriptive profiles and an operator-run nftables reference exist. Their deterministic tests do not complete hardware qualification, site-v3 model calibration, commercial adapter support or full P0–P6 gates. The legacy migration table below describes outstanding integration work for the Ryu path. Enterprise policy services are planned, not delivered by this document update.
 
 ## Starting point in this checkout
 
 | Source | Reuse | Change required |
 | --- | --- | --- |
-| `Controller_main_Claude.py` packet handler and Snort callback | Existing OpenFlow and alert inputs | Put normalized observations behind an adapter so APF can run without Ryu. |
+| `Controller_main_Claude.py` packet handler and Snort callback | Existing OpenFlow and alert inputs | Put normalized Ryu observations behind the framework's common adapter contracts. The separate home collector already runs without Ryu. |
 | `block_attacker`, `_block_worker`, `_do_block_attacker` | Hub-safe handoff for OpenFlow operations | The current block map can be populated before a rule is sent. A successful send does not confirm installation. Introduce an independent action lifecycle. Keep remote API calls off the Ryu hub. |
 | REST block and unblock handlers | Existing operator workflow as a reference | A protected-MAC skip can be reported as success by its caller. Review broad OpenFlow delete matching and the separate host-firewall cleanup path before reusing either for automated actions. |
 | `traffic_capture.py` | Window aggregation, feature extraction and per-IP profiles | Bound state, handle incomplete observations, separate identity from address, and prevent profile writes before final learning eligibility is decided. |
@@ -29,7 +33,7 @@ APF will observe an SD-WAN, learn device behavior, flag suspicious activity, and
 
 **Requires** the Phase 0 fixtures and an inventory of observation points. For a home pilot, use a verified TAP/SPAN path or a managed bridge. Measure which device-to-device paths bypass the sensor.
 
-1. Introduce a separate APF package with versioned `Observation`, `Session` and `FeatureFrame` contracts. Each record carries event time, site, tenant, observation point, quality flags and evidence references.
+1. Introduce a separate framework package with versioned `Observation`, `Session` and `FeatureFrame` contracts. Each record carries event time, site, tenant, observation point, quality flags and evidence references.
 2. Implement PCAP replay first, then passive capture. Adapt Ryu observations after replay parity is understood. Introduce flow exports and device logs as separate data sources with explicit sampling and field availability.
 3. Add bounded bidirectional session state and windows of 1 s, 5 s, 1 min, 15 min and daily summaries. Preserve both directions across windows. Deduplicate repeated ingestion at a sensor while retaining distinct ingress and egress observations.
 4. Join identity from lease, VLAN, interface, NAT and inventory history with validity intervals. Invalidate stale mappings. Keep shared-address and conflicting identities ambiguous. Attach capture loss, parser errors, missing directions and clock skew to dependent records.
@@ -75,7 +79,7 @@ APF will observe an SD-WAN, learn device behavior, flag suspicious activity, and
 
 ## Phase 5 — First commercial firewall adapter and site pilot
 
-**Requires** access to one customer-representative vendor lab, versioned management API credentials, and a documented change and rollback process. Choose the first vendor based on available equipment and safe write/read-back support.
+**Requires** access to one customer-representative vendor lab, versioned management API credentials, and a documented change and rollback process. Choose the first vendor based on available equipment and safe write/read-back support. First qualify read-only import and normalization of that vendor's policy/context using the P7 contract before enabling any write operation.
 
 1. Publish a capability matrix covering supported selectors, policy scope, commit and install semantics, HA visibility, TTL, revision checks and read-back. Use the same contract tests as the reference adapter. Fall back to findings and recommendations for unsupported enforcement paths.
 2. Onboard a site in passive mode. Inventory protected assets and validate paths with benign transactions. Collect at least seven days initially, extending the period for sparse devices and unobserved workflows.
@@ -95,10 +99,28 @@ APF will observe an SD-WAN, learn device behavior, flag suspicious activity, and
 
 **Exit** a seeded poisoning scenario cannot silently alter active enforcement, a qualified candidate can take over and roll back, and a failed candidate stays in shadow. The operator report distinguishes behavior, confidence, firewall response and independent confirmation.
 
-## Change sequence for the first implementation PR
+## P7–P13 — Final policy-management services
 
-1. Add the baseline manifest and sanitized replay fixtures.
-2. Add tests for repeated feature output, novelty and provisional block state.
-3. Record the baseline results and link each defect to a later phase.
+These phases make previously implicit competitor-inspired goals explicit. Read-only P7 work can start after P1 interfaces stabilize; it does not need to wait for all guarded learning work. Every vendor first passes read-only semantic tests. Narrow containment and broader policy changes have independent authorization and verification gates.
 
-Keep feature changes and adapter writes in later PRs so the baseline remains comparable. For each implementation PR, update the relevant Mintlify page and dated changelog, update OpenAPI for contract changes, and record the checks actually run.
+| Phase | Requirements and means | Exit evidence |
+| --- | --- | --- |
+| P7 Read-only policy data | Qualified exports/API collector, canonical rules/objects/NAT/routes/zones/VPN, revision snapshots, rule search, usage/reset history, ownership/source-of-truth and logical objects | Faithful fixtures, supported/unknown semantics, context-aware queries, reliable history and no write credentials required. |
+| P8 Deterministic audit | Set-based duplicate/redundant/shadow/partial coverage, expired/disabled/unobserved/logging/governance findings, object reference analysis and safe optimization candidates | Independent oracle/counterexample fixtures; logging/profile/time/context preserved; usage gaps and business exceptions retained. |
+| P9 Topology and reachability | Routing separate from policy; IPv4/IPv6/VRF/NAT/VPN/SD-WAN/cloud graph, paths and segmentation constraints | Allowed/blocked/indeterminate answers with rule/path/translation witnesses checked against controlled transactions. |
+| P10 Risk, compliance and behavioral-policy joins | Time-valid evidence-to-rule joins, custom risk profiles, vulnerability/attack-path context, versioned technical controls and scheduled/post-change reports | Traceable scenario and independent results; ambiguity/missingness cannot certify a path or inflate decision confidence. |
+| P11 Governance and applications | RBAC/tenant audit, ITSM, owner recertification, out-of-band reconciliation, application/dependency mapping, flow reviews, decommissioning and central object management | Reviewed workflows survive retries/restarts and preserve shared application dependencies; actor and decision provenance are retained. |
+| P12 Controlled broad changes | Necessary-change/path selection, exact target/revision/rule placement plans, risk/compliance/behavioral prechecks, approval, policy backup, rollback and post-change continuity | Qualified apply/read-back/traffic verification, concurrency/partial failure recovery, expiry/withdrawal and SOC reversal; no wrong-device or out-of-scope action. |
+| P13 Enterprise/vendor expansion | Additional commercial/cloud/SD-WAN adapters, tested capability matrix, authenticated transport, secret/tenant/retention controls, scale and recovery qualification | Published per-version read/write limits, outage/failover tests and operational release evidence. |
+
+Each service has a stable S ID in the matrix. Requirements from the specification for custom risk, audit reporting, application-centric behavior and evidence/finding models are also included. Deterministic firewall semantics stay separate from behavioral ML. RF/AE outputs on shared inputs are correlated. Missing usage alone cannot justify deletion. Generalized no-missed-attack claims and universal vendor compatibility require evidence beyond a feature list.
+
+## Current next implementation and testing sequence
+
+1. Qualify the t530 observation path and inventory; compare a short real capture against independent packet/byte/timing evidence before the two-week household pilot.
+2. Collect reviewed ordinary operating cycles with explicit UNKNOWN labels, quality/incident holds and separate candidate/approved profiles. Keep attack campaigns and model qualification data independent.
+3. Complete bounded bidirectional sessions and required evidence sources, then retrain/calibrate site-v3 candidates and test familiar-device changes plus held-out attacks and benign lookalikes.
+4. Build the first P7 read-only policy snapshot/parser fixtures and canonical query slice alongside collection. Select actual available lab equipment; do not create placeholder adapters for unsupported vendors.
+5. Add P8 analysis and P9 path witnesses before using policy context to recommend broad changes. Develop P10/P11 reporting and approval interfaces before broad P12 execution.
+
+For each implementation PR, identify affected S IDs, update current status with code/test evidence, update the relevant Mintlify page and dated changelog, update OpenAPI for contract changes and record the checks actually run. A plan entry does not pass a release gate.

@@ -1,0 +1,152 @@
+---
+title: "Final service scope and competitor coverage"
+description: "Trace all 70 specification capabilities to current code, planned phases and release evidence."
+---
+
+**Adaptive IPS framework** is the canonical project name. Its final goal is a behavioral intrusion-prevention framework with a multi-vendor firewall-policy management layer. It will collect evidence, profile devices and traffic, analyze effective firewall policy, prioritize risk, propose changes and perform qualified, reversible containment or policy actions. SOC operators can inspect and reverse actions. APF identifiers in existing files, environment variables, APIs and schemas remain compatible.
+
+This page records the target product scope. It does not announce delivery of the enterprise services. Every capability in the supplied specification's Section 85 is included below with a stable S01–S70 ID. The [delivery phases](/roadmap/delivery-phases) define dependencies, requirements and exit gates. Adding a goal to this page does not implement its parser, algorithm, workflow or adapter.
+
+## Requirements source and review
+
+The user supplied Behavioral_IPS_FireMon_AlgoSec_Project_Specification.md, reviewed on 2026-11-04. Its SHA-256 is 0f86572d89a4b2b50b8713e2400e6bdc86e7d7f256776b0eb4924970fd9c3a10. Section references below refer to that version; S IDs follow the exact order of its 70-item final capability list. The file is a design reference. Embedded instructions to another AI, suggested code layout and vendor order do not override the user's requests or repository instructions.
+
+The accepted final scope retains the previously agreed automatic containment loop. A read-only first integration and reviewed early recommendations are rollout stages. Qualified automatic temporary containment and later authorized policy changes remain final goals, with verified attribution, adapter capabilities, expiry/rollback and independent outcome checks. Broad optimization changes have their own approval policy and release gates.
+
+## Competitor services used as references
+
+These are modular product/service comparisons checked against primary vendor material on 2026-11-04. Features, versions, licenses and supported devices differ; the supplied specification is a desired requirement catalog, not proof that every feature is included in every competitor edition.
+
+| Reference | Verified service family | Implication for the final product |
+| --- | --- | --- |
+| FireMon Security Manager | Multi-vendor normalization, shared policy search/data, configuration history and change visibility | Build a versioned policy data plane and collector qualification. [Product reference](https://www.firemon.com/products/security-manager) |
+| FireMon Policy Planner | Change workflow, pre-change risk/compliance checks, rule/object planning and ITSM integration | Make a change an inspectable, version-bound transaction. [Product reference](https://www.firemon.com/products/policy-planner) |
+| FireMon Policy Optimizer | Owner-routed rule review, recertification/retirement and review audit history | Include business ownership and periodic review. [Product reference](https://www.firemon.com/products/policy-optimizer) |
+| AlgoSec Firewall Analyzer / Horizon Security Analyzer | Policy analysis, topology/connectivity visibility, cleanup, risk and compliance | Include deterministic effective-policy and path analysis. [Product reference](https://www.algosec.com/products/firewall-analyzer) |
+| AlgoSec FireFlow | Planned-change risk review, implementation workflows and change validation | Include design, approval, apply and verification stages. [Approval reference](https://techdocs.algosec.com/en/asms/a32.60/asms-help/content/ff-ug/fireflow-approve.htm) |
+| AlgoSec AppViz | Application/flow associations and AI-assisted application onboarding suggestions | Include application dependencies with owner review. [Technical reference](https://techdocs.algosec.com/en/asms/a33.10/asms-help/content/bf-ug/ai-app-disc.htm) |
+
+The intended contribution is evidence-backed behavioral input to policy decisions and verified response. Competitors also advertise AI and traffic/application analysis. Exclusivity, superior detection, lower cost and feature parity require measured comparisons and are not established here.
+
+## Current code evidence
+
+| Evidence ID | Existing implementation | Practical limit |
+| --- | --- | --- |
+| E1 | Controller/traffic_capture.py, Controller/Controller_main_Claude.py | Legacy Ryu windows, rate checks, device history and OpenFlow requests; lab semantics and outstanding migration limits apply. |
+| E2 | Controller/home_sensor.py, Controller/site_features.py | Separate 71-column site-v3.0 collection, IPv4/IPv6/VLAN, bounded G11–G17 subset, daily output and quality counters; UNKNOWN labels and no model scoring. See [collection coverage](/deployment/home-collection). |
+| E3 | Controller/ml_inference.py, Controller/ae_inference.py, shipped bundles and Controller/passive_ids.py | RF/AE inference for the legacy v2 schema; fixed lab-trained artifacts, not qualified site-v3 models. |
+| E4 | Controller/snort_monitor.py, Controller/snort3/, controller DAI and rate paths | Snort integration and deterministic lab detections; DAI logs conflicts, with its enforcement behavior documented separately. |
+| E5 | Controller/nft_quarantine.py and Controller/scripts/apf-quarantine.nft | Operator-run scoped temporary IPv4 set changes, read-back and removal; no commercial policy collector or automatic detector-to-adapter connection. |
+| E6 | Controller/site_policy.py and scripts/review_site_baseline.py | Expiring inventory, TCP-initiation role findings, quality/incident holds, candidate summaries and explicit frozen descriptive profiles; no authenticated discovery, calibrated decision or automatic promotion. See [shadow policy](/security/shadow-policy). |
+
+Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful subset exists with the limits above. **Planned** means the service is not implemented in the reviewed runtime. No row establishes production readiness. P0–P6 retain the existing IPS qualification roadmap; P7–P13 add the policy-management services. A phase listed before another is a dependency where stated, not a release date.
+
+## Behavioral foundation: S01–S19
+
+| ID | Required final capability | Source section | Current status | Delivery and acceptance evidence |
+| --- | --- | --- | --- | --- |
+| S01 | Behavioral traffic profiling | 4 | Partial E1/E2 | P1–P3: reproducible multi-horizon/session features, provenance, missingness and measured capture/resource limits. |
+| S02 | Device behavioral profiling | 5 | Partial E2/E6 | P1–P3/P6: persistent identity-bound approved/candidate profiles; score-before-update and poisoning/drift tests. |
+| S03 | Device-class baselines | 6 | Partial E6: manual roles | P2–P3/P6: evaluate device, cohort and site baselines; cold-start and role-misclassification tests. |
+| S04 | Supervised attack classification | 2.1, 82 | Lab E3 | P3: retrained schema-bound RF/candidates with independent campaign splits, calibration, held-out tools and false-alert results. |
+| S05 | Unsupervised anomaly detection | 2.1, 82 | Lab E3 | P3/P6: retrain AE weights/scaler for reviewed site data; test unknown attack families and benign shifts without treating error as probability. |
+| S06 | Signature-based detection | 2.1 | Lab E4 | P0–P3/P5: versioned rule/inspector inputs, replay parity and separately reported signature-only/fused coverage. |
+| S07 | Deterministic rate/protocol detectors | 2.1 | Lab E1/E4 | P1–P3: role-aware multi-window thresholds, protocol fixtures and benign burst/diagnostic controls. |
+| S08 | Asset identity | 5, 64 | Partial E6 | P1/P7: time-bounded lease/VLAN/port/NAT mappings, ambiguity handling and no wrong-device action under address reassignment. |
+| S09 | Source-of-truth integration | 64 | Planned | P7/P11: versioned inventory/CMDB/NetBox interfaces, ownership provenance and conflict/freshness handling. |
+| S10 | Protocol metadata analysis | 72 | Partial E2 | P2–P3: qualify DNS/TLS/QUIC/HTTP/MQTT evidence by supported parser, reassembly and encryption visibility. |
+| S11 | Application-layer security evidence | 72, 75 | Partial E2: lexical precursors | P2–P3/P11: correlate proxy/WAF/auth/application outcomes; test authorization abuse and payload attacks with independent target evidence. |
+| S12 | Adaptive inspection | 74 | Planned | P10/P13: policy-authorized escalation with measured capacity/privacy limits, expiry, audit and a useful result when inspection is unavailable. |
+| S13 | Multi-vendor firewall collection | 12, 79 | Planned | P7/P13: read-only configuration, objects, routes, NAT, interfaces, zones, VPN, security profiles, logs and counters from each qualified adapter. |
+| S14 | Canonical firewall policy model | 13 | Planned | P7: preserve rule order, context, inheritance, applications/users, schedules, logging and security profiles; retain unsupported vendor semantics explicitly. |
+| S15 | Universal rule search | 14 | Planned | P7/P9: context-aware search across qualified normalized policies, with effective match and indeterminate results distinguished. |
+| S16 | Object/group resolution | 13, 25–27 | Planned | P7/P8: nested address/service groups, ranges, exclusions, cycles and dynamic objects with reproducible expansion and uncertainty. |
+| S17 | Historical policy tracking | 41 | Planned | P7: immutable snapshot/revision lineage for policy, objects, routing, NAT and profiles with event time and collection freshness. |
+| S18 | Rule usage history | 15 | Planned | P7/P8: durable usage windows with reset/wrap/reorder detection, hit/byte/session units and measured observation coverage. |
+| S19 | Behavioral rule usage | 66–67 | Planned | P8/P10: join evidence to effective rule revision/NAT context; retain unknown and ambiguous attribution without inventing per-rule hit counts. |
+
+## Policy analysis and topology: S20–S40
+
+| ID | Required final capability | Source section | Current status | Delivery and acceptance evidence |
+| --- | --- | --- | --- | --- |
+| S20 | Duplicate rule detection | 17 | Planned | P8: semantic match/action equivalence fixtures including order, schedule, logging, security profile and context differences. |
+| S21 | Redundant rule detection | 18 | Planned | P8: prove whole effective match space is covered with equivalent behavior; return a witness/counterexample when unsafe. |
+| S22 | Shadowed rule detection | 19 | Planned | P8: compute prior-rule coverage, including unions and implicit/inherited policy; verify unreachable-rule results. |
+| S23 | Partial-overlap detection | 20 | Planned | P8: partition residual/intersecting address-port-protocol space and produce concrete witness tuples. |
+| S24 | Unused rule detection | 15, 40 | Planned | P8: declare coverage, time horizon and counter gaps; report unobserved/insufficient-history separately from a reviewed retirement candidate. |
+| S25 | Expired rule detection | 21 | Planned | P8/P11: compare timezone-aware schedules/expiry with owner exceptions and renewal workflows. |
+| S26 | Disabled rule detection | 22 | Planned | P8: preserve disabled state, ownership and change history without recommending unexplained deletion. |
+| S27 | Missing logging detection | 23 | Planned | P8/P10: assess explicit/inherited logging and collection reachability against versioned policy requirements. |
+| S28 | Missing documentation detection | 24 | Planned | P8/P11: flag missing owner, justification, ticket, expiry and approved exceptions with governance evidence. |
+| S29 | Unused object detection | 25 | Planned | P8: compute all rule/NAT/VPN/group/profile/application references before labeling an object unreferenced. |
+| S30 | Duplicate object detection | 26 | Planned | P8: compare resolved semantics within scope, retaining names, ownership and dynamic/FQDN differences. |
+| S31 | Misaligned object detection | 27 | Planned | P8/P11: compare intended shared objects across contexts/vendors; distinguish approved site-specific variations. |
+| S32 | Broad-rule tuning | 29 | Planned | P8/P10/P12: propose constrained sources/services with coverage, dependency exceptions and before/after path validation. |
+| S33 | Rule consolidation | 28 | Planned | P8/P12: prove effective behavior and audit/logging semantics preserved before preparing an approved merge. |
+| S34 | Safe rule reordering | 30 | Planned | P8/P12: prove precedence and security-profile equivalence; measure any performance benefit on the actual target platform. |
+| S35 | Network topology modeling | 31 | Planned | P9: graph devices, interfaces, zones, VLAN/VRF, subnet, VPN and cloud contexts with revision/freshness metadata. |
+| S36 | Routing analysis | 32 | Planned | P9: evaluate supported IPv4/IPv6 routing, policy routing, longest-prefix and alternate paths; mark unsupported cases indeterminate. |
+| S37 | NAT modeling | 33 | Planned | P7/P9: preserve pre/post translation tuples, order, reverse/stateful behavior and vendor-specific policy lookup stage. |
+| S38 | Reachability simulation | 34 | Planned | P9: return allowed/blocked/indeterminate, path, rule witness, translations and assumptions; compare with controlled live transactions. |
+| S39 | VPN path modeling | 31, 34 | Planned | P9/P13: qualify tunnel selectors, routes, policy and SD-WAN overlays; distinguish modeled paths from healthy/live tunnels. |
+| S40 | Zone/segmentation analysis | 35 | Planned | P9/P10: evaluate versioned inter-zone invariants across every supported feasible path and report uncovered paths. |
+
+## Governance, application services and response: S41–S70
+
+| ID | Required final capability | Source section | Current status | Delivery and acceptance evidence |
+| --- | --- | --- | --- | --- |
+| S41 | Behavioral policy-risk analysis | 36–37, 65 | Planned | P10: explain exposure, behavior, asset/vulnerability context and uncertainty; support versioned custom risk profiles. |
+| S42 | Compliance analysis | 38 | Planned | P10: versioned selected network-control mappings, evidence and exceptions; unsupported/unobserved controls cannot pass. |
+| S43 | Continuous compliance | 39 | Planned | P10: scheduled and post-change evaluation with drift, failure/staleness alerts and retained report lineage. |
+| S44 | Change monitoring | 41 | Planned | P7/P11: compare durable snapshots, reconcile events and retain actor attribution when authoritative logs provide it. |
+| S45 | Unplanned-change detection | 42 | Planned | P11: reconcile authorized requests, effective revisions and actor/time evidence; handle emergency changes and delayed audit events. |
+| S46 | Rule ownership/business justification | 43 | Planned | P7/P11: owner, requester, business unit, application, ticket, reason and expiry with versioned review history. |
+| S47 | Rule recertification | 44 | Planned | P11: scheduled/event-triggered owner reviews, certify/decertify decisions, escalation and evidence retention. |
+| S48 | Application-flow recertification | 61 | Planned | P11: review business flows and their shared rule dependencies without retiring another application's access. |
+| S49 | Firewall change requests | 45 | Planned | P11: authenticated request/analyze/design/approve/apply/verify states, role separation, ITSM linkage and durable audit. |
+| S50 | Pre-change reachability analysis | 46–47, 49 | Planned | P9/P12: identify already permitted access, blocking devices and relevant paths before proposing a change. |
+| S51 | Pre-change risk analysis | 49 | Planned | P10/P12: compare exposure/segmentation and critical-asset reachability against a frozen before/after snapshot. |
+| S52 | Pre-change compliance analysis | 50 | Planned | P10/P12: run the same versioned controls on the proposed state, preserving evidence and approved exceptions. |
+| S53 | Behavioral pre-change analysis | 51 | Planned | P10/P12: attach device/application maturity, incidents, exceptions and observation coverage; familiarity cannot authorize access alone. |
+| S54 | Exact change-plan generation | 48 | Planned | P12: specify target contexts, revisions, rule/object IDs, insertion points, commits/installs, expiry and compensation steps. |
+| S55 | Vendor remediation adapters | 52 | Partial E5: reference CLI only | P4–P5/P12–P13: qualify capability-scoped create/modify/disable/delete/object/schedule operations per vendor/version and approval class. |
+| S56 | Policy backup | 53 | Planned | P7/P12: protected pre-change policy snapshots with integrity, retention and tested recovery dependencies. |
+| S57 | Rollback | 53 | Planned | P4/P12: compensate only owned changes, preserve concurrent administrator edits and verify effective restored connectivity. |
+| S58 | Post-change verification | 54 | Partial E5: set read-back | P4–P5/P12: verify installed rule/order/object/NAT/path state on effective targets, including timeout/HA/partial-install cases. |
+| S59 | Behavioral post-change verification | 55 | Planned | P5/P12: independently measure intended containment, benign continuity, new failures and recovery; failed outcomes trigger reconciliation. |
+| S60 | Vulnerability correlation | 56 | Planned | P10: join timestamped scanner/asset/service evidence with reachability and patch status; exposure is distinct from successful exploitation. |
+| S61 | Attack-path simulation | 57 | Planned | P10: model reachability, exploit prerequisites and lateral steps with assumptions; simulated possibility is distinct from observed attack evidence. |
+| S62 | Business-application mapping | 58 | Planned | P11: owner-reviewed application/flow/rule associations with source, revision and confidence. |
+| S63 | Application dependency mapping | 59 | Planned | P11: reviewed frontend/API/database and shared infrastructure dependencies, with inactive/monthly workflow exceptions. |
+| S64 | Application decommissioning | 62 | Planned | P11/P12: identify candidate rules/objects/flows, preserve shared dependencies and verify approved retirement/recovery. |
+| S65 | Central network-object management | 63 | Planned | P7/P11/P12: stable logical IDs, vendor/context mappings and controlled object/group changes with referential integrity. |
+| S66 | Risk scoring using IPS evidence | 36, 66 | Planned | P3/P10: contextual evidence scores with documented dependencies, missingness and action-threshold evaluation; avoid adding correlated detector probabilities. |
+| S67 | Adaptive firewall recommendations | 69 | Planned | P10/P12: explain proposed least-privilege changes using reviewed behavior, business exceptions, path proofs and measured uncertainty. |
+| S68 | Privacy-preserving security analytics | 71 | Partial E2 | P1–P3/P13: minimized collection, authorized metadata, retention/access/tenant controls and measurable parser coverage. Hashes remain potentially sensitive. |
+| S69 | Selective deep packet inspection | 73 | Partial E2/E4: manual inspection inputs | P2/P10/P13: explicit policy/consent, bounded capture, approved termination-point evidence and audited escalation; no blanket decryption claim. |
+| S70 | Evidence-fusion decision engine | 8, 70, 75 | Planned | P2–P3/P10: immutable lineage, dependence-aware fusion, calibrated action eligibility and independent campaign/false-action evaluation. |
+
+## Requirements beyond the numbered list
+
+Section 37's custom risk profiles, Section 40's audit reporting, and Sections 75–76's evidence/finding contracts are required parts of P10/P11, alongside the 70 rows. Reports must include rule/object usage and cleanup, changes, compliance results, risk, behavioral associations, evidence versions, assumptions and unresolved coverage. Support machine-readable JSON/CSV and a human-readable report first; later PDF generation must preserve the same findings and lineage.
+
+Application-centric behavioral profiling from Section 60 is required in P11, extending S02/S11/S62/S63. Observed transport flows cannot establish application transactions, authorization outcomes or business ownership without appropriate supporting sources. Section 77's module layout is a proposed decomposition; creating empty folders is not an acceptance gate.
+
+Sections 78–83 guide sequencing, deterministic audit logic and measurement. Sections 84–87 describe the final product and summarize earlier requirements. They do not add an instruction to claim capabilities before their release gates pass. A specific vendor order is contingent on available lab equipment and faithful semantic coverage.
+
+## Interpretation rules for implementation
+
+- Maintain separate observation, detector verdict, independent ground-truth review, policy-risk, recommendation-confidence and enforcement-state fields. UNKNOWN is a valid result. A reviewed descriptive profile is not proof that every activity was benign.
+- Keep duplicate/coverage/routing/NAT/reachability calculations deterministic for supported semantics. ML can classify behavior and prioritize evidence. Generated explanations cannot turn an unsupported policy feature into a proven result.
+- RF and AE scoring shared rows are correlated. A signature can also share the same packet evidence. Record dependencies and validate combinations; do not multiply confidences or infer certainty from a vote count.
+- Absence of observed use does not establish safe deletion. Require visibility, counter continuity, business/seasonal exceptions, owner context and before/after verification.
+- Rule changes must preserve security-profile, schedule, identity, logging, inherited policy and stateful semantics, not only address/port overlap. Mark dynamic or unsupported application/user matches indeterminate.
+- A missing log is a visibility finding, not proof of an attack. A broad rule is exposure context, not proof that permitted traffic is malicious. Country/ASN novelty, high entropy and periodicity require corroborating context.
+- Compliance reporting covers supported technical checks and evidence. It does not certify an organization's compliance with an entire standard.
+- Publish a tested compatibility matrix for vendor, firmware, management system, virtual context, read/write operations and verification. The extensible core is the universal goal; untested combinations stay unsupported or read-only.
+
+## Final product acceptance
+
+Each S ID needs an implementation reference, versioned input/schema, fixtures, negative/unsupported cases, resource/privacy limits, UI/API/report behavior and an operator procedure before status changes. Preserve independent tests for sensor/feature correctness, parser/normalization fidelity, deterministic audit/path correctness, campaign detection, calibration, recommendation safety and effective enforcement/recovery.
+
+The final demonstration should link a behavioral event to a valid identity and contemporaneous policy revision, explain the effective permitting rule and path, produce a risk-aware recommendation, execute an authorized plan on a qualified adapter, verify containment and legitimate service continuity, and demonstrate expiry or SOC reversal. Model/profile changes must pass shadow and rollback gates. This scoped evidence cannot establish that no future attack will ever be missed.

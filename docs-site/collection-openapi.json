@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "APF home collection read API",
+    "title": "Adaptive IPS framework home collection read API",
     "version": "site-v3.0",
     "description": "Loopback-only collection service. Requests do not change enforcement. Ground truth is UNKNOWN. GET /ips/policy and shadow_policy in GET /ips/collection describe current-run shadow findings, review eligibility and frozen reviewed profiles."
   },

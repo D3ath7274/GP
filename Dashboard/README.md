@@ -1,4 +1,6 @@
-# SDN-IPS Dashboard
+# Adaptive IPS framework dashboard
+
+The legacy dashboard HTML retains its existing display labels and API contracts. This document uses the current project name. The [product service scope](../docs-site/roadmap/final-service-scope.mdx) distinguishes the present dashboard from planned policy search, recertification, compliance and change-workflow screens.
 
 A single-file, dependency-free web dashboard for the controller (`index.html`), built in the
 **shadcn/ui** design language (the real zinc dark theme tokens, Card/Badge/Button/Progress/Table

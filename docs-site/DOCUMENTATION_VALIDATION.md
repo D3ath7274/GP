@@ -1,5 +1,11 @@
 # Validation
 
+## Product rename and final-service traceability · 2026-11-04
+
+Compared the supplied specification's Section 85 directly with the authored service matrix: all 70 capability names match in order, each appears once under S01–S70, and every row has source-section references and delivery/acceptance criteria. Current-source review classifies 10 rows as partial foundations, four as legacy lab capabilities and 56 as planned. These classifications do not establish production readiness. Additional custom-risk, audit-reporting, application-profile and evidence-contract requirements are recorded outside the numbered table. The requirements source filename and SHA-256 are preserved in the matrix.
+
+Forty-three existing Python tests passed. PowerShell syntax parsing passed, the launcher reused the renamed running site, and HTTP checks returned 200 with Adaptive IPS framework branding for the homepage, service matrix, delivery phases and access guide. Documentation/API display names match the requested name. Runtime API paths, schema identifiers and model artifacts were not migrated. Mintlify build/validation, broken-link and accessibility checks passed, with the existing AA-versus-AAA color advisory. The new service plans are not executable features; their release evidence remains future work.
+
 ## Restore port 3333 and strengthen documentation checks · 2026-11-04
 
 The initial check found no listener on port 3333. Mintlify started successfully from docs-site. The Windows launcher then started a separate hidden process and exited after readiness; subsequent HTTP checks returned 200 for the homepage, documentation-access, home-collection, shadow-policy and changelog pages. Repeated launch reused the healthy preview. PowerShell parsing and Python compilation passed. Browser rendering and Windows reboot autostart were not tested; after reboot the documented launcher must be run again.

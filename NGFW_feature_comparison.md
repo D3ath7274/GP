@@ -1,7 +1,9 @@
-# Feature Comparison — this IPS vs. industry NGFWs (2026)
+# Adaptive IPS framework — comparison with industry NGFWs (2026)
 
-How the Adaptive Multi-Tier IPS compares with current next-generation firewalls, feature by
+How the Adaptive IPS framework compares with current next-generation firewalls, feature by
 feature, and what that comparison says about where the project belongs.
+
+**Scope update, 2026-11-04:** the earlier comparison below focuses on the legacy lab IPS and is not a current feature-parity certification. The home collector now adds limited protocol measurements and shadow device policy, while enterprise firewall-policy services remain planned. For the current source review and FireMon/AlgoSec-inspired final goals, use the [70-capability matrix](docs-site/roadmap/final-service-scope.mdx).
 
 > **Reference set:** the three Leaders in Gartner's first Magic Quadrant for **Hybrid Mesh
 > Firewall** (August 2025) — Palo Alto Networks (PAN-OS / Strata), Fortinet (FortiGate /
@@ -14,10 +16,7 @@ feature, and what that comparison says about where the project belongs.
 
 ## The verdict in two sentences
 
-As an NGFW **replacement**, the project loses. An NGFW is a policy device that understands
-applications, users, and content; this project has no policy engine at all. It forwards
-everything and drops only hosts a detection tier has convicted. As an **IoT detection layer
-next to an NGFW**, it wins in several places that matter, at a fraction of the cost.
+The present project supports lab intrusion prevention and passive behavioral collection. Its home shadow policy checks selected device connection attempts; full stateful application/user/content policy enforcement is outside that checker's scope. The intended deployment can complement a firewall through qualified telemetry and management adapters. Relative detection effectiveness, operating cost and enterprise suitability require measured comparisons.
 
 ## What "NGFW" means in 2026
 
