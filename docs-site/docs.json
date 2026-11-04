@@ -44,6 +44,7 @@
           "deployment/documentation-access",
           "deployment/policy-workbench",
           "deployment/home-pilot-step-by-step",
+          "deployment/no-mirror-pilot",
           "deployment/pretest-qualification",
           "deployment/security-campaigns",
           "deployment/policy-audit",

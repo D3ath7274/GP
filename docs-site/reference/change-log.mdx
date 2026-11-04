@@ -2,6 +2,10 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-04 · Step-by-step pilot while mirroring is unresolved
+
+Added a standalone Markdown [no-mirror walkthrough](/deployment/no-mirror-pilot), matching website page and private-copy results template. Commands cover a separate t530 checkout/environment, tests/golden/restart qualification, bounded Windows Ethernet captures, address-scoped replay/audit, a namespaced two-client routed nftables exercise with independent target receipts, manual reversal/native expiry, owned-resource cleanup and representative seven-day sessions. Explicit timing, stop conditions, UNKNOWN labels, replay REVIEW outcomes, private-data handling and handoff fields prevent mistaking partial endpoint data or manual enforcement for a qualified whole-home AI deployment. The live mirror backend's outgoing-copy skip is why these endpoint/router recipes use PCAP replay. No executable source, API, model, ruleset artifact or service status was changed. Command/source/syntax/replay and Mintlify verification is recorded in DOCUMENTATION_VALIDATION.md; Windows driver and actual t530 namespace/forwarding behavior remain operator tests.
+
 ## 2026-11-04 · Restore no-query workbench routes on Python 3.10
 
 The annotated Ubuntu job identified HTTP 400 on the workbench landing page: Python 3.10's strict query parser rejects empty input. Treat absent/empty queries as an empty parameter map while retaining strict validation for nonempty malformed/unknown/repeated queries. Expanded the existing real HTTP regression to cover bare empty queries and malformed fields. Operators on Ubuntu 22.04 must restart the viewer after pulling. Policy semantics, database read-only behavior, API shape and native firewall authority are unchanged; verification is recorded in DOCUMENTATION_VALIDATION.md.

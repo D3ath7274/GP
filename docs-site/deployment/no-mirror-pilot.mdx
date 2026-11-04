@@ -1,0 +1,677 @@
+---
+title: "Start testing without a traffic mirror"
+description: "Qualify the t530, capture real PC workloads, test a namespaced firewall and return a structured results handoff."
+---
+
+Version: 2026-11-04. Project: **Adaptive IPS framework**.
+
+## Start here
+
+This walkthrough uses your Ubuntu 22.04 t530 and Windows PC. No router mirror, additional physical NIC, external AP or Kali VM is required.
+
+| Stage | Where | Planning allowance | Deliverable |
+| --- | --- | --- | --- |
+| A. Software qualification | t530 | 20–40 minutes including installation | Tests, golden feature and accelerated restart results |
+| B. First real PC capture | PC, then t530 | Ten-minute capture plus transfer/replay | Endpoint dataset and quality report |
+| C. Isolated firewall lab | t530, four SSH terminals | 45–90 minutes | Live temporary quarantine, continuity and recovery evidence |
+| D. Representative sessions | PC and t530 | Selected sessions over seven days; optionally fourteen | Workload coverage with explicit limitations |
+| E. Return results | Your editor | About ten minutes | One filled Markdown handoff |
+
+These are planning allowances, not measured t530 benchmarks. Work in order. Stop at the first unexpected failure. You can return Stage A before attempting B or C.
+
+**Established by successful tests:** software/feature behavior within tested cases, observations from PC-1, and operator-driven containment in a small routed Linux lab.
+
+**Still unestablished:** whole-home visibility, phone/IoT Internet baselines, site-v3 RF/AE accuracy, automatic behavioral firewall decisions, commercial-vendor compatibility and production capacity. The home collector retains UNKNOWN ground truth and does not run the legacy models.
+
+The live collector skips locally outgoing packet copies because it was designed for mirror input. Here we capture both directions with Dumpcap/tcpdump and replay the saved PCAP. Do not substitute live collection on an ordinary endpoint/router interface and assume equivalent directional coverage.
+
+Keep actual addresses, manifests, logs and PCAPs private. Raw captures can contain payloads even though the derived CSV contains reduced features. Return a redacted results file initially.
+
+## A1. Prepare the t530
+
+**Ubuntu SSH terminal A.** Use your ordinary account; sudo appears only where needed. Preserve the operating system's python3 executable.
+
+~~~bash
+cat /etc/os-release
+python3 --version
+df -h "$HOME"
+free -h
+timedatectl status
+sudo apt update
+sudo apt install -y git python3-venv python3-pip iproute2 curl tcpdump
+~~~
+
+Expected: Ubuntu 22.04/Python 3.10 are suitable. Resolve clock synchronization before live timing tests. Allow at least 4 GiB free for this bounded pilot; recheck before capture transfers.
+
+Use an independent checkout so your existing controller installation remains available:
+
+~~~bash
+export APF_CODE="$HOME/apf-pilot-code"
+git clone --branch docs/readme-ngfw-and-test-plans --single-branch \
+  https://github.com/D3ath7274/GP.git "$APF_CODE"
+~~~
+
+If that directory already exists, stop and inspect it. Choose a fresh path such as apf-pilot-code-02 and change APF_CODE. Do not delete an existing installation. If the branch is unavailable, return that Git error rather than guessing a replacement.
+
+Create private data storage and a virtual environment outside Git:
+
+~~~bash
+umask 077
+export APF_HOME="$HOME/apf-pilot"
+export APF_RUN="$APF_HOME/runs/$(date -u +%Y%m%dT%H%M%SZ)"
+export APF_ENV="$APF_HOME/venv"
+mkdir -p "$APF_RUN" "$APF_HOME/inbox"
+chmod 700 "$APF_HOME" "$APF_RUN" "$APF_HOME/inbox"
+python3 -m venv "$APF_ENV"
+"$APF_ENV/bin/python" -m pip install -r "$APF_CODE/Controller/requirements-home.txt"
+"$APF_ENV/bin/python" -m pip install psutil
+printf 'export APF_CODE=%q\nexport APF_HOME=%q\nexport APF_RUN=%q\nexport APF_ENV=%q\n' \
+  "$APF_CODE" "$APF_HOME" "$APF_RUN" "$APF_ENV" > "$APF_HOME/active.env"
+cd "$APF_CODE"
+cp PILOT_RESULTS_TEMPLATE.md "$APF_RUN/RESULTS.md"
+git rev-parse HEAD > "$APF_RUN/code-commit.txt"
+"$APF_ENV/bin/python" --version > "$APF_RUN/python-version.txt"
+"$APF_ENV/bin/python" -m pip freeze > "$APF_RUN/packages.txt"
+uname -r > "$APF_RUN/kernel-version.txt"
+~~~
+
+psutil enables resource measurements, not a capacity guarantee. For a repeated pilot, retain previous run directories. Do not upgrade dependencies halfway through a comparison without recording it.
+
+**Restore variables in every additional Ubuntu terminal:**
+
+~~~bash
+source "$HOME/apf-pilot/active.env"
+cd "$APF_CODE"
+~~~
+
+## A2. Run the regression suite
+
+~~~bash
+(
+  set -o pipefail
+  "$APF_ENV/bin/python" -m unittest discover -s tests 2>&1 \
+    | tee "$APF_RUN/01-tests.txt"
+)
+~~~
+
+Wait for completion. Current reference code has 108 tests; a later documented version may have more. Expected: OK with no errors/failures. If it fails, stop and return the first redacted traceback.
+
+## A3. Verify independently expected feature values
+
+~~~bash
+(
+  set -o pipefail
+  "$APF_ENV/bin/python" scripts/qualify_home_collection.py \
+    --output-dir "$APF_RUN/golden" 2>&1 \
+    | tee "$APF_RUN/02-golden-console.txt"
+)
+cat "$APF_RUN/golden/qualification.json"
+~~~
+
+Expected for the current fixture: PASS, 142 comparisons, empty failures list. This checks synthetic packet expectations; it does not measure attack detection accuracy.
+
+## A4. Verify bounded state and restart behavior
+
+~~~bash
+(
+  set -o pipefail
+  "$APF_ENV/bin/python" scripts/qualify_home_runtime.py \
+    --output-dir "$APF_RUN/runtime" --windows 1000 --devices 4 2>&1 \
+    | tee "$APF_RUN/03-runtime-console.txt"
+)
+cat "$APF_RUN/runtime/runtime-qualification.json"
+~~~
+
+Expected: PASS, 4,000 checked rows, two distinct run IDs, no failures. Record elapsed_seconds, artifact_bytes, sampled_peak_rss_bytes and retained_profiles_at_end. Null RSS means UNMEASURED.
+
+This accelerates event time. It is not a live packet-rate or week-long soak test.
+
+**Checkpoint A:** fill section A in your private RESULTS.md. Proceed only if A2–A4 pass. You can send this checkpoint first.
+
+## B1. Prepare Windows endpoint capture
+
+**Windows PC: PowerShell, elevated if your capture driver requires it.**
+
+Install Wireshark from its [official download page](https://www.wireshark.org/download.html), including the offered Npcap component. Existing installations are usable. Make installer/driver choices locally.
+
+~~~powershell
+$Dumpcap = Join-Path $env:ProgramFiles 'Wireshark\dumpcap.exe'
+Test-Path $Dumpcap
+& $Dumpcap -D
+Get-NetIPConfiguration
+$CaptureInterface = [int](Read-Host 'Dumpcap interface number')
+& $Dumpcap -i $CaptureInterface -L
+~~~
+
+Expected: Test-Path True; select the physical Ethernet/Wi-Fi interface carrying your PC's traffic, not loopback, VPN or a VM adapter. Dumpcap's number may differ from Windows' interface index.
+
+The supported link type is Ethernet, typically EN10MB. If only raw Wi-Fi/radiotap or another link type is available, stop and report it; the present decoder expects Ethernet.
+
+Record actual addresses on that interface:
+
+~~~powershell
+Get-NetIPAddress | Select-Object InterfaceAlias, AddressFamily, IPAddress, PrefixLength
+$PcV4 = (Read-Host 'Current PC IPv4 address on that interface').Trim()
+$PcV6 = @((Read-Host 'Current PC IPv6 addresses, comma-separated; Enter if none').Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$Activity = Read-Host 'Activity category, e.g. qualification-browsing'
+$SessionId = 'pc-' + (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ')
+$PcRoot = Join-Path $env:USERPROFILE 'AdaptiveIPS-Pilot'
+$PcSession = Join-Path $PcRoot $SessionId
+New-Item -ItemType Directory -Path $PcSession -ErrorAction Stop | Out-Null
+$CaptureFilter = (@("host $PcV4") + @($PcV6 | ForEach-Object { "host $_" })) -join ' or '
+$Manifest = [ordered]@{
+    version = 'endpoint-pilot-v1'
+    session_id = $SessionId
+    capture_point = 'windows_endpoint'
+    ipv4 = $PcV4
+    ipv6 = $PcV6
+    activity = $Activity
+    ground_truth = 'UNKNOWN'
+    offload_review = 'PENDING'
+    requested_start_utc = (Get-Date).ToUniversalTime().ToString('o')
+}
+$Manifest | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $PcSession 'session.json')
+& $Dumpcap -v 2>&1 | Set-Content (Join-Path $PcSession 'capture-version.txt')
+Write-Output "Private session directory: $PcSession"
+Write-Output "Session ID: $SessionId"
+~~~
+
+If addresses change, end the session and start another with updated addresses. Unlisted IPv6/privacy addresses are outside this filter. If you supplied no IPv6 addresses, mark IPv6 UNOBSERVED. These manifests contain real addresses: keep them outside Git and omit them from the initial handoff.
+
+## B2. Capture ten minutes of ordinary use
+
+The first capture ends at 600 seconds or roughly 100 MB, whichever comes first:
+
+~~~powershell
+$CaptureArgs = @('-i', "$CaptureInterface", '-y', 'EN10MB', '-p', '-F', 'pcap', '-s', '0', '-f', $CaptureFilter, '-a', 'duration:600', '-a', 'filesize:100000', '-w', (Join-Path $PcSession 'endpoint.pcap'))
+& $Dumpcap @CaptureArgs 2>&1 | Tee-Object -FilePath (Join-Path $PcSession 'capture-console.txt')
+if ($LASTEXITCODE -ne 0) { throw 'Capture failed: stop and inspect capture-console.txt.' }
+$Manifest['capture_finished_utc'] = (Get-Date).ToUniversalTime().ToString('o')
+$Manifest | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $PcSession 'session.json')
+Get-Item (Join-Path $PcSession 'endpoint.pcap') | Select-Object Name, Length
+Get-FileHash -Algorithm SHA256 (Join-Path $PcSession 'endpoint.pcap')
+~~~
+
+During capture, browse normally and make a small download. Avoid a large throughput test for this first check. Full packets are saved for parser checks; the PCAP can contain sensitive content.
+
+Open the closed file in Wireshark. Confirm PC-originated packets and replies using its addresses as filters. Inspect timestamps and lengths. Record any available driver/capture-drop count; absent statistics mean UNMEASURED. An early size stop means a shorter session.
+
+Endpoint NIC offloading can create apparent checksum errors or large segments. Record these effects. Do not classify them as attacks or blindly disable NIC features. A configuration change requires a separately documented session.
+
+## B3. Transfer the closed session to the t530
+
+~~~powershell
+$ThinHost = Read-Host 't530 IPv4 address'
+$SshUser = Read-Host 't530 SSH username'
+$SshTarget = $SshUser + '@' + $ThinHost
+ssh $SshTarget "umask 077; mkdir -p apf-pilot/inbox/$SessionId"
+$RemoteSession = $SshTarget + ':apf-pilot/inbox/' + $SessionId + '/'
+scp (Join-Path $PcSession 'endpoint.pcap') (Join-Path $PcSession 'session.json') (Join-Path $PcSession 'capture-console.txt') $RemoteSession
+~~~
+
+Verify any new SSH host fingerprint through your existing trusted connection. If PowerShell was reopened, restore SessionId/PcSession from the saved directory/manifest rather than making a new empty capture.
+
+## B4. Replay using the PC's exact address scope
+
+**Ubuntu terminal A.** The helper reads the private manifest and calls existing CLIs. IPv4 /32 and listed IPv6 /128 scopes keep derived device rows tied to this PC.
+
+~~~bash
+source "$HOME/apf-pilot/active.env"
+cd "$APF_CODE"
+read -r -p 'PC session ID copied from Windows: ' PC_SESSION
+export PC_SESSION
+PC_DIR="$APF_HOME/inbox/$PC_SESSION"
+"$APF_ENV/bin/python" - "$PC_DIR" "$APF_CODE" "$APF_RUN" <<'PY'
+import hashlib
+import ipaddress
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+directory, code, run = map(Path, sys.argv[1:])
+manifest = json.loads((directory / "session.json").read_text(encoding="utf-8-sig"))
+if manifest["version"] != "endpoint-pilot-v1" or manifest["capture_point"] != "windows_endpoint":
+    raise SystemExit("Unexpected manifest; stop and review")
+if manifest["session_id"] != directory.name or manifest["ground_truth"] != "UNKNOWN":
+    raise SystemExit("Manifest identity/truth mismatch")
+v4 = ipaddress.IPv4Address(manifest["ipv4"])
+v6 = [ipaddress.IPv6Address(value) for value in manifest["ipv6"]]
+output = run / ("replay-" + directory.name)
+report = run / ("report-" + directory.name + ".json")
+if output.exists() or report.exists():
+    raise SystemExit("Existing replay/report refused; preserve it and choose a fresh run")
+pcap = directory / "endpoint.pcap"
+digest = hashlib.sha256()
+with pcap.open("rb") as source:
+    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+        digest.update(chunk)
+print("PCAP SHA256:", digest.hexdigest(), flush=True)
+command = [sys.executable, str(code / "Controller/home_sensor.py"),
+           "--pcap", str(pcap), "--data-dir", str(output), "--port", "18081",
+           "--metadata", "--http", "--max-data-gib", "1", "--min-free-gib", "1",
+           "--lan", str(v4) + "/32"]
+for address in v6:
+    command += ["--lan", str(address) + "/128"]
+subprocess.run(command, check=True)
+print("Closed replay:", output, flush=True)
+completed = subprocess.run([sys.executable, str(code / "scripts/audit_home_data.py"),
+                            str(output), "--output", str(report)])
+print("Private audit:", report, "exit:", completed.returncode, flush=True)
+raise SystemExit(completed.returncode)
+PY
+~~~
+
+Keep loopback port 18081 free during replay. If occupied, retain the error and choose an explicitly free port for the next attempt.
+
+Expected:
+
+- Compare the printed PCAP SHA-256 with B2's Windows hash; a mismatch is a STOP condition.
+- Replay runs at processing speed, not the capture's original wall-clock duration.
+- Its dashboard exists during replay and closes afterwards. A refused connection afterwards is expected.
+- Labels stay UNKNOWN. No site-v3 RF/AE decision or firewall action occurs.
+- Audit exit 2 / REVIEW is expected for replay, unavailable live kernel-loss evidence, partial final windows and observation-only holds. It is not baseline approval.
+- Audit FAIL / exit 1, invalid rows, missing evidence, hash mismatches or overlapping/out-of-order windows require investigation.
+- Zero DNS/TLS/HTTP parses can reflect encryption or unsupported framing. Supported cleartext HTTP/1 headers are not HTTPS inspection.
+
+Keep each session in a separate replay directory. Do not merge CSVs, replay overlapping files into a shared history or call these independent sessions continuous online learning. A qualified multi-file continuity/import workflow remains future work.
+
+## B5. Inspect the report and first rows
+
+~~~bash
+cat "$APF_RUN/report-$PC_SESSION.json"
+"$APF_ENV/bin/python" - "$APF_RUN/replay-$PC_SESSION" <<'PY'
+import csv
+from collections import Counter
+from pathlib import Path
+import sys
+rows = 0
+labels = Counter()
+outgoing = incoming = 0
+for path in Path(sys.argv[1]).glob("features-*.csv"):
+    with path.open(newline="", encoding="utf-8") as source:
+        reader = csv.DictReader(source)
+        print(path.name, "columns:", len(reader.fieldnames))
+        for row in reader:
+            rows += 1
+            labels[row["ground_truth"]] += 1
+            outgoing += int(float(row["out_packets"]))
+            incoming += int(float(row["in_packets"]))
+print({"rows": rows, "labels": dict(labels), "out_packets": outgoing, "in_packets": incoming})
+PY
+~~~
+
+Expected current schema: 71 columns, UNKNOWN labels only. Both directions should contain traffic during browsing. Counts are observed packets, not application transactions. Confirm devices contains only your intended PC addresses.
+
+Record rows, integrity_issues, quality counters, parser counts and direction totals. Missing direction, unexpected device rows or zero rows are STOP conditions. Offload/capture-point differences remain review items even if file integrity passes.
+
+**Checkpoint B:** fill section B of RESULTS.md. Return A+B if anything is unresolved before expanding collection.
+
+## C1. Prepare an isolated live firewall lab
+
+This optional stage uses four network namespaces on the t530. All new links, addresses, routes, forwarding and nftables changes below are namespaced. The physical NIC is not connected to the lab. Keep the shown namespace prefixes.
+
+Namespaces share CPU/RAM/kernel resources; they are not VMs or kernel-security boundaries. Tests use a small TCP scan and HTTP requests, with no flood.
+
+~~~text
+apf-client 192.0.2.10 --+
+                       +-- apf-fw lan0 192.0.2.1
+apf-good   192.0.2.11 --+          wan0 198.51.100.1 -- apf-server 198.51.100.20
+~~~
+
+These documentation addresses exist only in the isolated lab. No lab route uses the home router.
+
+~~~bash
+command -v nft
+command -v nmap
+sudo apt install -y nftables nmap
+nft --version
+ip -brief address > "$APF_RUN/host-addresses-before.txt"
+ip route show > "$APF_RUN/host-routes-before.txt"
+~~~
+
+Do not start/enable a host nftables service, load the framework table in the host namespace, flush a ruleset or modify existing firewall policy. The lab provisions only apf-fw.
+
+Existing namespace names cause refusal:
+
+~~~bash
+(
+  set -e
+  for ns in apf-client apf-good apf-fw apf-server; do
+    if sudo ip netns list | awk '{print $1}' | grep -Fxq "$ns"; then
+      printf 'STOP: namespace already exists: %s\n' "$ns"
+      exit 1
+    fi
+  done
+  if [ -e "$APF_RUN/lab-owned.namespaces" ]; then
+    printf 'STOP: existing ownership record; inspect the previous attempt\n'
+    exit 1
+  fi
+  printf '%s\n' apf-client apf-good apf-fw apf-server > "$APF_RUN/lab-owned.namespaces"
+  for ns in apf-client apf-good apf-fw apf-server; do
+    sudo ip netns add "$ns"
+    sudo ip -n "$ns" link set lo up
+  done
+  sudo ip -n apf-fw link add fc type veth peer name eth0 netns apf-client
+  sudo ip -n apf-fw link add fg type veth peer name eth0 netns apf-good
+  sudo ip -n apf-fw link add wan0 type veth peer name eth0 netns apf-server
+  sudo ip -n apf-fw link add lan0 type bridge
+  sudo ip -n apf-fw link set fc master lan0
+  sudo ip -n apf-fw link set fg master lan0
+  for link in fc fg lan0 wan0; do sudo ip -n apf-fw link set "$link" up; done
+  sudo ip -n apf-fw address add 192.0.2.1/24 dev lan0
+  sudo ip -n apf-fw address add 198.51.100.1/24 dev wan0
+  sudo ip -n apf-client address add 192.0.2.10/24 dev eth0
+  sudo ip -n apf-good address add 192.0.2.11/24 dev eth0
+  sudo ip -n apf-server address add 198.51.100.20/24 dev eth0
+  for ns in apf-client apf-good apf-server; do sudo ip -n "$ns" link set eth0 up; done
+  sudo ip -n apf-client route add default via 192.0.2.1
+  sudo ip -n apf-good route add default via 192.0.2.1
+  sudo ip -n apf-server route add default via 198.51.100.1
+  sudo ip netns exec apf-fw sysctl -w net.ipv4.ip_forward=1
+)
+sudo ip -n apf-client route get 198.51.100.20
+sudo ip -n apf-good route get 198.51.100.20
+sudo ip -n apf-server route get 192.0.2.10
+~~~
+
+Expected: client routes via 192.0.2.1; return route via 198.51.100.1. If setup fails, retain the error and inspect partial resources. Do not provision or rerun over an existing lab. C9 covers cleanup.
+
+## C2. Start the disposable target
+
+**Ubuntu terminal B:** restore variables and leave this server in the foreground:
+
+~~~bash
+source "$HOME/apf-pilot/active.env"
+mkdir "$APF_RUN/lab-www"
+printf 'Adaptive IPS framework lab OK\n' > "$APF_RUN/lab-www/index.html"
+sudo ip netns exec apf-server "$APF_ENV/bin/python" -u -m http.server \
+  8000 --bind 198.51.100.20 --directory "$APF_RUN/lab-www" 2>&1 \
+  | tee "$APF_RUN/lab-server-console.txt"
+~~~
+
+Serve only this disposable directory. The target is reachable inside the lab, not the home LAN.
+
+## C3. Start two independent captures
+
+**Ubuntu terminal C:** firewall-LAN observation:
+
+~~~bash
+source "$HOME/apf-pilot/active.env"
+sudo ip netns exec apf-fw tcpdump -Z "$(id -un)" -i lan0 -nn -s 0 -U \
+  -w "$APF_RUN/lab-firewall.pcap" \
+  'ip and (host 192.0.2.10 or host 192.0.2.11)' 2>&1 \
+  | tee "$APF_RUN/lab-firewall-capture.txt"
+~~~
+
+**Ubuntu terminal D:** independent target receipts:
+
+~~~bash
+source "$HOME/apf-pilot/active.env"
+sudo ip netns exec apf-server tcpdump -Z "$(id -un)" -i eth0 -nn -s 0 -U \
+  -w "$APF_RUN/lab-server.pcap" \
+  'tcp port 8000 and (host 192.0.2.10 or host 192.0.2.11)' 2>&1 \
+  | tee "$APF_RUN/lab-server-capture.txt"
+~~~
+
+Wait for both listening messages, then two more seconds. Leave them running. Saved captures will be replayed later.
+
+## C4. Establish baseline connectivity and bounded recon
+
+**Ubuntu terminal A:**
+
+~~~bash
+date -u +'%FT%TZ baseline_start' | tee -a "$APF_RUN/lab-events.txt"
+sudo ip netns exec apf-client curl --noproxy '*' --fail --silent --show-error \
+  --connect-timeout 2 --max-time 4 'http://198.51.100.20:8000/?case=baseline-client'
+sudo ip netns exec apf-good curl --noproxy '*' --fail --silent --show-error \
+  --connect-timeout 2 --max-time 4 'http://198.51.100.20:8000/?case=baseline-good'
+date -u +'%FT%TZ baseline_end' | tee -a "$APF_RUN/lab-events.txt"
+~~~
+
+Expected: both return the OK message; target logs show both GET requests. Stop if either fails.
+
+Generate a small recon fixture only against the named lab target:
+
+~~~bash
+date -u +'%FT%TZ recon_start' | tee -a "$APF_RUN/lab-events.txt"
+sudo ip netns exec apf-client nmap -sT -n -Pn \
+  --max-rate 10 --max-retries 1 --host-timeout 30s \
+  -p 1-100,8000 198.51.100.20 | tee "$APF_RUN/lab-recon.txt"
+date -u +'%FT%TZ recon_end' | tee -a "$APF_RUN/lab-events.txt"
+~~~
+
+Wait for completion, at most about 30 seconds under the host timeout. This records controlled port diversity. An approved administrator's scan is a benign lookalike; tool output does not prove malicious intent.
+
+No site-v3 classifier is enabled here. An absent alert is not a measured RF/AE miss. Wait ten seconds before C5 to separate phases.
+
+## C5. Provision only the namespace quarantine table
+
+~~~bash
+sudo ip netns exec apf-fw nft list tables
+~~~
+
+Expected: no inet apf_quarantine table. If one exists unexpectedly, stop rather than replacing it.
+
+~~~bash
+sudo ip netns exec apf-fw nft -c -f "$APF_CODE/Controller/scripts/apf-quarantine.nft"
+sudo ip netns exec apf-fw nft -f "$APF_CODE/Controller/scripts/apf-quarantine.nft"
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" status \
+  | tee "$APF_RUN/lab-quarantine-initial.json"
+~~~
+
+Expected: empty members. If the adapter rejects the table/JSON shape, retain the error and stop. Do not weaken its read-back validation.
+
+## C6. Verify containment and innocent-client continuity
+
+~~~bash
+date -u +'%FT%TZ manual_block_request' | tee -a "$APF_RUN/lab-events.txt"
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" add 192.0.2.10 \
+  --scope 192.0.2.0/24 --protect 192.0.2.1/32 --ttl 120 \
+  | tee "$APF_RUN/lab-block-readback.json"
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" status
+~~~
+
+Expected: set_member true, source 192.0.2.10 present. Run the next probes immediately within the 120-second TTL:
+
+~~~bash
+BLOCK_START_EPOCH="$(date -u +%s.%N)"
+printf '%s blocked_probe_start_epoch\n' "$BLOCK_START_EPOCH" | tee -a "$APF_RUN/lab-events.txt"
+sudo ip netns exec apf-client curl --noproxy '*' --fail --silent --show-error \
+  --connect-timeout 2 --max-time 4 'http://198.51.100.20:8000/?case=blocked-client' \
+  > "$APF_RUN/lab-blocked-body.txt" 2> "$APF_RUN/lab-blocked-error.txt"
+printf 'blocked_client_curl_exit=%s\n' "$?" | tee "$APF_RUN/lab-blocked-exit.txt"
+BLOCK_END_EPOCH="$(date -u +%s.%N)"
+printf '%s blocked_probe_end_epoch\n' "$BLOCK_END_EPOCH" | tee -a "$APF_RUN/lab-events.txt"
+printf 'Wireshark filter: frame.time_epoch >= %s && frame.time_epoch <= %s && ip.src == 192.0.2.10 && tcp.dstport == 8000\n' "$BLOCK_START_EPOCH" "$BLOCK_END_EPOCH" | tee "$APF_RUN/lab-blocked-filter.txt"
+sudo ip netns exec apf-good curl --noproxy '*' --fail --silent --show-error \
+  --connect-timeout 2 --max-time 4 'http://198.51.100.20:8000/?case=good-during-block'
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" status
+~~~
+
+Expected:
+
+- Selected client: nonzero curl exit, normally timeout 28, while membership is active.
+- Innocent client: successful OK response.
+- Target HTTP log: good-during-block present, blocked-client absent.
+- Firewall PCAP: selected-client attempts may remain visible before the drop.
+- Target PCAP: no new selected-client attempt in that blocked-probe interval; innocent traffic remains present.
+
+Later, open the target PCAP and paste the complete filter printed above into Wireshark's display-filter field. It includes the actual epoch bounds and this source/port condition:
+
+~~~text
+ip.src == 192.0.2.10 && tcp.dstport == 8000
+~~~
+
+Apply the same source/port/time filter to the firewall capture to confirm attempted traffic. An absent target GET alone cannot establish that no packet arrived. Capture losses or a dead target invalidate the conclusion.
+
+This tests operator-driven enforcement, not an AI decision or detection-to-block latency. Each curl opens a new connection.
+
+## C7. Verify reversal and native expiry
+
+~~~bash
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" remove 192.0.2.10 \
+  | tee "$APF_RUN/lab-remove-readback.json"
+sudo ip netns exec apf-client curl --noproxy '*' --fail --silent --show-error \
+  --connect-timeout 2 --max-time 4 'http://198.51.100.20:8000/?case=recovered-manual'
+~~~
+
+Expected: set_member false and successful traffic.
+
+~~~bash
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" add 192.0.2.10 \
+  --scope 192.0.2.0/24 --protect 192.0.2.1/32 --ttl 15 \
+  | tee "$APF_RUN/lab-expiry-add.json"
+sleep 20
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" status \
+  | tee "$APF_RUN/lab-expiry-status.json"
+sudo ip netns exec apf-client curl --noproxy '*' --fail --silent --show-error \
+  --connect-timeout 2 --max-time 4 'http://198.51.100.20:8000/?case=recovered-expiry'
+~~~
+
+Expected: absent membership and successful traffic after twenty seconds.
+
+Optional negative tests; both must refuse with nonzero exit:
+
+~~~bash
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" add 192.0.2.1 \
+  --scope 192.0.2.0/24 --protect 192.0.2.1/32 --ttl 15
+sudo ip netns exec apf-fw "$APF_ENV/bin/python" \
+  "$APF_CODE/Controller/nft_quarantine.py" add 203.0.113.10 \
+  --scope 192.0.2.0/24 --protect 192.0.2.1/32 --ttl 15
+~~~
+
+Retain scope/protection checks even if they prevent a requested test action.
+
+## C8. Close captures and extract lab features
+
+Press Ctrl+C once in terminals C and D. Wait for final capture statistics and record each kernel-drop count. Stop the HTTP server with Ctrl+C in terminal B.
+
+In terminal A:
+
+~~~bash
+sudo chown "$(id -un):$(id -gn)" "$APF_RUN/lab-firewall.pcap" "$APF_RUN/lab-server.pcap"
+chmod 600 "$APF_RUN/lab-firewall.pcap" "$APF_RUN/lab-server.pcap"
+"$APF_ENV/bin/python" "$APF_CODE/Controller/home_sensor.py" \
+  --pcap "$APF_RUN/lab-firewall.pcap" --lan 192.0.2.0/24 \
+  --metadata --http --port 18081 --data-dir "$APF_RUN/lab-replay" \
+  --max-data-gib 1 --min-free-gib 1
+"$APF_ENV/bin/python" "$APF_CODE/scripts/audit_home_data.py" \
+  "$APF_RUN/lab-replay" --output "$APF_RUN/lab-report.json"
+~~~
+
+Expected: lab-client rows, UNKNOWN labels and replay REVIEW conditions. The nonlocal target has no own row under this LAN scope. The gateway may have a row if it generated eligible IP traffic. HTTP counts need complete supported headers; inspect unexpected missingness. DNS/TLS can legitimately stay zero.
+
+Use target capture/logs as independent outcome evidence. Do not replay them into the same directory and double-count traffic.
+
+To inspect the two closed lab captures in Windows Wireshark, first print the run path in Ubuntu:
+
+~~~bash
+printf '%s\n' "$APF_RUN"
+~~~
+
+In the same Windows PowerShell session used for B3, copy only these lab files. If that session was closed, restore SshUser/ThinHost/SshTarget as in B3 first.
+
+~~~powershell
+$LabRun = Read-Host 'Exact absolute APF_RUN path printed by Ubuntu'
+$PcRoot = Join-Path $env:USERPROFILE 'AdaptiveIPS-Pilot'
+$LabLocal = Join-Path $PcRoot ('lab-' + (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ'))
+New-Item -ItemType Directory -Path $LabLocal -ErrorAction Stop | Out-Null
+scp ($SshTarget + ':' + $LabRun + '/lab-firewall.pcap') ($SshTarget + ':' + $LabRun + '/lab-server.pcap') ($SshTarget + ':' + $LabRun + '/lab-blocked-filter.txt') ($SshTarget + ':' + $LabRun + '/lab-events.txt') $LabLocal
+Write-Output "Open the closed PCAPs in: $LabLocal"
+~~~
+
+The blocked filter is in lab-blocked-filter.txt; paste the expression after its label. Apply it at both capture points and record the results before cleanup.
+
+## C9. Tear down only the owned lab
+
+Make sure B/C/D stopped. Cleanup refuses if any recorded namespace still has a process:
+
+~~~bash
+(
+  set -e
+  test -f "$APF_RUN/lab-owned.namespaces"
+  for ns in apf-client apf-good apf-fw apf-server; do
+    if sudo ip netns list | awk '{print $1}' | grep -Fxq "$ns"; then
+      if [ -n "$(sudo ip netns pids "$ns")" ]; then
+        printf 'STOP: process still running in %s; stop its foreground terminal\n' "$ns"
+        exit 1
+      fi
+    fi
+  done
+  for ns in apf-client apf-good apf-fw apf-server; do
+    if sudo ip netns list | awk '{print $1}' | grep -Fxq "$ns"; then
+      sudo ip netns delete "$ns"
+    fi
+  done
+)
+ip -brief address > "$APF_RUN/host-addresses-after.txt"
+ip route show > "$APF_RUN/host-routes-after.txt"
+diff -u "$APF_RUN/host-addresses-before.txt" "$APF_RUN/host-addresses-after.txt"
+diff -u "$APF_RUN/host-routes-before.txt" "$APF_RUN/host-routes-after.txt"
+~~~
+
+Only the four reserved namespaces are removed; data files and the host firewall remain. Expected: no lab namespaces and unchanged host network configuration. Inspect diffs; DHCP can change displayed state independently. If processes remain, stop their identified lab terminals rather than killing unrelated processes.
+
+## D. Collect representative workloads over a week
+
+Start after the first endpoint replay has no unresolved integrity/direction problems.
+
+For each capture, repeat B1's session/address block to create a **fresh directory and manifest**. Keep settings unchanged during a comparison. For a thirty-minute session capped at roughly 500 MB:
+
+~~~powershell
+$CaptureArgs = @('-i', "$CaptureInterface", '-y', 'EN10MB', '-p', '-F', 'pcap', '-s', '0', '-f', $CaptureFilter, '-a', 'duration:1800', '-a', 'filesize:500000', '-w', (Join-Path $PcSession 'endpoint.pcap'))
+& $Dumpcap @CaptureArgs 2>&1 | Tee-Object -FilePath (Join-Path $PcSession 'capture-console.txt')
+if ($LASTEXITCODE -ne 0) { throw 'Capture failed: inspect the log.' }
+$Manifest['capture_finished_utc'] = (Get-Date).ToUniversalTime().ToString('o')
+$Manifest | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $PcSession 'session.json')
+~~~
+
+For sixty minutes use duration:3600, retaining the size cap. First limit reached ends capture. Record actual duration/early size stops and check free space before each transfer.
+
+| Day | Suggested sessions | Record |
+| --- | --- | --- |
+| 1 | Qualification browsing, then 30 minutes work | Initial integrity, scope and directions |
+| 2 | 30–60 minutes gaming | Session/update context |
+| 3 | 30 minutes work and 30 minutes video/social browsing | Separate sessions |
+| 4 | A legitimate download/update/upload, up to 30 minutes | Volume/size diversity and early limits |
+| 5 | 30 minutes light/idle use | Distinguish low activity from capture failure |
+| 6 | 30–60 minutes mixed use | New destinations and transitions |
+| 7 | Repeat an earlier workload | Later-time comparison with the same settings |
+| 8–14, optional | Missing/repeated legitimate workflows | More coverage, not guaranteed reliability |
+
+After each session: transfer closed files, run B4/B5 into a fresh directory, review and fill one results row. Keep raw originals privately on the PC or your archive. Move/archive old raw copies before disk becomes scarce. The collector's directory budget does not cover inbox PCAPs or other capture tools.
+
+Independent sessions support feature analysis and future training design. They are not a continuous online profile, automatically benign data or evidence about family phones. Calendar duration alone does not establish confidence.
+
+## E. Return a useful handoff
+
+Edit APF_RUN/RESULTS.md, copied from PILOT_RESULTS_TEMPLATE.md. Find its private path with:
+
+~~~bash
+printf '%s\n' "$APF_RUN/RESULTS.md"
+~~~
+
+Send its redacted contents/file with code revision, test counts, qualification summaries, endpoint summaries, actual lab outcomes and the **first unresolved failure**. Use aliases PC-1, CLIENT-1 and TARGET-1.
+
+Remove real addresses, MACs, usernames, domains, private paths, account details and tokens. Initially omit raw PCAPs, complete manifests and unredacted household logs. A packet-level issue can be narrowed to a small sanitized sample after summary review.
+
+Next decisions: fix quality defects; establish observed scope; qualify native forwarding/recovery; build session/identity evidence and independent attack/benign campaigns; train/calibrate site-compatible models; then join qualified decisions to reversible actions.
+
+## References and validation boundary
+
+- [Dumpcap options and limits](https://www.wireshark.org/docs/man-pages/dumpcap.html)
+- [Endpoint offloading effects](https://wiki.wireshark.org/capturesetup/offloading)
+- [Network namespaces](https://man7.org/linux/man-pages/man7/network_namespaces.7.html)
+- [ip-netns commands](https://man7.org/linux/man-pages/man8/ip-netns.8.html)
+- [Virtual Ethernet pairs](https://man7.org/linux/man-pages/man4/veth.4.html)
+
+Commands were checked against repository entry points and primary tool documentation. Syntax/replay-helper checks are development verification. Windows driver behavior, namespace topology, real PC traffic and actual t530 forwarding still require your execution and recorded results; they are not pre-filled as successful.

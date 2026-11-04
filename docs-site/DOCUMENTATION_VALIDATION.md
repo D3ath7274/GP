@@ -1,5 +1,13 @@
 # Validation
 
+## No-mirror step-by-step pilot · 2026-11-04
+
+Added matching standalone Markdown/MDX walkthroughs and an editable Markdown results template. The procedure separates t530 software qualification, real PC endpoint capture, address-scoped replay, operator-run namespaced firewall evidence and a seven-day workload schedule. Current CLI arguments and schemas were cross-checked against home_sensor.py, audit_home_data.py, both qualifiers and nft_quarantine.py. The current mirror backend's outgoing-copy skip is explicitly why endpoint/router observations use independent bidirectional capture plus replay. No runtime, model, REST contract or installed ruleset artifact changed.
+
+All 27 Bash command blocks passed Git Bash syntax checking, all six PowerShell blocks passed the native parser, and both embedded Python programs compiled. A generated sanitized Ethernet PCAP exercised the exact replay helper through the actual collector/auditor: IPv4 and IPv6 endpoint scopes produced four 71-column UNKNOWN rows, four outgoing/four incoming packets and four complete HTTP request observations. The report returned REVIEW with no integrity issues as expected for replay/held/partial conditions. A second invocation refused existing output and preserved the report hash. This was development-workstation smoke verification, not a Windows-driver capture or t530 forwarding result. The standalone guide and website body match.
+
+Mintlify build/validation, broken-link and accessibility checks passed on 42 authored MDX pages, retaining the existing accent AA-versus-AAA advisory. Actual Windows/Npcap behavior, offload effects, namespace creation, nftables JSON/read-back/expiry, independent target receipts, capture losses, physical-host route preservation and real workload representativeness require operator execution and are not pre-filled as PASS in the handoff template.
+
 ## Python 3.10 empty-query compatibility · 2026-11-04
 
 Remote run 41858261375 passed docs-sync and docs-build, but identified one failing HTTP test: the workbench root returned 400 on Ubuntu 22.04/Python 3.10. Source review confirmed that Python 3.10's strict parse_qs raises on empty input. The handler now bypasses parsing only for absent/empty queries, preserving strict nonempty-query validation. The existing HTTP test additionally checks trailing-question-mark routes and malformed fields. All twenty workbench tests passed locally after the fix. Target verification must come from the subsequent Ubuntu job; this record does not reinterpret the failed run as a pass.

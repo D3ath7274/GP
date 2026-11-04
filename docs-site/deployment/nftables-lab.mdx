@@ -4,6 +4,8 @@ title: "Test temporary firewall quarantine"
 
 The reference adapter is an operator-run CLI for an isolated Linux router. It adds or removes an IPv4 source in the framework's dedicated nftables set. The kernel expires entries. A successful CLI result verifies set membership, while a paired traffic test verifies forwarding impact.
 
+For a complete one-NIC setup without a router mirror or extra VM, use [the namespaced no-mirror pilot](/deployment/no-mirror-pilot). It supplies two clients, a routed firewall, a disposable server, two capture points, TTL/reversal checks and owned-resource cleanup. These are execution instructions awaiting actual t530 evidence, not a new automatic decision loop or vendor qualification.
+
 ## Prepare the lab
 
 Use two clients and a destination behind a routed Linux test firewall. Verify both clients can reach the destination before loading the framework's table. Choose a test subnet and a protected address for your management path. The examples below use documentation addresses and must match your isolated topology. Check that an `inet apf_quarantine` table does not already exist before provisioning it.

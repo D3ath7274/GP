@@ -3,6 +3,8 @@ title: "Collect home traffic for two weeks"
 description: "Run the site-v3 collector on Ubuntu with daily CSVs, observation history and capture health."
 ---
 
+If whole-network visibility is unavailable, follow [the no-mirror pilot](/deployment/no-mirror-pilot) for bounded PC endpoint captures and replay on the t530. The live backend skips locally outgoing packet copies for its mirror-input use case; this is why endpoint/router tests use independently captured bidirectional PCAPs. Replay retains its own provenance and review gates, and independent sessions are not a continuous approved baseline.
+
 The dedicated home collector writes the versioned **site-v3.0** dataset and serves the dashboard on loopback port 8081. Its five-second rows summarize each local IP address and VLAN. Historical profiles describe observed behavior. Ground truth stays **UNKNOWN** until you independently review activity.
 
 If the t530 is connected to an ordinary router LAN port, start with [the home visibility/pilot steps](/deployment/home-pilot-step-by-step). Seeing the sensor's own traffic or broadcasts is insufficient. Prove the intended PC/phone request and response paths before a long-duration baseline run.
