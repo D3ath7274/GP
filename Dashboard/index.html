@@ -251,6 +251,10 @@
       const ml = status.ml_mode || "—";
       setBadge($("ml"), ml==="AUTHORIZE"?"b-bad":ml==="OBSERVE"?"b-warn":"b-secondary", "ML " + ml);
       $("sw").textContent = (status.switches ?? "—") + " switch" + (status.switches===1?"":"es");
+      if(status.deployment_mode === "passive"){
+        $("detect").textContent = "PASSIVE IDS";
+        $("sw").textContent = status.capture_state.replaceAll("_", " ");
+      }
 
       const [blk, m, al] = await Promise.all([
         getJSON("/ips/blocked"), getJSON("/ips/metrics"), getJSON("/ips/alerts?n=50")
@@ -291,7 +295,7 @@
       const bt = m?.by_tier || {};
       const tiers = [
         {k:"Snort 3", v:bt.snort, d:"signatures (Tier 1)", icon:"radio", on:m?.snort_running},
-        {k:"Rate + DAI", v:bt.rate_dai, d:"counters (Tier 2)", icon:"activity", on:true},
+        {k:"Rate + DAI", v:bt.rate_dai, d:"counters (Tier 2)", icon:"activity", on:m?.deployment_mode !== "passive"},
         {k:"Random Forest", v:bt.rf, d:"supervised (Tier 3)", icon:"brain", on:m?.rf_loaded},
         {k:"Autoencoder", v:bt.ae, d:"anomaly (Tier 4)", icon:"layers", on:m?.ae_loaded},
       ];

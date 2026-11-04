@@ -1,0 +1,24 @@
+---
+title: "Dashboard and unblock workflow"
+---
+
+Open `/` on the controller's REST origin. The single dashboard screen polls status, metrics, alerts and blocks.
+
+The header shows connection state, the last successful status update, DETECT, ML mode and switch count. Status is polled every two seconds. If status fails, the header shows **controller offline** and panels can retain the last values. When status succeeds but a panel request fails, that panel can show empty or default data.
+
+| Panel | Meaning |
+| --- | --- |
+| Threat level and counters | Local summary of recent alerts, confirmed sources and block records |
+| Detection tiers | Snort process state, configured detection state and model availability |
+| System health | CPU, memory and root filesystem usage when psutil is available |
+| Attacks by type | Snort classifications accumulated in this session |
+| Recent events | Recent Snort alerts |
+| Blocked hosts | Controller REST and tier block records with an unblock action |
+
+**UNDER ATTACK** means the UI found a confirmed source or a block record. **ELEVATED** means it found a recent alert without either condition. **CLEAR** means those counters were zero or unavailable. The Rate + DAI tile is always marked loaded by the UI. RF and AE availability indicators come from the API. Their per-tier counts show a dash when the API omits them.
+
+The blocked table shows source IP, record kind and attack type or reason. A source can appear under both REST and tier kinds. The dashboard has no login, search or filtering controls.
+
+Use **Unblock** on the row for the intended IP. The browser sends a REST DELETE and refreshes the view. Confirm the OVS drop was removed and retest client connectivity. External host-firewall rules are a separate path. A block record alone does not verify the switch accepted a flow modification.
+
+If panels are empty, check the browser is using the controller's origin and inspect `/ips/metrics` and `/ips/blocked` directly. Keep dashboard access within your management network.

@@ -1,0 +1,26 @@
+---
+title: "Detection modes and controls"
+---
+
+Run commands from the controller directory. UDP delivery has no acknowledgement. Confirm mode changes in controller logs or REST status.
+
+```bash
+python3 ipsctl.py CONTROL:DETECT:OFF
+python3 ipsctl.py CONTROL:ML:OBSERVE
+curl -fsS http://127.0.0.1:8081/ips/status
+```
+
+| Control | Effect |
+| --- | --- |
+| `CONTROL:DETECT:ON` | Enables traditional enforcement for eligible Snort alerts and confirmed rate events |
+| `CONTROL:DETECT:OFF` | Disables those automatic blocks |
+| `CONTROL:ML:OFF` | Stops ML scoring |
+| `CONTROL:ML:OBSERVE` | Scores without ML enforcement |
+| `CONTROL:ML:AUTHORIZE:0.80` | Enables model mitigation and sets the RF cutoff |
+| `CONTROL:ML:RF:OFF`, `CONTROL:ML:AE:OFF` | Isolates a model. Use `ON` to restore it |
+| `CONTROL:ML:AE:BLOCK:0.85` | Adjusts the AE block band separately |
+| `CONTROL:ML:DEFER:ON` | Skips AE action on already labeled rows |
+| `CONTROL:CLEAR` | Clears detection state |
+| `CONTROL:UNBLOCK:<ip>` | Requests enforcement cleanup |
+
+For collection use both detection and ML OFF. For model shadow testing use detection OFF and ML OBSERVE. DAI logs binding conflicts. Snort can continue producing alerts when its automatic blocking is disabled.

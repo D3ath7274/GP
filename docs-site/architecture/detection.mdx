@@ -1,0 +1,16 @@
+---
+title: "Detection tiers and decisions"
+---
+
+| Tier | Evidence | Outcome and limitations |
+| --- | --- | --- |
+| Snort 3 | Rule and inspector alerts | Eligible alerts can trigger source mitigation with detection enabled. Coverage depends on loaded rules and monitored interfaces. |
+| Rate and DAI | Per-source counters and ARP binding history | Sustained rate detections can block. DAI reports binding conflicts and contributes labeling evidence. |
+| RF | Preprocessed flow row | Predicts a learned class and score. Enforcement requires AUTHORIZE and the configured band. |
+| AE | Normalized reconstruction error | Flags deviations. The score is not a calibrated probability of compromise. |
+
+The four local Snort rules are ICMP echo traffic (SID 1000001), SYN traffic (1000002), UDP to destination port 53 (1000003), and UDP to other ports (1000004). Their configured count/window pairs are 500/5s, 2000/5s, 500/5s and 500/5s respectively. These are separate from Python rate thresholds.
+
+The Python rate detector checks more than 500 ICMP observations, more than 100 SYNs across more than 100 ports with fewer than 50 ACKs for a scan, or more than 300 SYNs with at most 10 ports and fewer than 50 ACKs for a SYN flood. More than 500 UDP packets can yield UDP flood or control-plane saturation, depending on port diversity. The confirmation map sets three qualifying windows for ICMP and UDP floods and two for SYN flood and scan. Inspect confirmation logs for the actual escalation path.
+
+The controller initializes RF block and flag thresholds at 0.90 and 0.80. AE flag and block defaults are 0.60 and 0.73. The launch guide's example AUTHORIZE command overrides the RF block threshold. A model loaded indicator reflects availability rather than detection effectiveness.

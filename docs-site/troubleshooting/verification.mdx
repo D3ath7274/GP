@@ -1,0 +1,14 @@
+---
+title: "Verify and troubleshoot"
+---
+
+| Symptom | Check |
+| --- | --- |
+| CSV stays empty | Verify switch registration and send traffic through the managed datapath |
+| Alerts but no mitigation | Verify modes, identify the deciding tier and inspect switch or firewall counters |
+| Block entry but traffic passes | Check source MAC and ingress path, flow priority and matching packet counts |
+| Dashboard missing | Check controller port and the repository-relative Dashboard/index.html |
+| Frequent benign anomalies | Use OBSERVE and collect representative site data before tuning |
+| High CPU or sparse scores | Compare CSV row counts with scoring logs and review the per-window limit |
+
+For an authorized lab test, measure connectivity before and after, verify matching drop counters with `ovs-ofctl dump-flows`, test a separate benign client and record rollback results. Test each model independently before trying the full stack.

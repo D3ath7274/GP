@@ -1,0 +1,10 @@
+table inet apf_quarantine {
+    set blocked_v4 {
+        type ipv4_addr
+        flags timeout
+    }
+    chain forward_guard {
+        type filter hook forward priority -5; policy accept;
+        ip saddr @blocked_v4 drop
+    }
+}

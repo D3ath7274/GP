@@ -1,0 +1,22 @@
+---
+title: "Install the controller"
+---
+
+## Prerequisites
+
+Use an Ubuntu/Linux controller host with Open vSwitch, Python and a management connection. The project runbook records a Python 3.10 environment with Ryu 4.34, an Eventlet compatibility patch and scikit-learn 1.6.1 for the shipped RF artifact. Install and test the Python dependencies in the environment that actually launches Ryu. Keep the system Python symlink intact.
+
+Build Snort 3 and LibDAQ from source using the repository installation runbook. Verify the installed version before copying the project configuration.
+
+```bash
+/usr/local/bin/snort -V
+sudo install -d /etc/snort/rules /var/log/snort
+sudo install -m 644 Controller/snort3/sdn_ips.lua /etc/snort/sdn_ips.lua
+sudo install -m 644 Controller/snort3/sdn_ips_local.rules /etc/snort/rules/sdn_ips_local.rules
+sudo /usr/local/bin/snort -T -c /etc/snort/sdn_ips.lua -i enp1s0
+python3 -c 'import ryu, sklearn, numpy, pandas, joblib'
+```
+
+Replace `enp1s0` with a suitable interface present on the installation host. Install `psutil` in the controller Python environment for resource metrics. Verify that both shipped model files are present before enabling inference.
+
+Use the [placement guide](/deployment/placement) to choose a traffic path before following the [quickstart](/getting-started/quickstart).

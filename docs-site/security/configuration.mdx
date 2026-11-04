@@ -1,0 +1,19 @@
+---
+title: "Configuration and management access"
+---
+
+The controller reads `Controller/ips_config.json`. Set `lan_cidr` for the monitored LAN, `ext_whitelist` for exempt management IPs and `protected_macs` for MAC-based tier protection. The REST IPv4 fallback requires separate consideration when testing exemptions.
+
+| Setting | Purpose |
+| --- | --- |
+| `SNORT_PHYS_IFACE`, `SNORT_IFACES` | Select physical and monitored interfaces |
+| `IPS_NO_TAP` | Disable the TAP path |
+| `IPS_V2_FEATURES` | Select the corrected feature schema |
+| `IPS_MAX_SCORE_ROWS` | Limit model scoring per window |
+| `IPS_BLOCK_SECONDS` | Set tier MAC drop duration. Zero means no hard timeout |
+| `IPS_EXTERNAL_BLOCK`, `IPS_MGMT_WHITELIST` | Opt in to host firewall drops and supplement management exemptions |
+| `IPS_GET_LOG` | Set WSGI access log output |
+| `IPS_HOST`, `IPS_PORT` | Configure the UDP client destination |
+| `RYU_API_URL` | Configure the standalone Snort bridge destination |
+
+The REST routes and UDP control path lack application-level authentication. Restrict them to the management boundary with network controls. Handle CSVs, alerts and optional evidence packet captures as sensitive. Snort can inspect packet content depending on configuration, and evidence capture may retain frames.

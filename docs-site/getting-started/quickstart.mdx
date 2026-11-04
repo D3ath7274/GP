@@ -1,0 +1,24 @@
+---
+title: "Verify your first capture"
+---
+
+Use Linux on the controller, a reachable OpenFlow 1.0 OVS datapath, the project Python dependencies and Snort 3 built from source. The live models are under `Controller/ml_models`. Check that `/usr/local/bin/snort -V` reports version 3 and that your site has the project Lua and local rules installed.
+
+From the repository root, launch from the controller directory. Use the actual physical interface name and the TAP path for this example.
+
+```bash
+cd Controller
+sudo SNORT_PHYS_IFACE=enp1s0 SNORT_IFACES=snort_tap IPS_V2_FEATURES=1 \
+  python3 -c "import collections,collections.abc; collections.MutableMapping=collections.abc.MutableMapping; from ryu.cmd.manager import main; main()" \
+  Controller_main_Claude.py --wsapi-port 8081
+```
+
+Leave detection and ML enforcement off. Generate ordinary traffic through the managed switch, then check these from the controller host.
+
+```bash
+curl -fsS http://127.0.0.1:8081/ips/switches
+curl -fsS http://127.0.0.1:8081/ips/status
+wc -l dataset.csv
+```
+
+A registered datapath and a growing CSV establish two separate facts. The controller saw a switch, and traffic reached the collector. Open the controller's REST origin in a browser to see the dashboard.

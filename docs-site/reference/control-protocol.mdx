@@ -1,0 +1,24 @@
+---
+title: "UDP control protocol"
+---
+
+The listener binds UDP 9999 on all IPv4 interfaces. Run `ipsctl.py` locally unless the management network deliberately permits remote control. The client sends text and prints a send receipt. Review controller logs for processing results.
+
+| Message | Purpose |
+| --- | --- |
+| `CONTROL:DETECT:ON` or `OFF` | Set the traditional detection mode |
+| `CONTROL:ML:OFF`, `OBSERVE` or `AUTHORIZE:0.80` | Select inference and enforcement mode |
+| `CONTROL:ML:STATS` | Print RF inference statistics |
+| `CONTROL:ML:FLAG:0.65`, `CONTROL:ML:BLOCK:0.85` | Set RF bands |
+| `CONTROL:ML:AE:FLAG:0.60`, `CONTROL:ML:AE:BLOCK:0.73` | Set AE bands |
+| `CONTROL:ML:RF:ON`, `CONTROL:ML:AE:ON`, `CONTROL:ML:DEFER:ON` | Enable a model or AE deferral. Use OFF to disable |
+| `CONTROL:CLEAR` or `CONTROL:CLEAR:192.0.2.10` | Clear collection detection state |
+| `CONTROL:UNBLOCK:192.0.2.10` | Request rule removal and state cleanup |
+| `CONTROL:ROTATE:baseline.csv` | Rotate CSV. Optional suffix supplies an expected attack class to the lab validator |
+| `REGISTER:NAME:camera:192.0.2.10` | Associate a display name with an IPv4 address |
+| `REGISTER:IOT:192.0.2.10:IOT:Camera` | Register an IoT device type by IP |
+| `LABEL_OVERRIDE:192.0.2.10:Port Scan` | Override labeling in a controlled collection session. Use `clear` to remove it |
+| `ATTACK_START:nmap:port-scan`, `ATTACK_STOP` | Set or clear collection metadata |
+| `MININET_EVENT:pingall` | Record a lab event label |
+
+Use simple local filenames for rotation. The optional validator referenced by the runtime is absent from the deployment-only checkout. Verify the resulting file and logs. See [operating modes](/operations/modes) for safe mode combinations.

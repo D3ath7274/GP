@@ -1186,6 +1186,9 @@ class TrafficCapture:
                 # into the per-window summary below. (Logging every flow every window floods
                 # stdout through the tee pipe and can stall the whole controller.)
                 if ml_mode == 'OBSERVE':
+                    observer = getattr(self.controller, 'on_detection_observed', None)
+                    if observer is not None and ml_conf >= flag_thr:
+                        observer('RF', src_ip, dst_ip, ml_type, ml_conf)
                     self._log('info',
                         "[ML-OBSERVE] %s → %s  verdict=%s  conf=%.2f  band=%s",
                         src_ip, dst_ip, ml_type, ml_conf, band)
@@ -1296,6 +1299,9 @@ class TrafficCapture:
 
                 # OBSERVE: surface each FLAGGED window individually.
                 if ae_mode == 'OBSERVE':
+                    observer = getattr(self.controller, 'on_detection_observed', None)
+                    if observer is not None:
+                        observer('AE', src_ip, dst_ip, 'Anomaly (AE)', ae_conf)
                     self._log('info',
                         "[AE-OBSERVE] %s → %s  anomaly conf=%.2f  err=%.4f  band=%s",
                         src_ip, dst_ip, ae_conf, ae_err, band)

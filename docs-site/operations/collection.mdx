@@ -1,0 +1,16 @@
+---
+title: "Collect and validate site data"
+---
+
+Enable `IPS_V2_FEATURES=1` and start in capture-only mode. Record device roles, address changes, time ranges and intentional test activity. Separate normal-only windows from attack sessions and preserve raw captures in restricted storage. Controller startup can rotate an existing dataset.
+
+Collect ordinary usage across several days, including device reconnects and scheduled jobs. Observe which sources the switch actually exposes. Per-device profiles are IP-keyed and live in memory. The maturity indicator requires at least 20 observations and 180 seconds. An address change or restart can affect the baseline.
+
+Fit models offline with chronological or session-separated validation. Keep benign calibration, held-out benign and held-out attack sessions separate. Compare false alarms per device-day, recall and score coverage. The shipped model artifacts remain fixed during runtime.
+
+```bash
+cd Controller/ml_models
+python3 retrain_rf_v4.py --csv /path/to/labeled.csv --out rf_candidate.joblib
+```
+
+The AE bundle builder uses existing H5 weights and derives scaling and a threshold from CSV data. Reusing weights with different scaling changes inputs, so validate the resulting bundle before promotion. Back up active artifacts and restart after a deliberate swap. Nightly promotion and hot reload are planned work.

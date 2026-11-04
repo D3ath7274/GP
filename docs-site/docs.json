@@ -1,0 +1,62 @@
+{
+    "$schema":  "https://mintlify.com/docs.json",
+    "theme":  "mint",
+    "name":  "Adaptive IoT IPS",
+    "colors":  {
+                   "primary":  "#087F73",
+                   "light":  "#42D9C3",
+                   "dark":  "#087F73"
+               },
+    "navigation":  {
+                       "groups":  [
+                                      {
+                                          "group":  "Start",
+                                          "pages":  [
+                                                        "index",
+                                                        "getting-started/install",
+                                                        "getting-started/quickstart"
+                                                    ]
+                                      },
+                                      {
+                                          "group":  "Operate",
+                                          "pages":  [
+                                                        "operations/dashboard",
+                                                        "operations/modes",
+                                                        "operations/collection",
+                                                        "troubleshooting/verification",
+                                                        "operations/incident-response"
+                                                    ]
+                                      },
+                                      {
+                                          "group":  "Deploy and develop",
+                                          "pages":  [
+                                                        "architecture/data-flow",
+                                                        "deployment/placement",
+                                                        "security/configuration",
+                                                        "integrations/snort",
+                                                        "architecture/detection",
+                                                        "developers/maintenance",
+                                                        "deployment/passive-sensor",
+                                                        "deployment/nftables-lab"
+                                                    ]
+                                      },
+                                      {
+                                          "group":  "API",
+                                          "pages":  [
+                                                        "api-reference/overview",
+                                                        "reference/control-protocol",
+                                                        "reference/change-log"
+                                                    ]
+                                      },
+                                      {
+                                          "group":  "REST endpoints",
+                                          "openapi":  "/openapi.json"
+                                      }
+                                  ]
+                   },
+    "api":  {
+                "playground":  {
+                                   "display":  "none"
+                               }
+            }
+}

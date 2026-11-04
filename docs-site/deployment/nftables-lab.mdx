@@ -1,0 +1,31 @@
+---
+title: "Test temporary firewall quarantine"
+---
+
+The reference adapter is an operator-run CLI for an isolated Linux router. It adds or removes an IPv4 source in APF's dedicated nftables set. The kernel expires entries. A successful CLI result verifies set membership, while a paired traffic test verifies forwarding impact.
+
+## Prepare the lab
+
+Use two clients and a destination behind a routed Linux test firewall. Verify both clients can reach the destination before loading the APF table. Choose a test subnet and a protected address for your management path. The examples below use documentation addresses and must match your isolated topology. Check that an `inet apf_quarantine` table does not already exist before provisioning it.
+
+```bash
+cd Controller
+sudo nft -c -f scripts/apf-quarantine.nft
+sudo nft -f scripts/apf-quarantine.nft
+sudo python3 nft_quarantine.py status
+```
+
+## Test containment and recovery
+
+```bash
+sudo python3 nft_quarantine.py add 192.0.2.10 --scope 192.0.2.0/24 --protect 192.0.2.1/32 --ttl 30
+sudo python3 nft_quarantine.py status
+sudo python3 nft_quarantine.py remove 192.0.2.10
+```
+
+1. While the element is present, try a new connection from the selected client and from the second client. Record whether the first fails and the second succeeds.
+2. After removal, verify the first client recovers. Repeat without removal and verify native expiry after the TTL.
+3. Try the protected address and an out-of-scope address. Both requests must fail. Repeat an add while it is active and confirm the timer was not extended.
+4. For a lab teardown, delete only the APF-owned table with `sudo nft delete table inet apf_quarantine`.
+
+The rule covers forwarded IPv4 traffic matched by source address. Confirm the address is unique in that routing context and is visible at the forward hook. Shared or reassigned addresses require identity checks before containment. The passive dashboard does not invoke this CLI. A CLI error leaves the outcome unconfirmed until you inspect the actual set.

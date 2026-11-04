@@ -1,0 +1,319 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "IPS Management API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8081"
+    }
+  ],
+  "paths": {
+    "/ips/status": {
+      "get": {
+        "summary": "Read controller status",
+        "responses": {
+          "200": {
+            "description": "Controller response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "switches": {
+                      "type": "integer"
+                    },
+                    "detection_enabled": {
+                      "type": "boolean"
+                    },
+                    "ml_mode": {
+                      "type": "string"
+                    },
+                    "rest_blocked": {
+                      "type": "integer"
+                    },
+                    "tier_blocked": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/switches": {
+      "get": {
+        "summary": "List connected switches",
+        "responses": {
+          "200": {
+            "description": "Controller response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "switches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/blocked": {
+      "get": {
+        "summary": "List block records",
+        "responses": {
+          "200": {
+            "description": "Controller response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "blocked": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/alerts": {
+      "get": {
+        "summary": "List Snort alerts",
+        "responses": {
+          "200": {
+            "description": "Controller response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "alerts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/metrics": {
+      "get": {
+        "summary": "Read dashboard metrics",
+        "responses": {
+          "200": {
+            "description": "Controller response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "snort_running": {
+                      "type": "boolean"
+                    },
+                    "rf_loaded": {
+                      "type": "boolean"
+                    },
+                    "ae_loaded": {
+                      "type": "boolean"
+                    },
+                    "detection_enabled": {
+                      "type": "boolean"
+                    },
+                    "ml_mode": {
+                      "type": "string"
+                    },
+                    "alerts_total": {
+                      "type": "integer"
+                    },
+                    "alerts_last_60s": {
+                      "type": "integer"
+                    },
+                    "confirmed_attackers": {
+                      "type": "integer"
+                    },
+                    "by_attack": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "by_tier": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "ram_pct": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "cpu_pct": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "disk_pct": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "switches": {
+                      "type": "integer"
+                    },
+                    "rest_blocked": {
+                      "type": "integer"
+                    },
+                    "tier_blocked": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/block": {
+      "post": {
+        "summary": "Request a source block",
+        "responses": {
+          "200": {
+            "description": "Controller response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "src_ip": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "mac": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "switches": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON or missing source"
+          },
+          "500": {
+            "description": "Controller reported an enforcement error"
+          }
+        },
+        "description": "MAC matches use the configured block duration. IPv4 fallback uses the request timeouts. Verify enforcement on the datapath.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "src_ip"
+                ],
+                "properties": {
+                  "src_ip": {
+                    "type": "string",
+                    "format": "ipv4"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "default": "Snort alert"
+                  },
+                  "idle_timeout": {
+                    "type": "integer",
+                    "default": 0
+                  },
+                  "hard_timeout": {
+                    "type": "integer",
+                    "default": 600
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/block/{src_ip}": {
+      "delete": {
+        "summary": "Clear a source block",
+        "responses": {
+          "200": {
+            "description": "Controller response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "src_ip": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "src_ip",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "ipv4"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

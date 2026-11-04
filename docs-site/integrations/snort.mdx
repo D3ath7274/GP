@@ -1,0 +1,9 @@
+---
+title: "Snort and alternate reader path"
+---
+
+The merged runtime manages Snort and consumes JSON alerts. Choose the mirror path according to placement. The repository supplies `Controller/snort3/sdn_ips.lua` and `sdn_ips_local.rules`. Confirm the alert file changes during a controlled lab test and match the SID to the loaded rules.
+
+The standalone reader and bridge are an alternate integration. The bridge uses `RYU_API_URL`, defaulting to `http://127.0.0.1:8081/ips/block`. Verify the startup destination and the listening controller before using it. Run a single enforcement path for each alert source so testing can attribute a drop to its origin.
+
+The repository config includes four active local rules. Full web application inspection requires a separate documented configuration or WAF integration. Encrypted traffic content requires a point with legitimate visibility into plaintext.

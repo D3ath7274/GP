@@ -1,0 +1,17 @@
+---
+title: "Implementation changelog"
+---
+
+Use a new dated heading for each implementation change. Link the affected reference pages and record the checks you ran.
+
+## 2026-11-04 · Passive IDS sensor
+
+Added a Ryu-independent Ethernet capture and replay entry point with a loopback dashboard, v2 CSV output and optional RF/AE observation. A firewall mirror can feed the sensor without giving APF write access. See the [passive sensor guide](/deployment/passive-sensor).
+
+## 2026-11-04 · Reference firewall quarantine
+
+Added an operator-run nftables adapter for scoped temporary IPv4 source quarantine, set read-back and explicit removal. See the [lab procedure](/deployment/nftables-lab).
+
+## 2026-11-03 · Documentation baseline
+
+Documented the four-tier runtime, operator workflows, deployment paths and management contracts. The coverage matrix maps source files to their documentation.

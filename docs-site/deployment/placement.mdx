@@ -1,0 +1,13 @@
+---
+title: "Select deployment placement"
+---
+
+| Placement | Visibility and enforcement |
+| --- | --- |
+| Inline bridge | Two Ethernet interfaces place OVS between the router and a downstream switch or AP. It can enforce on traffic that crosses the bridge. |
+| AP on the t530 | Requires a detected AP-capable radio and a verified forwarding path through OVS. |
+| Mirror or SPAN | Provides copies within the mirror configuration. Drop actions on the sensor do not stop the original traffic. |
+
+An all-in-one router's built-in Wi-Fi can bypass an appliance attached to a LAN port. Devices on the same downstream switch may also communicate locally. Verify placement with a controlled transfer and counters before collecting baselines.
+
+Keep management reachability available during installation. Back up interface configuration, confirm IP and gateway placement, and test both management and forwarding after changing the bridge. The repository includes separate bridge and AP runbooks. The documented t530 had one Ethernet interface and no detected wireless interface.

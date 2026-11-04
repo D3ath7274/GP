@@ -1,0 +1,11 @@
+---
+title: "Verify, contain and recover"
+---
+
+1. Record time, source, destination, evidence tier and network placement. Check the alert against expected device activity and confirm that the source crossed the monitored datapath.
+2. Check the installed OpenFlow match and packet counters. For host firewall mitigation, inspect the host firewall separately. For a mirror deployment verify any enforcement on the device that actually forwards traffic.
+3. Compare an authorized test source with an unaffected client. Record the mitigation window and application availability.
+4. Remove the rule using the matching control path. For controller-managed quarantine use `CONTROL:UNBLOCK:192.0.2.10` and confirm logs, rules and connectivity. Dashboard unblock targets the REST/OpenFlow path.
+5. Preserve relevant controller logs, alert records and configuration in restricted storage. Avoid including packet captures or local addresses in public reports.
+
+For deployment rollback, restore the original management and forwarding path before retiring the bridge. Keep previous model artifacts to restore behavior after a model promotion. When testing a timed drop, verify switch expiry independently of the dashboard record.

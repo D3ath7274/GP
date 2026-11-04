@@ -1,0 +1,19 @@
+---
+title: "Develop and verify changes"
+---
+
+| Area | Entry point |
+| --- | --- |
+| Controller and REST | `Controller/Controller_main_Claude.py` |
+| Packet aggregation, labeling, CSV | `Controller/traffic_capture.py` |
+| RF and AE runtime | `Controller/ml_inference.py`, `Controller/ae_inference.py` |
+| Snort launch and normalization | `Controller/snort_monitor.py` |
+| Alternate Snort chain | `Controller/snort_alert_reader.py`, `Controller/snort_ryu_bridge.py` |
+| Dashboard | `Dashboard/index.html` |
+| TAP and deployment helpers | `Controller/traffic_mirror.py`, `Controller/scripts/` |
+
+Use the [data flow](/architecture/data-flow) to trace a packet or alert. Keep OpenFlow sends on the Ryu hub. Preserve the queue handoff when adding detector callbacks and preserve the single-job RF runtime setting when exporting a model. Compare feature names, order, types, defaults and model input selection before changing capture.
+
+Use Python compilation as a syntax check. Exercise switch registration, capture and drop counters on an isolated Linux/OVS setup to verify runtime changes. Review the [verification workflow](/troubleshooting/verification) before changing mitigation.
+
+Update the relevant page and [implementation changelog](/reference/change-log) in the same contribution. REST contract changes also require an OpenAPI update. The repository hook and PR check require an implementation changelog entry.

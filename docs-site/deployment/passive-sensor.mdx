@@ -1,0 +1,38 @@
+---
+title: "Test the passive sensor"
+---
+
+Run APF as a standalone IDS on the t530 or attach it to a firewall's supported TAP or mirror output. The firewall keeps forwarding traffic. This integration uses mirrored Ethernet frames and requires no firewall credentials.
+
+## Replay a known capture
+
+Install Scapy in the Python environment used for the sensor. Install the existing model dependencies if you want RF and AE observation. Start with a short, sanitized Ethernet PCAP.
+
+```bash
+cd Controller
+python3 -m pip install scapy
+python3 passive_ids.py --pcap /path/to/test.pcap --capture-only
+```
+
+Replay preserves the spacing between packets and uses the collector's wall-clock windows. It is a smoke test. The dashboard stays available after replay completes. Remove `--capture-only` to score with the shipped bundles in OBSERVE mode. The dashboard displays RF findings at or above the flag threshold and AE flags. Labels in the CSV are detector output or collection defaults and require independent ground truth for training.
+
+## Capture on the t530
+
+Use a dedicated mirror-facing interface. Configure the switch or firewall to mirror the relevant directions and zones. Preserve your existing management interface.
+
+```bash
+cd Controller
+sudo /path/to/python3 passive_ids.py --interface enx0123456789 --dataset home-passive.csv
+```
+
+Use the Python interpreter with Scapy and the model dependencies installed. Live capture requires Linux raw-socket privileges. The sensor binds the dashboard to loopback. From your workstation, forward the port over SSH and open `http://127.0.0.1:8081/`.
+
+```bash
+ssh -N -L 8081:127.0.0.1:8081 operator@t530
+```
+
+Send an ordinary connection between known devices, check for both directions in the capture, and verify that the dataset grows after a window flush. Repeat from each zone you intend to monitor. Use `/ips/status` to check mode and capture state and `/ips/metrics` to verify model availability. Zero switches and an empty block table are expected. Stop with Ctrl+C or SIGTERM. Startup rotates the selected CSV if it already exists.
+
+## Coverage
+
+This entry point covers Ethernet IPv4 flows and ARP observations. It reuses the v2 collector and RF/AE loaders. It does not start Snort, run DAI or install firewall rules. The existing Ryu deployment retains its OpenFlow IPS path. Firewall write adapters, IPv6 qualification and guarded model promotion are later phases. Keep household CSV files private and manage their disk retention. The shipped model scores need site validation before they can support enforcement.
