@@ -1,5 +1,6 @@
 name: Documentation sync
 on:
+  push:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 permissions:
@@ -10,9 +11,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Check documentation record
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: python3 scripts/check_docs_sync.py --base "$BASE_SHA"
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            python3 scripts/check_docs_sync.py --base "$BASE_SHA"
+          else
+            if [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
+              BASE_SHA=$(git rev-parse HEAD^ 2>/dev/null || git hash-object -t tree /dev/null)
+            fi
+            python3 scripts/check_docs_sync.py --from "$BASE_SHA"
+          fi
+  docs-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --global mint@4.2.1195
+      - name: Validate documentation and links
+        working-directory: docs-site
+        run: |
+          mint validate
+          mint broken-links
+          mint a11y

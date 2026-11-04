@@ -2,9 +2,25 @@
 title: "Documentation access and updates"
 ---
 
+## Windows documentation preview on port 3333
+
+From the repository root in PowerShell, run:
+
+```powershell
+.\scripts\start_docs.ps1
+```
+
+Open **http://localhost:3333/**. This starts the actual Mintlify site independently of collection and the controller. The background process survives closing the launching terminal. It serves the checked-out docs-site directory and reloads edited pages. Run the helper again after restarting Windows; an already healthy preview is reused. Install npm's mint@4.2.1195 globally if the helper reports it missing.
+
+The helper fixes the working directory and port, waits for a successful response containing the site identity and reports startup failures. It logs output under .local/docs-preview, which is ignored by Git. A different service occupying the requested port is an error rather than a reason to move silently to another port. Use -Port to choose another port explicitly. For visible console output, use -Foreground. First preparation can require network access and take longer than subsequent starts.
+
+ERR_CONNECTION_REFUSED at localhost:3333 means that local address has no accepting listener. Start the preview before opening the browser. If startup fails, inspect mint-3333.stdout.log and mint-3333.stderr.log in the log directory. A local preview is available on the workstation where it runs; accessing the t530's sensor documentation uses the separate tunnel below.
+
+## Sensor documentation on port 8081
+
 The home sensor and passive sensor serve the checked-out documentation at **/docs** on their dashboard origin. Through the same SSH tunnel, open http://127.0.0.1:8081/docs. This lightweight local reader loads MDX/Markdown pages from docs-site on each request. After pulling a code/documentation update, refresh the page. The page matches that checkout's version. Native Mintlify search, interactive API components and Mermaid rendering use the Mintlify site; the local reader presents Markdown, tables, code, simple cards and step headings.
 
-Every implementation change belongs with updated pages and a dated entry in the [implementation changelog](/reference/change-log). New routes require the corresponding OpenAPI update. The versioned commit hook and PR documentation guard check for an update record. Reviewers check accuracy and coverage.
+Every implementation change belongs with updated pages and a dated entry in the [implementation changelog](/reference/change-log). New routes require the corresponding OpenAPI update. The versioned commit hook and push/PR documentation guard require both the changelog and an affected page according to the source map. Mintlify checks also run in CI. Reviewers check accuracy and coverage; repository branch rules must require the checks to make failed checks block merging.
 
 ## Keep the hosted Mintlify website current
 

@@ -5,3 +5,5 @@ When changing executable code, runtime configuration, deployment scripts, Snort 
 Check the coverage matrix to locate the relevant page. Update `docs-site/openapi.json` when REST contracts change and update navigation for new pages. Keep runtime claims tied to implementation. Exclude real addresses, device data and credentials from examples. Leave planned capabilities marked as planned.
 
 Run the documentation guard and Mintlify checks described in `docs-site/README.md` before submitting.
+
+Every implementation commit must include both a dated changelog entry and an affected MDX content page. `docs-site/documentation-map.json` maps source patterns to acceptable pages; the first matching rule wins. New or unmapped code requires `docs-site/developers/maintenance.mdx` until a specific rule is added. Internal tooling, dependency and CI changes also need documentation. Use staged files for the local check; an unstaged explanation does not accompany the commit. Keep the map, human coverage matrix and navigation current.

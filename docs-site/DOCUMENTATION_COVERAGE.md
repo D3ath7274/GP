@@ -17,5 +17,7 @@
 | site_features.py, home_sensor.py, daily data audit and service | Collect home traffic for two weeks |
 | site_policy.py, site_policy.example.json, review_site_baseline.py, policy API and dashboard | Shadow policy and reviewed baselines |
 | Loopback documentation reader from Mintlify sources | Documentation access and updates |
+| scripts/start_docs.ps1, background Mintlify preview and readiness logs | Documentation access and updates |
+| Documentation map, Git hook, staged guard and push/PR validation | Develop and verify changes |
 
 Advanced lab and setup steps remain in the repository runbooks.

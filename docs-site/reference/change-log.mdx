@@ -2,6 +2,10 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-04 · Restore local docs and require affected-page updates
+
+Restored the Mintlify preview at localhost:3333 after finding no listener. Added a Windows background launcher with explicit working directory/port, readiness verification, existing-preview reuse and Git-ignored logs. The [access guide](/deployment/documentation-access) now distinguishes the local preview, sensor reader and hosted deployment. Strengthened the documentation guard to require both a dated entry and an affected MDX page from a versioned source map, using staged or committed files. Added guard regression tests and push/PR Mintlify checks. [Developer instructions](/developers/maintenance) explain the map, internal-change requirements and remaining branch-rule configuration. Verified launch and HTTP responses locally; GitHub-hosted checks and required branch settings need remote confirmation.
+
 ## 2026-11-04 · Shadow device policy and reviewed profiles
 
 Added expiring operator-defined IP/VLAN/MAC inventory, TCP initiation role rules, explicit capture-quality states and incident holds to home collection. Separate daily evidence keeps the 71-column CSV unchanged. Candidate summaries never update approved profiles. A stopped-collector review CLI checks CSV/evidence alignment, final run quality and policy/schema provenance before writing an explicit descriptive profile. The read-only policy API and dashboard show findings and review eligibility. See [the walkthrough](/security/shadow-policy). No firewall adapter or model promotion is invoked. Existing empirical history remains unverified; calibrating decisions requires real and labeled attack data. Deterministic tests cover prohibited/allowed initiation handling, conflicts, quality faults, frozen approvals and rejected promotion inputs. Live t530/Linux qualification remains required.

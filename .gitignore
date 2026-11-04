@@ -11,3 +11,6 @@ Controller/GET_log.txt
 
 # Vendored mininet-wifi/ryu/hostapd build tree — only QoS/*.py were integrated into QoS/
 Quality Of Service  part/
+
+# Local documentation preview processes and logs
+/.local/

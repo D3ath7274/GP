@@ -1,5 +1,13 @@
 # Validation
 
+## Restore port 3333 and strengthen documentation checks · 2026-11-04
+
+The initial check found no listener on port 3333. Mintlify started successfully from docs-site. The Windows launcher then started a separate hidden process and exited after readiness; subsequent HTTP checks returned 200 for the homepage, documentation-access, home-collection, shadow-policy and changelog pages. Repeated launch reused the healthy preview. PowerShell parsing and Python compilation passed. Browser rendering and Windows reboot autostart were not tested; after reboot the documented launcher must be run again.
+
+Forty-three Python tests passed, including seven isolated Git repository tests for the stronger documentation guard. The guard rejects a changelog without an affected page, unrelated/unstaged/deleted pages, missing maps and undocumented subsequent commits. Documented PR/push comparisons and the unmapped-code fallback passed. Requirements files, model/rule files, CI and Git hooks are classified as implementation. The GitHub workflow now checks pushes and PRs and validates Mintlify sources; GitHub-hosted execution and required branch settings remain unverified locally.
+
+The staged documentation guard passed. Mintlify build/validation, broken-link and accessibility checks passed, with the existing primary-color AA-versus-AAA advisory. These validate documentation sources; they do not publish a hosted site.
+
 ## Shadow policy and reviewed profiles · 2026-11-04
 
 Thirty-six Python tests passed, including the existing collection/quarantine tests and new checks for TCP initiation scope, role violations, binding conflicts/expiry, run-latched quality and incident holds, incomplete/replay/stale observations, immutable reviewed profiles, policy/schema mismatch rejection and detached API snapshots. Review tests reject active writers, missing/misaligned/tampered evidence and final-run faults reported after an initially eligible window. A CLI test created a loadable profile from synthetic reviewed windows and refused to overwrite it. A real home-collector CLI replay emitted shadow findings, separate evidence and UNKNOWN CSV rows. An HTTP test fetched the policy API, dashboard HTML and local policy guide, and confirmed POST rejection. Synthetic live-health counters exercise gate behavior without establishing actual Linux capture quality. The CSV contract remains 71 columns with UNKNOWN labels.

@@ -1,5 +1,7 @@
 # Adaptive Multi-Tier IPS for IoT over SD-WAN
 
+**Local documentation:** open http://localhost:3333/ after running `.\scripts\start_docs.ps1` from the repository root in PowerShell. The preview runs in the background and reloads documentation changes. See [documentation access](docs-site/deployment/documentation-access.mdx). Implementation commits must include an affected documentation page and a dated changelog entry; the Git hook and push/PR checks enforce inclusion.
+
 For extended real-home collection, use the dedicated [site-v3 home collector](docs-site/deployment/home-collection.mdx). It adds bounded measurements for G11–G17, daily IPv4/IPv6 CSVs, observed profile snapshots, capture-health reporting and a loopback dashboard with local documentation at `/docs`. The recommended first collection period is 14 days after a short measurement qualification. Its versioned feature contract requires separately trained models. The original Ryu and passive v2 paths remain available for their documented purposes.
 
 You can configure [shadow device policy and reviewed baselines](docs-site/security/shadow-policy.mdx) before collection. Operator-defined TCP initiation rules produce evidence findings, while identity/quality checks and incident holds control candidate summaries. Offline review explicitly approves a frozen descriptive profile. This collector path keeps CSV ground truth UNKNOWN and never invokes firewall writes or model promotion. Real-data calibration and independently labeled attack tests remain required before automatic response.

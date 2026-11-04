@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "fallback_pages": ["docs-site/developers/maintenance.mdx"],
+  "rules": [
+    {
+      "sources": ["Controller/home_sensor.py", "Controller/site_features.py", "scripts/audit_home_data.py", "Controller/scripts/apf-home.service", "Controller/requirements-home.txt"],
+      "pages": ["docs-site/deployment/home-collection.mdx", "docs-site/security/shadow-policy.mdx"]
+    },
+    {
+      "sources": ["Controller/site_policy.py", "Controller/site_policy.example.json", "scripts/review_site_baseline.py"],
+      "pages": ["docs-site/security/shadow-policy.mdx"]
+    },
+    {
+      "sources": ["Controller/local_docs.py", "scripts/start_docs.ps1"],
+      "pages": ["docs-site/deployment/documentation-access.mdx"]
+    },
+    {
+      "sources": ["scripts/check_docs_sync.py", "tests/*", "scripts/*"],
+      "pages": ["docs-site/developers/maintenance.mdx"]
+    },
+    {
+      "sources": ["Controller/passive_ids.py"],
+      "pages": ["docs-site/deployment/passive-sensor.mdx"]
+    },
+    {
+      "sources": ["Controller/nft_quarantine.py", "Controller/scripts/apf-quarantine.nft"],
+      "pages": ["docs-site/deployment/nftables-lab.mdx"]
+    },
+    {
+      "sources": ["Dashboard/*"],
+      "pages": ["docs-site/operations/dashboard.mdx", "docs-site/deployment/home-collection.mdx", "docs-site/security/shadow-policy.mdx"]
+    },
+    {
+      "sources": ["Controller/snort*", "Controller/snort3/*", "Controller/scripts/*snort*"],
+      "pages": ["docs-site/integrations/snort.mdx"]
+    },
+    {
+      "sources": ["Controller/ipsctl.py"],
+      "pages": ["docs-site/reference/control-protocol.mdx", "docs-site/operations/modes.mdx"]
+    },
+    {
+      "sources": ["Controller/*inference.py", "Controller/ml_models/*", "Controller/traffic_capture.py"],
+      "pages": ["docs-site/architecture/detection.mdx", "docs-site/operations/collection.mdx", "docs-site/architecture/data-flow.mdx"]
+    },
+    {
+      "sources": ["Controller/*config*"],
+      "pages": ["docs-site/security/configuration.mdx"]
+    },
+    {
+      "sources": ["Controller/Controller_main_Claude.py", "Controller/ips_rest_api.py"],
+      "pages": ["docs-site/architecture/data-flow.mdx", "docs-site/architecture/detection.mdx", "docs-site/api-reference/overview.mdx", "docs-site/security/configuration.mdx", "docs-site/operations/modes.mdx"]
+    }
+  ]
+}
