@@ -36,6 +36,8 @@ P1/P2 identity work includes supported ARP/NDP/DHCP binding evidence, spoofing/c
 
 ## Next work: qualify the home pilot
 
+The [updated one-NIC walkthrough](/deployment/home-pilot-step-by-step) uses an external bridged AP through a managed mirror switch to expose tested wired/Wi-Fi uplink paths. It specifies ingress-only source selection, duplicate/oversubscription checks, 60-second per-device probes, 10/20-minute qualifications and one-hour/24-hour gates. Sustainable management/NTP and same-AP lateral blind paths remain explicit requirements; equipment/firmware availability is not inferred from the t530's healthy Ubuntu interface log.
+
 1. Inventory the workstation and three phones with private aliases and validity-bound identities. Use suitable personal-device roles; do not reuse the example camera allow list. Expected household activity is not independent proof of benignness.
 2. Prove the sensor sees owned transactions in both directions from each segment. Record local-to-local blind paths separately from Internet access. Run a short capture, compare independent packet/byte/timing evidence and inspect loss/omission counters.
 3. Run the [home collection guide](/deployment/home-collection) for a first 14-day operating cycle, extending for missing workflows. Include gaming/work, streaming, updates, backups, reconnects and idle activity. Keep ambient observations UNKNOWN and independently review training eligibility.

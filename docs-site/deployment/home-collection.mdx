@@ -7,6 +7,8 @@ The dedicated home collector writes the versioned **site-v3.0** dataset and serv
 
 If the t530 is connected to an ordinary router LAN port, start with [the home visibility/pilot steps](/deployment/home-pilot-step-by-step). Seeing the sensor's own traffic or broadcasts is insufficient. Prove the intended PC/phone request and response paths before a long-duration baseline run.
 
+The updated pilot covers the one-NIC t530 explicitly: external bridged AP through a managed mirror switch, ingress-only source selection to avoid duplicate traversal copies, per-phone timed probes and separate management/clock gates. Wi-Fi on the original integrated router may bypass the switch; same-AP peer traffic may stay local. A capture-only mirror port can work without an IP address but cannot be assumed to support SSH/dashboard/NTP. The 14-day run starts only after sustainable access, visibility and one-hour/24-hour qualification.
+
 The current contract has 71 columns. Its device/window measurements are a separate dataset from the legacy 102-column per-flow v2 files. Store and train each schema separately. The runtime writes the exact field order to schema.json.
 
 The collector also writes separate [shadow policy evidence](/security/shadow-policy). Configure device roles before collection to identify prohibited TCP initiations and hold unsuitable observations out of candidate baseline summaries. The CSV stays unchanged and UNKNOWN. Read-only findings and explicit offline profile review are available now; calibrated models and automatic enforcement need later qualification.

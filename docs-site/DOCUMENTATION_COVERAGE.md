@@ -22,7 +22,7 @@
 | User-supplied 70-capability product specification and current-source assessment | Final service scope and competitor coverage |
 | apf_implementation_roadmap.md, P0–P6 IPS gates and P7–P13 policy-management services | Delivery phases and service release gates |
 | firewall_policy.py, policy_store.py, policy_http.py, policy_inventory.py and reference fixtures | Test the read-only policy workbench; Policy workbench: code and rationale |
-| Ordinary router LAN connection, PC/phone visibility test and home pilot gates | Home pilot: verify visibility before collecting |
+| Ordinary router LAN connection, single-NIC switch/bridged-AP layout, management gates and timed PC/phone/Internet tests | Home pilot: one Ethernet port, wired and Wi-Fi; Select deployment placement |
 | collection_io.py, pure collection contract, run fingerprints, preflight and golden/runtime qualifiers | Qualify collection before a long pilot; Qualification and audit: code and rationale |
 | collection_report.py, audit_home_data.py, paired evidence and daily/device summaries | Qualify collection before a long pilot; Collect home traffic for two weeks |
 | evaluate_security_campaign.py and examples/testing contracts | Run independent security campaigns; Qualification and audit: code and rationale |

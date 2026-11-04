@@ -1,15 +1,87 @@
 ---
-title: "Home pilot: verify visibility before collecting"
-description: "Check a router LAN connection, qualify four-device traffic and start a reviewed baseline collection."
+title: "Home pilot: one Ethernet port, wired and Wi-Fi"
+description: "A timed, command-by-command passive pilot with an external AP, ingress mirror and explicit management/visibility gates."
 ---
 
-Your present setup is a t530 plugged into a normal LAN port of an ISP-supplied ZTE ZXHN H188A. A normal switched port does not automatically receive the other devices' unicast traffic. Promiscuous capture changes what the t530 accepts from its interface; it cannot instruct the router to mirror frames. Seeing broadcasts or the t530's own Internet traffic is insufficient evidence of whole-home monitoring.
+This revised procedure fits the reported t530: Ubuntu 22.04, Python 3.10, one active physical Ethernet interface enp1s0, no detected Wi-Fi interface, about 16 GiB free and a synchronized UTC clock. OVS/Docker interfaces are virtual; their presence does not add a second physical cable path. The old br-snort is not a source of current household traffic merely because it exists.
 
-The particular ISP firmware's mirror capability has not been verified. Do not assume a hidden menu, diagnostics capture or a firmware replacement provides a continuous LAN/WLAN mirror. The immediate test below establishes observation of a known PC/phone transaction. Meanwhile, the [offline policy workbench](/deployment/policy-workbench) can be tested without changing the network.
+**Recommended topology: keep the ZTE as the Internet router, move household Wi-Fi to a separate bridged access point, and mirror the managed switch to the t530.** One t530 Ethernet interface is enough to receive copies. A wired switch can observe Wi-Fi clients' traffic when that traffic crosses the AP's Ethernet uplink. This recommendation is an engineering topology derived from those forwarding paths, not a claim that any untested router/switch firmware has the needed features.
 
-## 1. Record the actual interfaces and paths
+An ordinary cable to a ZTE LAN port still does not create a mirror. Native LAN/WLAN mirroring on the ISP H188A firmware remains unverified. If you have no verified router mirror, managed switch/external AP or equivalent observation path yet, perform Session 1's offline checks only; do not start a supposed whole-home baseline. No command on enp1s0 can recover unicast frames the network never delivers to it.
 
-On the t530, use a local console or your existing management session:
+## Plan, equipment and wait times
+
+| Session | Planned duration / wait | Exit condition |
+| --- | --- | --- |
+| 0. Select the topology and management method | 10–15 minutes; equipment acquisition is separate | Physical paths and single-port access limitations understood. |
+| 1. Prepare the t530 while it has normal Internet access | 15–30 minutes; package/build time varies | Correct checkout, requirements and offline qualification work. |
+| 2. Wire the switch and bridged AP | 20–40 minutes; allow 2–5 minutes per reboot | PC/phones have normal Internet through the intended paths. |
+| 3. Enable ingress mirroring and test management | 10–15 minutes; 30 seconds for a link change | Mirror configuration saved; local console available; remote access either verified or explicitly unavailable. |
+| 4. Test each phone against the wired PC | 60-second capture per phone, then review; about 10–15 minutes total | Successful phone fetch and matching packets in both directions on t530. |
+| 5. Test Internet paths and address families | 60 seconds per device/family/path under test | Coverage and bypasses recorded; no hidden NAT aggregation. |
+| 6. Header-only qualification | 10-minute timed capture plus 5–10 minutes review | Correct observations and no unresolved integrity problem. |
+| 7. Optional metadata qualification | 20-minute timed capture plus review | DNS/TLS/HTTP settings and limitations understood. |
+| 8. First operational run | 1 hour, inspect; then 24 hours, inspect | Resources, clock, visibility and closed-file quality remain acceptable. |
+| 9. Representative collection | Initial 14 days, checked daily | Required workflows/devices represented, with a private activity ledger. |
+
+These durations are practical test schedules, not mathematical accuracy guarantees. An AP reboot taking longer than five minutes needs investigation against its own manual; repeating waits does not fix incorrect cabling or mirroring.
+
+Minimum equipment for the recommended path:
+
+- A managed Gigabit switch with enough ports and **multiple source ports with ingress/RX-only mirroring** to one destination port. A product labeled merely unmanaged is insufficient. Verify the exact hardware revision and firmware's mirror controls before buying.
+- A separate Ethernet-uplink access point, or a spare router that supports genuine AP/bridge operation without client NAT. A second ISP modem is not required. Appropriate security settings stay enabled; do not use an open SSID.
+- Four Ethernet cables for ZTE–switch, AP–switch, PC–switch and t530–switch. A spare ordinary switch port is used for recovery/export. The five-port map below is sufficient; an eight-port switch leaves expansion room.
+- A local display and keyboard on the t530 for setup/recovery unless an independent management path already exists.
+
+TP-Link's [switch guide](https://static.tp-link.com/Easy%20Smart%20Switch_User%20Guide.pdf) describes source/destination and ingress/egress controls; its [older TL-SG108E guide](https://static.tp-link.com/resources/document/TL-SG108E_V1_UG.pdf) also shows revision-specific behavior. Those are examples of required functionality, not a guarantee of every current device's compatibility. Do not assume all products sharing part of a model name behave identically.
+
+## Session 0 — Fix the observation topology
+
+```text
+Internet / DSL
+      |
+ZTE H188A: routing, DHCP and NAT remain here
+      | LAN
+      |                 Managed switch
+      +---------------- P1: router link       [mirror source RX]
+                        P2: bridged AP       [mirror source RX] ---- three phones on AP Wi-Fi
+                        P3: wired PC         [mirror source RX]
+                        P4: ordinary spare/recovery port
+                        P5: mirror destination -------------------- t530 enp1s0
+```
+
+Connect each monitored wired endpoint through the observed switch. Move every monitored phone to the external AP's SSID. Keep the ZTE Wi-Fi available for rollback during migration; after validating the new AP, disable its radios or make all monitored devices forget its SSID so they cannot silently reconnect there. Phones left on the ZTE's built-in Wi-Fi bypass the AP uplink. Do not alter the ZTE's DSL/PPPoE/Internet credentials, routing or DHCP merely to install this passive pilot.
+
+The AP must bridge clients to the existing LAN. In router/NAT mode, the switch might see only the AP's upstream address, undermining per-device profiles. Follow the AP vendor's documented mode and uplink-port instructions. If using a spare router's manual AP method, DHCP must not compete with the ZTE, and its management address must not conflict with the DHCP pool. [AP configuration reference](https://www.tp-link.com/us/support/faq/1384/)
+
+### What this path covers
+
+| Traffic | Expected visibility after verification |
+| --- | --- |
+| Phone to Internet and back through external AP | Crosses P2/P1; original client IPs are present on the LAN side before ZTE NAT. |
+| Wired PC to Internet and back | Crosses P3/P1. |
+| Phone to wired PC and back | Crosses P2/P3. |
+| Two devices on different observed switch ports/APs | Their traversing frames can be mirrored. |
+| Two phones communicating inside the same AP | May be switched locally and never reach P2. Do not claim lateral coverage without a separate test/observation design. |
+| Phones still on ZTE Wi-Fi; devices locally communicating behind another unobserved switch | Bypass paths may be invisible. |
+| Public probes rejected on the ZTE's WAN side | A LAN mirror may never receive them. |
+| HTTPS/QUIC application payloads | Headers/limited visible metadata only; this is not decryption or Wi-Fi radio monitoring. |
+
+The same-AP limitation follows local forwarding: see [Nokia's AP-local switching discussion](https://infocenter.alcatel-lucent.com/public/7750SR1910R1A/topic/com.sr.triple.play/html/vrgw.html). Later lateral-movement coverage may require separate VLANs/controlled inter-segment routing, AP/controller telemetry or a qualified AP capture facility. Client isolation blocks some traffic; it does not automatically export otherwise invisible traffic to this sensor. Do not add isolation/VLAN changes during the initial normal baseline without documenting their effect on household services.
+
+### A single NIC must also have a management plan
+
+Some mirror destinations are receive-only monitoring ports and stop ordinary networking. [Cisco's SPAN documentation](https://www.cisco.com/c/en/us/support/docs/switches/catalyst-6500-series-switches/10570-41.html) explicitly discusses analyzer reachability. Consequently, **capture support is not proof that SSH, dashboard access, updates or NTP will work through P5.** Choose one of these paths:
+
+1. **One NIC with verified shared mirror/management behavior:** the exact switch/firmware explicitly supports ordinary bidirectional host connectivity on that mirror destination. Verify it while mirroring is active, including DHCP renewal/reboot, NTP, SSH and observation counts. Do not use an undocumented ingress/injection switch setting from another model as a substitute.
+2. **One NIC and local console:** sufficient for short capture qualification. While on P5, use local commands. Stop capture before moving the same cable to ordinary P4 for updates/export. This temporarily stops observation. Without continuing NTP/management, do not treat a two-week unattended run as fully qualified.
+3. **Separate management adapter later:** retain enp1s0 on P5 and connect a supported USB Ethernet adapter to ordinary P4. Use that added interface only for management. It is not necessary to make the t530 an inline bridge. This is the preferred separation for unattended use if shared-port management is unavailable.
+
+If there is neither a local console nor a verified management path, stop before moving the cable/enabling a dedicated mirror destination. The guide does not reconfigure Netplan, set a default gateway to the t530 or enable forwarding/NAT. Those operations would describe a different deployment.
+
+## Session 1 — Prepare software on an ordinary port
+
+Keep enp1s0 on an ordinary ZTE LAN or switch port initially. Your inventory/clock checks already passed the basic operating-system gate. Confirm them when returning after a long pause:
 
 ```bash
 cat /etc/os-release
@@ -19,93 +91,398 @@ ip -br addr
 ip route
 df -h /
 timedatectl status
+ss -ltnp '( sport = :8081 )'
 ```
 
-Record interface names and router/PC/phone addresses privately. Keep a device alias for the PC and each phone. Phones may use private per-network MACs; register the observed identity and its valid interval rather than guessing from the device label. An IP/MAC match alone does not authenticate a device. Note whether IPv6 is active and which local prefixes are actually observed.
+Do not start a legacy enforcing Ryu controller for this baseline. If 8081 is already occupied, identify the process and intentionally stop the appropriate old lab session before proceeding; do not kill unrelated services or reset OVS/iptables blindly. The home collector is passive, ML OFF, with no firewall writes.
 
-## 2. Identify a valid mirror or forwarding arrangement
-
-Inspect the documented administration features of your exact router firmware for port mirroring/SPAN. A usable setup identifies traffic sources and a destination port connected to the sensor, covers both directions and includes the relevant WLAN/LAN paths. Menu availability and wireless-source coverage are firmware-specific and remain unconfirmed here. Preserve management connectivity before changing a mirror destination: some switch implementations stop ordinary traffic on that port. [Example vendor SPAN behavior](https://www.cisco.com/c/en/us/support/docs/switches/catalyst-6500-series-switches/10570-41.html)
-
-If the router cannot supply a verified mirror, use an appropriate managed-switch mirror/TAP or a separately designed inline path. With a managed switch, only traffic crossing the mirrored source ports is visible. Phones staying on the router's integrated Wi-Fi may bypass a downstream switch; a separate AP attached through the observed switch is one possible topology. Mirroring a WAN link can expose translated router traffic rather than individual device addresses. An inline t530 needs suitable physical interfaces and a topology that actually carries the monitored traffic. No network reconfiguration is performed by the new policy workbench.
-
-## 3. Prove a PC-to-phone transaction reaches the sensor
-
-Start a small temporary HTTP service on your PC, serving only a new test directory. In PowerShell:
-
-```powershell
-$demo = Join-Path $env:TEMP ('apf-visibility-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $demo | Out-Null
-Set-Content -LiteralPath (Join-Path $demo 'probe.txt') -Value 'Adaptive IPS framework visibility probe'
-$pcAddress = Read-Host 'PC LAN IPv4 address'
-python -m http.server 8088 --bind $pcAddress --directory $demo
-```
-
-Use an explicitly allowed local-network test connection if the PC firewall prompts; keep the directory limited to the generated test file. Leave this terminal running during the test. On the t530, install tcpdump if missing and choose the actual sensor interface/addresses:
+From the project checkout, obtain the pushed branch containing the tools. Review local changes first; the following switch can refuse if they conflict, and you should preserve them rather than reset them:
 
 ```bash
-sudo apt install -y tcpdump
-read -r -p 'Sensor interface: ' SENSOR_IFACE
-read -r -p 'PC LAN IPv4 address: ' PC_IP
-read -r -p 'Phone LAN IPv4 address: ' PHONE_IP
-sudo timeout 30 tcpdump -i "$SENSOR_IFACE" -nn -e -s 96 \
+cd ~/GP
+git status --short --branch
+git fetch origin
+git switch docs/readme-ngfw-and-test-plans
+git pull --ff-only
+sudo apt update
+sudo apt install -y python3-venv tcpdump tmux curl
+python3 -m venv .venv
+.venv/bin/python -m pip install -r Controller/requirements-home.txt
+```
+
+Allow packages to finish; do not interrupt installation to move the cable. Optional psutil supplies process/dashboard resource measurements and can be installed into this venv deliberately with .venv/bin/python -m pip install psutil. Without it those readings are unavailable, not zero. Do not change the system python3 symlink or install the distribution's Snort 2 package.
+
+Run the offline checks now, even if hardware is not ready. Each output directory must be new; increase the suffix on subsequent runs:
+
+```bash
+.venv/bin/python -m unittest discover -s tests
+.venv/bin/python scripts/qualify_home_collection.py --output-dir .local/home-golden-01
+.venv/bin/python scripts/qualify_home_runtime.py \
+  --output-dir .local/home-runtime-01 --windows 1000 --devices 4
+```
+
+Expected results: all tests pass, the golden check reports PASS with 142 comparisons, and the accelerated run reports PASS with 4,000 rows. Allow several minutes on the t530; runtime depends on CPU/storage. These are replay/state checks, not actual switch visibility. On failure, retain the error and stop before the long run. See [qualification details](/deployment/pretest-qualification).
+
+Use a persistent terminal for the next sessions:
+
+```bash
+tmux new-session -s apf-pilot
+```
+
+Inside that session, use Ctrl+B then D to detach, and tmux attach-session -t apf-pilot to return after reconnecting. Ctrl+B then C creates a second shell window for local curl checks; Ctrl+B then N/P changes windows. tmux preserves the process when an SSH connection drops, but does not restore the lost network path. See [tmux's getting-started guide](https://github.com/tmux/tmux/wiki/Getting-Started). Authenticate sudo in the foreground; do not background a password prompt.
+
+Inside the collector's tmux window, set the following variables. They are private session values, not repository configuration:
+
+```bash
+cd ~/GP
+SENSOR_IFACE=enp1s0
+read -r -p 'Actual connected local IPv4 CIDR, from ip route: ' LAN_CIDR
+read -r -p 'Actual local IPv6 CIDR, or leave empty if not yet present: ' LAN6_CIDR
+LAN_ARGS=(--lan "$LAN_CIDR")
+if [ -n "$LAN6_CIDR" ]; then
+  LAN_ARGS+=(--lan "$LAN6_CIDR")
+fi
+date -u --iso-8601=seconds
+```
+
+Your posted sensor output showed link-local IPv6, not a confirmed globally routed household prefix. That alone does not prove other devices lack IPv6. Session 5 checks this. Add every actual local prefix before the long run; a parser/network setting change requires a new data directory. Re-enter these variables when starting a fresh shell rather than the same tmux window.
+
+## Session 2 — Wire and migrate without breaking the old network
+
+1. Back up the switch/AP settings through their documented administration interfaces. Record model, hardware revision and firmware privately. Leave the original ZTE configuration recoverable.
+2. Connect ZTE LAN to P1. Connect PC to P3. Leave t530 temporarily on ordinary P4. Keep only one intended cable uplink from the AP; do not make a switching loop.
+3. Configure the separate AP in its documented bridge/AP mode and connect its uplink to P2. Use a distinct temporary SSID so you can tell which radio serves each phone. Preserve encryption and a strong private passphrase. Disable a spare router's DHCP server if its AP procedure requires it; the ZTE remains the address authority.
+4. After an AP reboot, allow 2–5 minutes, then test the PC's Internet connectivity. Do not advance solely because a timer expired.
+5. Move one phone to the new SSID. Allow 30–60 seconds for association/DHCP. Verify normal browsing and that its client address belongs to the intended home network. Repeat for the other phones. Record private per-SSID MACs/addresses and UTC times. Do not disable private-MAC features merely to simplify profiling.
+6. Once all intended devices work, prevent reconnection to the old ZTE SSID as described in Session 0. Leave modem/DHCP/NAT functions intact. Recheck the PC and phones for two minutes.
+
+The following PC commands identify the actual Ethernet/IPv4 configuration; they do not assign static addresses:
+
+```powershell
+Get-NetIPConfiguration
+Get-NetIPAddress -AddressFamily IPv4 | Where-Object AddressState -eq Preferred
+```
+
+Only the switch/AP vendor can supply exact UI/CLI names for the hardware you choose. The complete logical port settings are below; do not paste Cisco/TP-Link CLI commands into the ZTE or an unrelated switch.
+
+## Session 3 — Configure the mirror once, then prove access
+
+Set these values in the switch's mirroring configuration and save the configuration persistently:
+
+| Setting | Value in the five-port example |
+| --- | --- |
+| Mirroring/session state | Enabled |
+| Destination / monitor / mirroring port | P5 only |
+| Source / monitored / mirrored ports | P1, P2, P3, plus each additional ordinary port carrying a monitored endpoint |
+| Direction on each selected source | Ingress / RX / received only |
+| Egress / TX on those sources | Disabled |
+| P5 as a source | Disabled; never mirror the destination back into itself |
+| P4 | Ordinary recovery/management port; add RX only if its traffic is intentionally in capture scope |
+
+Here ingress means a frame entering the switch from the router/AP/PC. Selecting all relevant sources RX-only obtains each traversal's incoming frame without also copying its departure at another selected port. For example, phone request enters P2 and PC response enters P3. Router-to-phone reply enters P1. Mirroring P1 and P2/P3 in both directions can count the same packet twice and distort rates; this collector does not transparently deduplicate mirror copies. [Duplicate-copy discussion](https://www.keysight.com/nl/en/assets/3120-1089/white-papers/Duplicate-Packets-Are-They-Good-or-Bad-and-Best-Practices-for-Managing-Them.pdf)
+
+If the switch cannot implement this source/direction combination, stop and adapt the observation design for that exact model. Merely mirroring the router uplink both ways covers its crossing traffic but may miss phone-to-PC paths. Mirroring AP and PC ports both ways is not an equivalent substitute because their shared traffic may be duplicated. A Gigabit destination can also be oversubscribed by aggregate sources; inspect switch counters and compare independently generated low-rate tests before loading it.
+
+Move enp1s0 to P5 with the t530 local console available. Allow about 30 seconds for link establishment, then on t530:
+
+```bash
+ip -br link show enp1s0
+ip -br addr show enp1s0
+timedatectl status
+```
+
+For the shared-port management option, test actual reachability while mirroring is active. An old assigned address remaining on the interface is insufficient. Read the current address locally, then from Windows:
+
+```powershell
+$sensorAddress = Read-Host 'Current t530 management IPv4 address'
+Test-NetConnection -ComputerName $sensorAddress -Port 22
+```
+
+On t530, test current gateway reachability and name resolution, then inspect NTP:
+
+```bash
+DEFAULT_GW=$(ip -4 route show default dev enp1s0 | awk 'NR==1 {print $3}')
+if [ -n "$DEFAULT_GW" ]; then
+  ping -c 3 -W 2 "$DEFAULT_GW"
+fi
+getent ahostsv4 ubuntu.com
+timedatectl timesync-status
+```
+
+If this fails after moving to P5, use the local-console option for short sessions and stop expecting remote SSH/dashboard through that port. The switch may deliberately isolate the destination. Do not flush addresses, disable host firewalls or reboot the ZTE to fix a designed port limitation. To recover, stop capture locally, move the same cable back to P4, allow 30–60 seconds and check DHCP/clock again. A long-run management adapter or explicitly supported shared-port design is required before Session 9's unattended gate.
+
+With shared mirror/management, also compare the sensor's own control traffic: some implementations can deliver both an ordinary and a mirrored copy. Infrastructure/sensor subjects are not automatically excluded by this collector. Keep them identified separately during offline household-baseline review; do not assume all observed local addresses represent a phone or PC. A separate management interface remains easier to qualify.
+
+## Session 4 — Prove each phone reaches the wired PC and the sensor
+
+On Windows, open an **Administrator PowerShell** for the short-lived probe server and narrowly scoped inbound rule. The rule accepts TCP 8088 only at the entered PC address and only from the entered phones. This does not disable the Windows firewall:
+
+```powershell
+$probeDir = Join-Path $env:TEMP ('apf-probe-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $probeDir | Out-Null
+Set-Content -LiteralPath (Join-Path $probeDir 'probe.txt') -Value 'Adaptive IPS framework visibility probe'
+$pcAddress = Read-Host 'Wired PC LAN IPv4 address'
+$phoneAddresses = (Read-Host 'Three phone IPv4 addresses, comma-separated').Split(',') | ForEach-Object { $_.Trim() }
+$probeRule = 'APF-Probe-' + [guid]::NewGuid().ToString('N')
+New-NetFirewallRule -Name $probeRule -DisplayName $probeRule -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8088 -LocalAddress $pcAddress -RemoteAddress $phoneAddresses -Profile Any | Out-Null
+python -u -m http.server 8088 --bind $pcAddress --directory $probeDir
+```
+
+If a corporate policy refuses the narrow rule, resolve that endpoint policy rather than disabling protections. Keep this terminal open while testing. Serving only the generated directory avoids exposing personal project files.
+
+On t530, test one phone at a time:
+
+```bash
+read -r -p 'Wired PC LAN IPv4 address: ' PC_IP
+read -r -p 'Phone under test IPv4 address: ' PHONE_IP
+date -u --iso-8601=seconds
+sudo timeout --signal=INT 60 tcpdump -i enp1s0 -nn -e -tttt -S -s 128 \
   "host $PC_IP and host $PHONE_IP and tcp port 8088"
 ```
 
-During those 30 seconds, use the phone's browser on home Wi-Fi to open http://PC-LAN-IP:8088/probe.txt, replacing PC-LAN-IP with the actual address. Verify the phone receives the probe. The capture should show packets in both directions between PC and phone. timeout can end with exit 124 when its time expires; that is distinct from a tcpdump error. No broad household payload capture is needed for this test.
+During those 60 seconds, open http://PC-ADDRESS:8088/probe.txt?probe=phone1-test1 on that phone, replacing PC-ADDRESS with the entered address. Request it three times about five seconds apart, changing the final test number to prevent a cached response. The phone must display the probe. The PC terminal should record its requests. The t530 must show phone-to-PC and PC-to-phone packets at corresponding times. The timeout normally returns 124 when its minute ends; tcpdump prints its capture/drop summary. This bounded display is not a household payload archive.
 
-Repeat for all three phones and record each result. If the phone fetch succeeds but the t530 sees none of its packets, the observation path failed. If only one direction appears, record asymmetric visibility and investigate. If the fetch itself fails, fix the test service, endpoint firewall or client isolation before using it to judge sensor visibility. End the PC server with Ctrl+C afterward.
+Repeat a fresh 60-second capture for phone2 and phone3 with their actual addresses. Keep a private ledger: alias, SSID, source/target addresses, request success, both observed directions, UTC time, counts and mirror configuration. If the fetch succeeds but sensor frames are missing, the observation path fails. If the fetch fails too, investigate the server, PC firewall, AP isolation and routing before judging the mirror. Repeated identical sequence ranges need comparison with endpoint evidence; legitimate TCP retransmissions must not be mistaken automatically for mirror duplicates.
 
-This validates only the tested paths, protocol, time and addresses. Also verify device-to-Internet traffic with an owned/known transaction and both directions, and IPv6 where present. Record untested or bypassing segments. An AP can locally forward traffic that never crosses its uplink. A mirror itself can drop packets; independent endpoint/capture counts are still needed.
+After the last probe, press Ctrl+C in the PC server terminal, then clean up the exact temporary rule and generated files in that same PowerShell session:
 
-## 4. Run a short collector qualification
-
-The [pre-test qualification tools](/deployment/pretest-qualification) now provide a preflight, independent golden packet check, accelerated restart exercise and stronger daily reports. You may perform steps 1–3 of this guide while those offline checks run. Stop before the multi-day phase until actual visibility and short-capture quality pass; an ordinary LAN cable still does not create a mirror.
-
-Only after the observation path passes, follow [home collection](/deployment/home-collection) to create the venv and install Controller/requirements-home.txt. From the repository root:
-
-```bash
-read -r -p 'Sensor interface: ' SENSOR_IFACE
-read -r -p 'Actual local IPv4 CIDR: ' LAN_CIDR
-sudo .venv/bin/python Controller/home_sensor.py \
-  --interface "$SENSOR_IFACE" --lan "$LAN_CIDR" \
-  --data-dir /var/lib/apf/home-qualification
+```powershell
+Remove-NetFirewallRule -Name $probeRule
+Remove-Item -LiteralPath (Join-Path $probeDir 'probe.txt')
+Remove-Item -LiteralPath $probeDir
 ```
 
-This first run is header-only. Repeat --lan for actual IPv6/additional local subnets. Select optional metadata/HTTP parsers deliberately using the collection guide; their settings become part of a separate collection contract and require a new directory when changed. The home collector is a separate collection/shadow path with UNKNOWN labels and no RF/AE scoring or automatic firewall action.
+No phone-to-phone coverage is established by this test. If desired, test a separately owned service between wireless endpoints and record whether its traffic reaches the AP uplink; absence must remain a declared blind path.
 
-Use the existing SSH tunnel on port 8081 to view the collection dashboard. Generate known browsing/download/reconnect activity and compare packet/byte/rate/timing measurements with equivalent independent filters. Local-to-local frames contribute to both local device summaries; global capture counts count each admitted frame once. Byte/rate denominators and partial windows matter. Stop after a short qualification, then audit:
+## Session 5 — Check Internet traffic, IPv6 and per-device identity
+
+For each phone and the PC, run a 60-second capture while that device alone starts a known normal browsing/streaming action. A per-device MAC filter includes both IP families when the bridged path preserves that MAC:
 
 ```bash
-sudo .venv/bin/python scripts/audit_home_data.py /var/lib/apf/home-qualification
+read -r -p 'Observed current device MAC on this AP/LAN: ' DEVICE_MAC
+sudo timeout --signal=INT 60 tcpdump -i enp1s0 -nn -e -s 128 \
+  "ether host $DEVICE_MAC and (ip or ip6)"
 ```
 
-Exit 0 means tested file/evidence invariants passed without listed review conditions; exit 1 indicates integrity/missing data or an unavailable writer lease; exit 2 requires quality/held/partial-window review. The upgraded audit requires a stopped collector, checks paired evidence and final run totals, and provides daily/device/gap/parser summaries. None proves benign traffic. Investigate losses, truncation, stale timing, cap/eviction events and unavailable statistics before continuing. Optional parser limitations must be evaluated separately.
+Record outbound device IPs and matching inbound traffic, distinguishing background connections from the known activity. Confirm actual packet source/MAC behavior rather than assuming all AP modes preserve identity. If every phone appears only as the AP's upstream IP/MAC, investigate AP NAT/proxy behavior before building per-device profiles. Seeing DHCP or broadcast alone is insufficient. On an actual bridged AP, LAN-side Internet observations should retain the clients' internal IPs; the ZTE's public translation is beyond this mirror.
 
-## 5. Collect ordinary operating cycles
+If IPv6 client traffic is present, record its actual local prefix(es) privately. Rebuild LAN_ARGS with those prefixes and use them consistently in preflight, foreground capture and service configuration. If you cannot determine them yet, record IPv6 as unqualified and pause the whole-home collection claim; do not label missed IPv6 observations benign. Link-local and globally routed prefixes are different scopes. Phone privacy-address changes and DHCP renewals require time-bound identity review, not permanent assumptions about an address.
 
-After the short check passes, use the documented systemd deployment and a private long-duration directory. Target a first 14-day period, checking after an hour, the first day and daily. Estimate CSV plus policy-evidence size and retain disk headroom. The collection guide documents storage stops and restart behavior.
+In the same collector window, update the optional confirmed prefix before creating the qualification directories:
 
-Record ordinary gaming/work, streaming/social media, updates, downloads, backups, reconnects and idle periods with UTC times/device aliases. Keep ambient traffic UNKNOWN. Expected family usage is not proof of no compromise. Configure appropriate personal-device roles and expiring bindings using [shadow policy](/security/shadow-policy); the camera example is not an appropriate automatic allow list for a gaming PC or phone.
+```bash
+read -r -p 'Confirmed local IPv6 CIDR, or empty if none present: ' LAN6_CIDR
+LAN_ARGS=(--lan "$LAN_CIDR")
+if [ -n "$LAN6_CIDR" ]; then
+  LAN_ARGS+=(--lan "$LAN6_CIDR")
+fi
+```
 
-Candidate summaries cannot promote themselves. Explicitly reviewed profiles are descriptive; they do not establish attack confidence. A run-latched quality/incident hold requires investigation and may require a new qualified run. Stop the service before auditing closed files or approving a profile. State which workflows are absent, including infrequent/monthly behavior, before treating the capture as representative.
+The scope is qualifying the stated paths, not claiming all network/radio/Internet events. If a phone remains on cellular data, a VPN changes application visibility or an AP switches a peer flow locally, record that exception. Ordinary metadata does not reveal encrypted web payloads.
 
-## 6. Keep later attack testing separate
+## Session 6 — Ten-minute header qualification
 
-Use [the independent campaign guide and scorecard](/deployment/security-campaigns) to freeze detector revisions, record truth/arrival/coverage separately and measure misses, false alerts, abstentions and independently verified containment. It does not turn the passive home collector into an enforcing detector.
+Retain the previous collector-window variables. Use a new header-only directory; it is not the later metadata directory. Before starting:
 
-Freeze reviewed baseline candidates before isolated Kali campaigns. Use an owned disposable target and record source/target/time/tool/rate and independently observed outcomes. Separate a new bridged device from a familiar test client's changed behavior. Reserve tools, rates and campaigns for evaluation; maintain benign gaming/streaming controls. A bridged VM on home LAN is an insider. For an outside test, use a controlled WAN/LAN firewall lab and record traffic before/after filtering; upstream-rejected traffic may never reach a LAN sensor.
+```bash
+sudo .venv/bin/python scripts/home_preflight.py \
+  --interface "$SENSOR_IFACE" "${LAN_ARGS[@]}" \
+  --data-dir /var/lib/apf/header-qualification
+```
 
-The present workbench supplies policy-model results. The present home collector supplies traffic observations/shadow role findings. Joining real firewall rules to behavioral evidence, calibrating site-v3 models and enabling qualified automatic containment remain later milestones.
+Preflight returns 0 PASS, 1 FAIL or 2 REVIEW. Visibility remains REVIEW until you supply a dated private visibility-v1 attestation from the actual tests; see [the attestation format](/deployment/pretest-qualification). Do not turn its booleans true merely to obtain exit 0. Resolve operational FAIL first; review optional dependency, clock and observation issues explicitly.
 
-## Results to bring forward
+Run for ten minutes, generating the known PC/phone activities in the table:
 
-| Evidence | Record privately |
+```bash
+sudo timeout --signal=INT --kill-after=30s 10m \
+  .venv/bin/python Controller/home_sensor.py \
+  --interface "$SENSOR_IFACE" "${LAN_ARGS[@]}" \
+  --data-dir /var/lib/apf/header-qualification
+```
+
+| Capture minute | Activity |
 | --- | --- |
-| Observation topology | Actual firmware/mirror configuration or alternative topology, sensor interface, directions and bypass paths. |
-| Per-device visibility | PC and each phone transaction, request/response seen, IPv4/IPv6 and time/identity validity. |
-| Capture quality | Independent counts/timestamps, kernel losses, parser coverage, resource/cap events and audit output. |
-| Baseline coverage | Workflows and hours represented, known exceptions, unverified intervals and collector/schema revisions. |
-| Policy milestone | Fixture/snapshot IDs, model query/diff outputs and later vendor/firmware/read-only export availability. |
+| 0–2 | Keep devices connected and otherwise idle; record background traffic. |
+| 2–4 | Normal PC browsing/download from an ordinary trusted service. |
+| 4–6 | Phone1 browsing/streaming. |
+| 6–8 | Phone2 activity. |
+| 8–10 | Phone3 activity. |
 
-Keep actual addresses, MACs, captures and credentials out of public repository/docs examples. A successful household pilot establishes evidence about that site and those devices; broader IoT/industrial/SD-WAN suitability needs additional representative qualification.
+This minute schedule is for reproducibility, not a detector threshold. Use independent endpoint records where possible; count comparisons must use the same device/direction/time/filter and captured Ethernet-byte definition. A frame between two local endpoints contributes to both device rows, while the global received-frame count counts it once. Do not sum all endpoint rows and compare directly with one global packet count.
+
+The timer requests a graceful stop. Exit 124 is expected for a completed timeout; a forced kill or an exception needs investigation. Wait for shutdown/checkpoint completion before the audit:
+
+```bash
+sudo .venv/bin/python scripts/audit_home_data.py /var/lib/apf/header-qualification
+```
+
+Require no unresolved integrity issues, correct identities/directions/rates and explained quality counters. Partial final windows and held/unregistered shadow windows can legitimately produce REVIEW. They are not automatically attack evidence or file corruption. Absent/held policy bindings cannot become approved normal data by waiting. Review [shadow policy](/security/shadow-policy) before promoting any descriptive baseline.
+
+In a second tmux window during capture, local status works even without mirror-port SSH:
+
+```bash
+curl -fsS http://127.0.0.1:8081/ips/collection | python3 -m json.tool
+curl -fsS http://127.0.0.1:8081/ips/metrics | python3 -m json.tool
+```
+
+For a verified reachable management interface, open an SSH tunnel from Windows using that interface's current address:
+
+```powershell
+$sensorAddress = Read-Host 'Verified reachable t530 management IP'
+$sensorUser = Read-Host 't530 SSH username'
+ssh -N -L 8081:127.0.0.1:8081 "$sensorUser@$sensorAddress"
+```
+
+Then open http://127.0.0.1:8081/ on the PC. Keep the tunnel terminal open. On a dedicated capture-only P5 this tunnel will not work; use the local console rather than changing the dashboard to a public bind.
+
+## Session 7 — Twenty-minute metadata qualification
+
+Select the extra parsers deliberately. --metadata measures supported UDP DNS and complete one-packet TLS ClientHello metadata; --http measures supported complete cleartext HTTP/1 request headers. It stores reduced features, not a full household packet/payload archive. This does not inspect HTTPS content, reconstruct TCP streams or parse QUIC applications. Ordinary HTTPS-heavy use may yield zero HTTP parses; DoH/DoT and split ClientHellos can limit metadata.
+
+```bash
+sudo .venv/bin/python scripts/home_preflight.py \
+  --interface "$SENSOR_IFACE" "${LAN_ARGS[@]}" --metadata --http \
+  --data-dir /var/lib/apf/metadata-qualification
+sudo timeout --signal=INT --kill-after=30s 20m \
+  .venv/bin/python Controller/home_sensor.py \
+  --interface "$SENSOR_IFACE" "${LAN_ARGS[@]}" --metadata --http \
+  --data-dir /var/lib/apf/metadata-qualification
+```
+
+During these twenty minutes, spend about five minutes each on PC activity and the three phones. Include the owned HTTP probe again if testing HTTP lexical collection; repeat the temporary server/rule setup and cleanup. Compare DNS/TLS evidence with the known transaction where possible rather than assuming every encrypted application is observable.
+
+After shutdown:
+
+```bash
+sudo .venv/bin/python scripts/audit_home_data.py /var/lib/apf/metadata-qualification
+```
+
+Inspect parser_settings, per-device counts, partial/held windows, source provenance and parse/loss/cap counters. Parse failures require review; zero successful parses have several possible causes. This separate directory prevents silently mixing header and metadata feature contracts. Never feed these site-v3 rows to the shipped legacy v2 RF/AE bundles.
+
+## Session 8 — Install the long-run service, only with management qualified
+
+Proceed after short checks pass and a sustainable management/NTP path exists. For an isolated single mirror port, this is a stop gate until the chosen shared-port capability or separate management method is verified. A local console permits short tests, but cannot by itself provide continuous network time synchronization or a remotely accessible dashboard.
+
+From ~/GP while Internet access is available, install a readable, administrative code copy and the private state account. Stop an existing apf-home service before updating its copy. If you already installed it, reuse the account; do not recreate/reset it:
+
+```bash
+sudo systemctl stop apf-home 2>/dev/null || true
+sudo install -d -m 755 /opt/apf
+sudo cp -a Controller Dashboard docs-site scripts tests /opt/apf/
+sudo chown -R root:root /opt/apf/Controller /opt/apf/Dashboard /opt/apf/docs-site /opt/apf/scripts /opt/apf/tests
+sudo chmod -R a+rX /opt/apf/Controller /opt/apf/Dashboard /opt/apf/docs-site /opt/apf/scripts /opt/apf/tests
+sudo python3 -m venv /opt/apf/.venv
+sudo /opt/apf/.venv/bin/python -m pip install -r /opt/apf/Controller/requirements-home.txt
+if ! getent passwd apf >/dev/null; then
+  sudo useradd --system --user-group --home-dir /var/lib/apf --shell /usr/sbin/nologin apf
+fi
+sudo install -d -o apf -g apf -m 700 /var/lib/apf
+sudo install -d -m 755 /etc/apf
+```
+
+### Prepare reviewable inventory before the long run
+
+The short captures may legitimately run without inventory and produce HOLD evidence. If you want the later explicit baseline-review command to approve descriptive profiles, configure its shadow inventory **before** this longer run. It cannot retrospectively turn old no-policy records into records from a new approved policy. Pure observation-only collection remains useful, but all candidate eligibility remains held without the required policy/identity/quality evidence.
+
+Create a root-controlled file readable by the service account. The example is copied only if no private policy already exists:
+
+```bash
+if ! sudo test -e /etc/apf/site-policy.json; then
+  sudo install -o root -g apf -m 640 /opt/apf/Controller/site_policy.example.json /etc/apf/site-policy.json
+fi
+date -u --iso-8601=seconds
+date -u -d '+15 days' --iso-8601=seconds
+sudoedit /etc/apf/site-policy.json
+sudo /opt/apf/.venv/bin/python /opt/apf/scripts/review_site_baseline.py validate --policy /etc/apf/site-policy.json
+sudo -u apf test -r /etc/apf/site-policy.json
+```
+
+Replace every example binding/date/role; the supplied camera policy is not a household PC/phone allow list. The date commands help prepare a bounded interval, not automatic authorization for fifteen days. Select validity based on your actual reviewed observation/inventory period and renew after changes.
+
+| Private field | Required operator choice |
+| --- | --- |
+| revision | New policy/inventory revision identifier. |
+| observation | Actual tested paths reference, valid dates and bidirectional_verified only after Session 4/5 evidence. |
+| devices | PC and three phones, observed IP/VLAN/lowercase source MAC, unique IDs, assigned role and binding validity. Separate IPv4/IPv6 bindings need distinct IDs; the current code does not automatically merge them into one authenticated identity. |
+| roles | Expected TCP initiation destinations and explicit service ports for the actual PC/phone roles; review work/gaming/push/update requirements. Do not use the camera example or allow everything merely to suppress findings. |
+
+Configure stable DHCP reservations through documented router controls if available, while preserving actual private per-SSID MAC behavior. Otherwise track binding changes and stop/update/revalidate policy at each reassignment. An unexpected role finding holds observations for review; it does not prove compromise. Policy edits load on the next run and change the policy hash. Record why an observed service was permitted rather than erasing an unexplained incident. The standalone preflight visibility-v1 file and this policy's observation record are separate contracts; both must refer to the actual tested scope when used.
+
+Create the environment file from the same validated variables. Extra --lan and the validated --policy argument are part of APF_FEATURE_ARGS; the service expands those words. Do not put credentials in this file:
+
+```bash
+FEATURE_ARGS='--metadata --http --policy /etc/apf/site-policy.json'
+if [ -n "$LAN6_CIDR" ]; then
+  FEATURE_ARGS="$FEATURE_ARGS --lan $LAN6_CIDR"
+fi
+printf 'APF_INTERFACE=%s\nAPF_LAN=%s\nAPF_FEATURE_ARGS="%s"\n' \
+  "$SENSOR_IFACE" "$LAN_CIDR" "$FEATURE_ARGS" | sudo tee /etc/apf/home.env >/dev/null
+sudo chmod 600 /etc/apf/home.env
+sudo install -m 644 /opt/apf/Controller/scripts/apf-home.service /etc/systemd/system/apf-home.service
+sudo systemctl daemon-reload
+```
+
+Append additional actual prefixes deliberately if needed; preserve the same settings/order across runs. Use /var/lib/apf/collection only if new or already the exact chosen contract. If a previous root-run collector used that directory, stop it and inspect ownership/settings before handing it to apf; do not delete data or apply a blind recursive permission change. The short qualifications above used different directories so a fresh long-run state is normally created by the service.
+
+Before starting, verify dependency imports and state access under the actual service account. This does not open a raw socket; systemd grants CAP_NET_RAW only when it starts the service. All assertions must pass:
+
+```bash
+sudo -u apf /opt/apf/.venv/bin/python -c "import sys,os; from pathlib import Path; sys.path.insert(0,'/opt/apf/Controller'); import home_sensor; p=Path('/var/lib/apf'); c=p/'collection'; assert os.access(p,os.W_OK); assert not c.exists() or os.access(c,os.W_OK); print('Collector imports and service-account directory access passed')"
+```
+
+Then run the same preflight against /var/lib/apf/collection with the intended parser/network flags. A root-run preflight cannot replace the service-account access check. Start without enabling boot startup yet:
+
+```bash
+sudo /opt/apf/.venv/bin/python /opt/apf/scripts/home_preflight.py \
+  --interface "$SENSOR_IFACE" "${LAN_ARGS[@]}" --metadata --http \
+  --data-dir /var/lib/apf/collection --policy /etc/apf/site-policy.json
+sudo systemctl start apf-home
+sudo systemctl status apf-home --no-pager
+sudo journalctl -u apf-home -n 40 --no-pager
+```
+
+At **five minutes**, inspect live /ips/collection and /ips/metrics using the earlier local/tunnel commands. At **one hour**, stop cleanly and audit closed files:
+
+```bash
+sudo systemctl stop apf-home
+sudo /opt/apf/.venv/bin/python /opt/apf/scripts/audit_home_data.py /var/lib/apf/collection
+timedatectl status
+df -h /var/lib/apf
+```
+
+Allow the stop to complete (service stop timeout is 30 seconds), inspect errors/clock/disk and confirm all four intended devices contributed expected activity. Router/sensor addresses may also appear; device_profiles is not an authenticated household-device count. Do not infer that there were exactly four devices from row counts alone.
+
+If acceptable, start again with sudo systemctl start apf-home and run **24 hours**. Repeat the stop/audit/clock/disk review. Only after this gate, enable reboot startup:
+
+```bash
+sudo systemctl enable apf-home
+```
+
+Before leaving it unattended, test one deliberate t530 restart at a convenient time. Wait up to about three minutes, then verify service state, clock, management, link and known PC/phone visibility again. If it does not return, use the local console; do not wait overnight hoping it will recover. Record the deliberate gap/restart and review warm-up. An apf-home active status alone does not prove mirrored traffic is arriving.
+
+## Session 9 — Fourteen-day initial collection and daily review
+
+After the first 24-hour gate, continue for an initial fourteen-day operating cycle. Extend for missing workflows or inactive devices. Time alone does not establish that data is accurate or threat decisions are calibrated. Keep actual addresses/MACs/captures and the activity ledger private, outside the repository.
+
+Every day, spend about 10–15 minutes checking live health, known path continuity, clock and disk. Briefly stop for the closed-file audit, inspect it and restart only after explaining faults/holds. Record this gap. Restarting warms short-term histories and resets candidate/incident holds; it is not an incident resolution. Reference the [daily report fields](/deployment/pretest-qualification) and [baseline review gates](/security/shadow-policy).
+
+Record ordinary PC gaming/work, social media, streaming, downloads, application/OS updates, phone reconnects and idle periods with UTC times and aliases. Ambient rows stay UNKNOWN. Family usage is not proof of no compromise. The empirical feature history adapts, but this collector does not train/promote RF/AE models or block devices. Configure reviewed roles/time-bound bindings and approve descriptive profiles only through the documented separate process.
+
+Storage stops default to 5 GiB of collection files or less than 1 GiB free. The reported free space is a useful starting margin, not a two-week capacity guarantee. Estimate daily file growth after the first hour/day, reserve system headroom and adjust retention/budgets only deliberately. Audit caps are two million rows/4,096 bindings per report; archive complete closed periods before exceeding them, preserving schema/evidence/run files. Do not move files while the writer owns them.
+
+Keep later [attack campaigns](/deployment/security-campaigns) separate. A bridged Kali VM is an insider test; an outside test needs a controlled WAN/LAN boundary and before/after observations. An offline mirror cannot stop original traffic by installing a DROP on its own interface. Prevention later requires a qualified router/firewall integration or actual inline/gateway path and independent outcome checks.
+
+## Rollback and what to report
+
+For network disruption, stop apf-home if running, restore the saved switch mirror configuration, reconnect the PC/t530 to the original ordinary LAN ports, and reconnect phones to the original ZTE Wi-Fi. Keep only one AP uplink and avoid loops. Restore only settings you deliberately changed; do not factory-reset the ISP router. Allow 30–60 seconds for wired/DHCP recovery and 2–5 minutes for a device reboot when required, checking actual connectivity each time. Preserve collected files for analysis.
+
+| Checkpoint | Record privately |
+| --- | --- |
+| Equipment | Switch/AP model, hardware revision, firmware, port map and AP bridge mode. |
+| Management | Shared-port behavior actually tested, or dedicated management/local-console limits; NTP/reboot/SSH results. |
+| Observation | Each phone/PC request/response and Internet/address-family result; duplicates, loss, NAT/proxy identity and same-AP bypasses. |
+| Data | Short/one-hour/day audit output, source/schema fingerprints, parser settings and resource/file growth. |
+| Baseline | Device/workflow participation, unknown/held intervals and private activity references; no automatic benign labels. |
+
+If no extra observation hardware is available today, the useful immediate outcome is Session 1's offline qualification plus an explicitly limited test of the t530's own/broadcast traffic. It cannot substitute for collecting the other devices. The next hardware choice is a verified mirror switch and bridged AP, with a management method selected before an unattended run. Native H188A mirror support remains a possible alternative only after the actual ISP firmware and LAN/WLAN paths are proven.

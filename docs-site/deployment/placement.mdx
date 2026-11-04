@@ -7,7 +7,10 @@ title: "Select deployment placement"
 | Inline bridge | Two Ethernet interfaces place OVS between the router and a downstream switch or AP. It can enforce on traffic that crosses the bridge. |
 | AP on the t530 | Requires a detected AP-capable radio and a verified forwarding path through OVS. |
 | Mirror or SPAN | Provides copies within the mirror configuration. Drop actions on the sensor do not stop the original traffic. |
+| One-NIC sensor plus switch and bridged external AP | Phone traffic crossing the AP uplink can be mirrored alongside wired devices. The t530 receives copies on one Ethernet interface; same-AP local traffic and mirror-port management need separate qualification. |
 
 An all-in-one router's built-in Wi-Fi can bypass an appliance attached to a LAN port. Devices on the same downstream switch may also communicate locally. Verify placement with a controlled transfer and counters before collecting baselines.
+
+For the current single-Ethernet t530, follow the [timed home pilot](/deployment/home-pilot-step-by-step): keep ZTE routing/DHCP, place a bridged AP and the PC on observed switch ports, move phones to that AP, and mirror ingress from the relevant router/AP/PC ports. Multiple sources mirrored both directions can create duplicate observations. A dedicated mirror destination may disable SSH/DHCP/NTP, so the guide separates verified shared-port access, short local-console tests and a later management-only USB adapter. No transparent bridge, router firmware change or gateway reassignment is performed. The actual switch/AP and ISP firmware remain unqualified until their tests pass.
 
 Keep management reachability available during installation. Back up interface configuration, confirm IP and gateway placement, and test both management and forwarding after changing the bridge. The repository includes separate bridge and AP runbooks. The documented t530 had one Ethernet interface and no detected wireless interface.
