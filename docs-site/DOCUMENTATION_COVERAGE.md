@@ -21,5 +21,7 @@
 | Documentation map, Git hook, staged guard and push/PR validation | Develop and verify changes |
 | User-supplied 70-capability product specification and current-source assessment | Final service scope and competitor coverage |
 | apf_implementation_roadmap.md, P0–P6 IPS gates and P7–P13 policy-management services | Delivery phases and service release gates |
+| firewall_policy.py, policy_store.py, policy_http.py, policy_inventory.py and reference fixtures | Test the read-only policy workbench; Policy workbench: code and rationale |
+| Ordinary router LAN connection, PC/phone visibility test and home pilot gates | Home pilot: verify visibility before collecting |
 
 Advanced lab and setup steps remain in the repository runbooks.

@@ -1,0 +1,107 @@
+---
+title: "Home pilot: verify visibility before collecting"
+description: "Check a router LAN connection, qualify four-device traffic and start a reviewed baseline collection."
+---
+
+Your present setup is a t530 plugged into a normal LAN port of an ISP-supplied ZTE ZXHN H188A. A normal switched port does not automatically receive the other devices' unicast traffic. Promiscuous capture changes what the t530 accepts from its interface; it cannot instruct the router to mirror frames. Seeing broadcasts or the t530's own Internet traffic is insufficient evidence of whole-home monitoring.
+
+The particular ISP firmware's mirror capability has not been verified. Do not assume a hidden menu, diagnostics capture or a firmware replacement provides a continuous LAN/WLAN mirror. The immediate test below establishes observation of a known PC/phone transaction. Meanwhile, the [offline policy workbench](/deployment/policy-workbench) can be tested without changing the network.
+
+## 1. Record the actual interfaces and paths
+
+On the t530, use a local console or your existing management session:
+
+```bash
+cat /etc/os-release
+python3 --version
+ip -br link
+ip -br addr
+ip route
+df -h /
+timedatectl status
+```
+
+Record interface names and router/PC/phone addresses privately. Keep a device alias for the PC and each phone. Phones may use private per-network MACs; register the observed identity and its valid interval rather than guessing from the device label. An IP/MAC match alone does not authenticate a device. Note whether IPv6 is active and which local prefixes are actually observed.
+
+## 2. Identify a valid mirror or forwarding arrangement
+
+Inspect the documented administration features of your exact router firmware for port mirroring/SPAN. A usable setup identifies traffic sources and a destination port connected to the sensor, covers both directions and includes the relevant WLAN/LAN paths. Menu availability and wireless-source coverage are firmware-specific and remain unconfirmed here. Preserve management connectivity before changing a mirror destination: some switch implementations stop ordinary traffic on that port. [Example vendor SPAN behavior](https://www.cisco.com/c/en/us/support/docs/switches/catalyst-6500-series-switches/10570-41.html)
+
+If the router cannot supply a verified mirror, use an appropriate managed-switch mirror/TAP or a separately designed inline path. With a managed switch, only traffic crossing the mirrored source ports is visible. Phones staying on the router's integrated Wi-Fi may bypass a downstream switch; a separate AP attached through the observed switch is one possible topology. Mirroring a WAN link can expose translated router traffic rather than individual device addresses. An inline t530 needs suitable physical interfaces and a topology that actually carries the monitored traffic. No network reconfiguration is performed by the new policy workbench.
+
+## 3. Prove a PC-to-phone transaction reaches the sensor
+
+Start a small temporary HTTP service on your PC, serving only a new test directory. In PowerShell:
+
+```powershell
+$demo = Join-Path $env:TEMP ('apf-visibility-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $demo | Out-Null
+Set-Content -LiteralPath (Join-Path $demo 'probe.txt') -Value 'Adaptive IPS framework visibility probe'
+$pcAddress = Read-Host 'PC LAN IPv4 address'
+python -m http.server 8088 --bind $pcAddress --directory $demo
+```
+
+Use an explicitly allowed local-network test connection if the PC firewall prompts; keep the directory limited to the generated test file. Leave this terminal running during the test. On the t530, install tcpdump if missing and choose the actual sensor interface/addresses:
+
+```bash
+sudo apt install -y tcpdump
+read -r -p 'Sensor interface: ' SENSOR_IFACE
+read -r -p 'PC LAN IPv4 address: ' PC_IP
+read -r -p 'Phone LAN IPv4 address: ' PHONE_IP
+sudo timeout 30 tcpdump -i "$SENSOR_IFACE" -nn -e -s 96 \
+  "host $PC_IP and host $PHONE_IP and tcp port 8088"
+```
+
+During those 30 seconds, use the phone's browser on home Wi-Fi to open http://PC-LAN-IP:8088/probe.txt, replacing PC-LAN-IP with the actual address. Verify the phone receives the probe. The capture should show packets in both directions between PC and phone. timeout can end with exit 124 when its time expires; that is distinct from a tcpdump error. No broad household payload capture is needed for this test.
+
+Repeat for all three phones and record each result. If the phone fetch succeeds but the t530 sees none of its packets, the observation path failed. If only one direction appears, record asymmetric visibility and investigate. If the fetch itself fails, fix the test service, endpoint firewall or client isolation before using it to judge sensor visibility. End the PC server with Ctrl+C afterward.
+
+This validates only the tested paths, protocol, time and addresses. Also verify device-to-Internet traffic with an owned/known transaction and both directions, and IPv6 where present. Record untested or bypassing segments. An AP can locally forward traffic that never crosses its uplink. A mirror itself can drop packets; independent endpoint/capture counts are still needed.
+
+## 4. Run a short collector qualification
+
+Only after the observation path passes, follow [home collection](/deployment/home-collection) to create the venv and install Controller/requirements-home.txt. From the repository root:
+
+```bash
+read -r -p 'Sensor interface: ' SENSOR_IFACE
+read -r -p 'Actual local IPv4 CIDR: ' LAN_CIDR
+sudo .venv/bin/python Controller/home_sensor.py \
+  --interface "$SENSOR_IFACE" --lan "$LAN_CIDR" \
+  --data-dir /var/lib/apf/home-qualification
+```
+
+This first run is header-only. Repeat --lan for actual IPv6/additional local subnets. Select optional metadata/HTTP parsers deliberately using the collection guide; their settings become part of a separate collection contract and require a new directory when changed. The home collector is a separate collection/shadow path with UNKNOWN labels and no RF/AE scoring or automatic firewall action.
+
+Use the existing SSH tunnel on port 8081 to view the collection dashboard. Generate known browsing/download/reconnect activity and compare packet/byte/rate/timing measurements with equivalent independent filters. Local-to-local frames contribute to both local device summaries; global capture counts count each admitted frame once. Byte/rate denominators and partial windows matter. Stop after a short qualification, then audit:
+
+```bash
+sudo .venv/bin/python scripts/audit_home_data.py /var/lib/apf/home-qualification
+```
+
+Exit 0 means tested file invariants passed with no listed quality counters; exit 1 indicates integrity/missing data; exit 2 requires quality review. None proves benign traffic. Investigate losses, truncation, stale timing, cap/eviction events and unavailable statistics before continuing. Optional parser limitations must be evaluated separately.
+
+## 5. Collect ordinary operating cycles
+
+After the short check passes, use the documented systemd deployment and a private long-duration directory. Target a first 14-day period, checking after an hour, the first day and daily. Estimate CSV plus policy-evidence size and retain disk headroom. The collection guide documents storage stops and restart behavior.
+
+Record ordinary gaming/work, streaming/social media, updates, downloads, backups, reconnects and idle periods with UTC times/device aliases. Keep ambient traffic UNKNOWN. Expected family usage is not proof of no compromise. Configure appropriate personal-device roles and expiring bindings using [shadow policy](/security/shadow-policy); the camera example is not an appropriate automatic allow list for a gaming PC or phone.
+
+Candidate summaries cannot promote themselves. Explicitly reviewed profiles are descriptive; they do not establish attack confidence. A run-latched quality/incident hold requires investigation and may require a new qualified run. Stop the service before auditing closed files or approving a profile. State which workflows are absent, including infrequent/monthly behavior, before treating the capture as representative.
+
+## 6. Keep later attack testing separate
+
+Freeze reviewed baseline candidates before isolated Kali campaigns. Use an owned disposable target and record source/target/time/tool/rate and independently observed outcomes. Separate a new bridged device from a familiar test client's changed behavior. Reserve tools, rates and campaigns for evaluation; maintain benign gaming/streaming controls. A bridged VM on home LAN is an insider. For an outside test, use a controlled WAN/LAN firewall lab and record traffic before/after filtering; upstream-rejected traffic may never reach a LAN sensor.
+
+The present workbench supplies policy-model results. The present home collector supplies traffic observations/shadow role findings. Joining real firewall rules to behavioral evidence, calibrating site-v3 models and enabling qualified automatic containment remain later milestones.
+
+## Results to bring forward
+
+| Evidence | Record privately |
+| --- | --- |
+| Observation topology | Actual firmware/mirror configuration or alternative topology, sensor interface, directions and bypass paths. |
+| Per-device visibility | PC and each phone transaction, request/response seen, IPv4/IPv6 and time/identity validity. |
+| Capture quality | Independent counts/timestamps, kernel losses, parser coverage, resource/cap events and audit output. |
+| Baseline coverage | Workflows and hours represented, known exceptions, unverified intervals and collector/schema revisions. |
+| Policy milestone | Fixture/snapshot IDs, model query/diff outputs and later vendor/firmware/read-only export availability. |
+
+Keep actual addresses, MACs, captures and credentials out of public repository/docs examples. A successful household pilot establishes evidence about that site and those devices; broader IoT/industrial/SD-WAN suitability needs additional representative qualification.

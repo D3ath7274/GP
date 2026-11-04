@@ -1,0 +1,110 @@
+---
+title: "Test the read-only policy workbench"
+description: "Exercise the first P7 slice without a firewall, then prepare a qualified vendor export."
+---
+
+This milestone advances S13–S17 and S44 with a deliberately limited P7 slice: operator-described policy input, strict normalization, address objects/groups, local snapshot history, per-snapshot header-rule search and structural diffs. It also supplies a read-only browser workbench. Native commercial parsers, automatic polling, universal cross-device search, rule cleanup, route/NAT simulation, compliance and firewall writes remain planned.
+
+The input is a description supplied by an operator, not a verified export parser. A vendor name in the file is metadata and does not qualify that vendor. Model ALLOW/DENY/REJECT results describe ordered header rules only. INDETERMINATE means relevant evidence is missing. Every query reports reachability NOT_EVALUATED and enforcement NOT_ATTEMPTED.
+
+## What you can test immediately
+
+Use Python 3.10 or later from the repository root. The policy workbench uses the standard library; it needs neither Ryu, Scapy, npm nor administrator privileges. On Ubuntu use python3; the examples below use python for Windows. Run the equivalent python3 command on your t530. Examples contain documentation addresses and never send packets to those addresses.
+
+### 1. Validate and import the two reference descriptions
+
+```powershell
+python scripts/policy_inventory.py validate --input examples/policies/reference-v1.json
+python scripts/policy_inventory.py import --input examples/policies/reference-v1.json --store .local/policy-workbench/policies.sqlite3
+python scripts/policy_inventory.py import --input examples/policies/reference-v2.json --store .local/policy-workbench/policies.sqlite3
+python scripts/policy_inventory.py list --store .local/policy-workbench/policies.sqlite3
+```
+
+Both validations/imports should succeed. Record the snapshot_id returned for each import as V1 and V2 in your private test notes. Listing should show two snapshots. Reimporting V1 reports created false, retains one V1 snapshot and appends another import observation with the raw input hash. The normalized-content hash is the snapshot ID. Preserve IDs rather than assuming a file name identifies a revision.
+
+.local is ignored by Git. That is not an access-control boundary: keep the directory private. On Unix, new store directories/files request 0700/0600 permissions. Existing permissions and Windows ACLs still need operator review. Raw descriptions and the SQLite database contain policy/address information in plaintext. The pilot import budget is a conservative 256 MiB estimate plus filesystem/journal overhead; archive a closed database deliberately before exceeding it.
+
+### 2. Search and evaluate the model
+
+Replace the snapshot placeholder with the actual returned ID. The following PowerShell assignment reads it from a repeat import:
+
+```powershell
+$v1 = (python scripts/policy_inventory.py import --input examples/policies/reference-v1.json --store .local/policy-workbench/policies.sqlite3 | ConvertFrom-Json).snapshot_id
+$v2 = (python scripts/policy_inventory.py import --input examples/policies/reference-v2.json --store .local/policy-workbench/policies.sqlite3 | ConvertFrom-Json).snapshot_id
+python scripts/policy_inventory.py search --store .local/policy-workbench/policies.sqlite3 --snapshot $v1 --source 192.0.2.10 --destination 198.51.100.20 --protocol tcp --destination-port 443
+```
+
+On Ubuntu, shell variables can be assigned with the standard-library JSON reader:
+
+```bash
+store="$HOME/apf-data/policy-workbench/policies.sqlite3"
+python3 scripts/policy_inventory.py import --input examples/policies/reference-v1.json --store "$store"
+v1=$(python3 scripts/policy_inventory.py validate --input examples/policies/reference-v1.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot_id"])')
+v2=$(python3 scripts/policy_inventory.py validate --input examples/policies/reference-v2.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["snapshot_id"])')
+python3 scripts/policy_inventory.py import --input examples/policies/reference-v2.json --store "$store"
+python3 scripts/policy_inventory.py search --store "$store" --snapshot "$v1" --source 192.0.2.10 --destination 198.51.100.20 --protocol tcp --destination-port 443
+```
+
+Use the V1 snapshot for these cases. Change only the arguments shown in the table; the default source/destination are the first search command's addresses.
+
+| Test | Query change | Expected result and reason |
+| --- | --- | --- |
+| Known web permission | TCP destination port 443 | ALLOW, decisive_rule allow-web; the workstation resolves through the trusted_clients group. |
+| Explicit deny | TCP destination port 22 | DENY, decisive_rule deny-ssh. |
+| Earlier unresolved rule | TCP destination port 8443 | INDETERMINATE; application-8443 may match before deny-8443. A later denial cannot resolve that uncertainty. |
+| Unlisted source | source 203.0.113.10, TCP port 443 | DENY with used_default true; a default decision has no explicit decisive rule. |
+| Disabled policy | TCP port 2222, add --include-disabled | disabled-2222 appears in search but the model still uses default DENY. |
+| IPv6 | source 2001:db8::10, destination 2001:db8:1::20, TCP port 443 | ALLOW under allow-v6. |
+| UDP | source 192.0.2.10, destination 198.51.100.53, protocol udp, port 53 | ALLOW under allow-dns. |
+| Missing required field | TCP query without destination port | A validation error, never a guessed match. |
+
+### 3. Inspect and compare snapshots
+
+```powershell
+python scripts/policy_inventory.py show --store .local/policy-workbench/policies.sqlite3 --snapshot $v1
+python scripts/policy_inventory.py diff --store .local/policy-workbench/policies.sqlite3 --before $v1 --after $v2
+```
+
+The diff reports allow-web's destination_ports changing from 443 to 443 plus 8443 and its comment changing. The example V2 is a test broadening, not a recommended policy. Querying V2 on port 8443 now returns model ALLOW because its first rule is decisive before the unresolved rule. The service has not changed a firewall or approved that broader access. Diffs are structural and cannot establish security equivalence, business approval or actor identity. Comparing different tenant/site/device/context/vendor identities is rejected.
+
+Use python3 and the quoted store/snapshot variables on Ubuntu. show includes up to 20 import provenance records with verified returned raw hashes. list/search display at most 200 results and report truncation; rule evaluation still considers the complete admitted snapshot. Snapshot history has no update/delete command. Integrity hashes detect content disagreement; they do not authenticate the original operator or a firewall.
+
+### 4. Open the browser workbench
+
+```powershell
+python scripts/policy_inventory.py serve --store .local/policy-workbench/policies.sqlite3 --port 8082
+```
+
+Open http://127.0.0.1:8082/ on the same machine. If a workbench was already started for this coding session, use that running viewer rather than starting a second listener on the same port. Select V1/V2, run the table's queries, inspect policy/provenance and compare the earlier ID with the selected snapshot. Reload the browser after later imports to refresh its snapshot selector. For your own foreground launch, keep the serving terminal open; Ctrl+C ends it. When running on the t530, use a separate SSH tunnel:
+
+```bash
+ssh -N -L 8082:127.0.0.1:8082 operator@t530
+```
+
+The viewer binds only loopback. It has no login, tenant authorization, import endpoint or write API, so retain local/SSH management access. The browser uses textContent for policy strings, not HTML interpolation. Its /docs reader serves this checkout's runbooks; formatting uses the existing optional Markdown dependency and otherwise falls back to plain text. The API is documented in [the policy reference](/api-reference/policy-workbench). Ports 8081 (home sensor), 8082 (workbench) and 3333 (workstation Mintlify) are separate services.
+
+### 5. Record the milestone results
+
+Record code revision, Python/SQLite versions, fixture and snapshot IDs, each expected/actual result, repeated-import behavior and whether the API rejects POST. Save output privately. Run the regression tests:
+
+```powershell
+python -m unittest discover -s tests -p "test_policy_workbench.py" -v
+```
+
+The tests cover validation, unresolved precedence, disabled rules, IPv6/UDP, object cycles, missing source ports, bounded results, revision diffs, rollback after a forced transaction failure, corruption, read-only database access and CLI/HTTP behavior. These tests qualify this model slice, not a commercial firewall parser or live forwarding outcome. Follow [the code tour](/developers/policy-workbench-code-tour) to understand each module and the rationale behind its checks.
+
+## Input contract and limits
+
+The top-level fields are format, source_kind, tenant, site, device, context, vendor, policy_revision, collected_at, default_action, unmodeled_context, objects and rules. Format is apf-policy-v1 and source_kind is operator_description. collected_at requires a timezone. Native exports are rejected; a future adapter must faithfully produce a qualified model with explicit unsupported semantics.
+
+Rules require id, position, enabled, sources, destinations, protocol, source_ports, destination_ports, action, logging, owner, comment and constraints. Fields are conjunctive; selectors within an address list are a union. Ports accept any or integer/range lists and are normalized by merging overlapping/adjacent intervals. Actions are allow/deny/reject. Logging and owner are retained metadata, not additional match predicates. Rules have unique IDs and positions; enabled rules use ascending position and first-match semantics. Only concrete tcp/udp/icmp/icmpv6 point queries are supported. A missing constrained source port makes a candidate POSSIBLE.
+
+Address objects contain CIDRs/hosts; address groups contain literals or @object references. An unresolved object retains a reason and does not become ANY. Rule constraints and global unmodeled_context retain uncertainty for conditions such as native applications, zones, time/identity lookup or NAT stage. Unknown schema fields are rejected so an unsupported condition cannot disappear during normalization.
+
+Limits: 8 MiB input, 10,000 rules, 2,048 objects, 4,096 entries per selector/expanded set, recursive expansion depth 16 and 100,000 expanded entries of work per normalization/query, 128 port intervals per input field and 32 unmodeled conditions per scope/rule. Inputs exceeding limits fail explicitly. These are prototype resource guards, not measured throughput guarantees. Every lookup revalidates the stored normalized body/hash. Database imports serialize check-and-insert in a transaction; failures roll back the snapshot/raw/ledger writes together. Backup files are private copies of the closed database, not verified device rollback artifacts.
+
+## Prepare for an industrial firewall later
+
+Before a native adapter, record the actual vendor, firmware/manager version, virtual contexts, rule evaluation order, zones, NAT lookup stage, routes, VPN/SD-WAN behavior and available read-only exports/API permissions. Obtain representative policy/object/schedule/user/application/security-profile cases and expected decisions from its documented semantics and an isolated lab. Keep credentials out of fixtures. Consistent anonymization must preserve prefix containment, groups, NAT relationships and rule order.
+
+The next development step is an adapter for the available platform and a read-only fixture corpus. The generic operator format cannot be used as proof that the same rules faithfully describe that vendor's effective configuration. Actual traffic and rule-usage joins, native counters, commercial compatibility and any automation remain separate gates.

@@ -9,6 +9,8 @@ This is the service-delivery plan for **Adaptive IPS framework**. The [70-capabi
 
 The implemented home collector and shadow policy are foundations for P1/P2/P6. The legacy Ryu detectors and operator-run nftables adapter provide lab references for P0/P3/P4. Actual t530 observation quality, site-v3 models, production decision confidence and commercial firewall interoperability remain unqualified.
 
+The [first P7 workbench](/deployment/policy-workbench) now adds operator-described policy models, bounded address-group/header queries, snapshot/raw import history and structural diffs. It advances S13–S17/S44 as a partial foundation. Native collection, complete canonical semantics, multi-context search, usage history and effective path analysis are still missing. Follow the [source-line tour](/developers/policy-workbench-code-tour) to inspect its checks. For the present router-LAN connection, start with [the home visibility gate](/deployment/home-pilot-step-by-step).
+
 | Track | Work and dependencies | Required result |
 | --- | --- | --- |
 | P0 | Freeze legacy code, feature settings and artifact/schema hashes | Repeatable replay and independently measured forwarding/enforcement baseline. |

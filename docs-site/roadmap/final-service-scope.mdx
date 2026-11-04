@@ -38,6 +38,7 @@ The intended contribution is evidence-backed behavioral input to policy decision
 | E4 | Controller/snort_monitor.py, Controller/snort3/, controller DAI and rate paths | Snort integration and deterministic lab detections; DAI logs conflicts, with its enforcement behavior documented separately. |
 | E5 | Controller/nft_quarantine.py and Controller/scripts/apf-quarantine.nft | Operator-run scoped temporary IPv4 set changes, read-back and removal; no commercial policy collector or automatic detector-to-adapter connection. |
 | E6 | Controller/site_policy.py and scripts/review_site_baseline.py | Expiring inventory, TCP-initiation role findings, quality/incident holds, candidate summaries and explicit frozen descriptive profiles; no authenticated discovery, calibrated decision or automatic promotion. See [shadow policy](/security/shadow-policy). |
+| E7 | Controller/firewall_policy.py, Controller/policy_store.py, Controller/policy_http.py and scripts/policy_inventory.py | Operator-described file models, bounded address/group resolution, local snapshot/raw import history, per-snapshot ordered-header queries, structural diffs and a read-only viewer. No native vendor parser, automatic polling, route/NAT analysis or firewall writes. See [the workbench runbook](/deployment/policy-workbench). |
 
 Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful subset exists with the limits above. **Planned** means the service is not implemented in the reviewed runtime. No row establishes production readiness. P0–P6 retain the existing IPS qualification roadmap; P7–P13 add the policy-management services. A phase listed before another is a dependency where stated, not a release date.
 
@@ -57,11 +58,11 @@ Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful
 | S10 | Protocol metadata analysis | 72 | Partial E2 | P2–P3: qualify DNS/TLS/QUIC/HTTP/MQTT evidence by supported parser, reassembly and encryption visibility. |
 | S11 | Application-layer security evidence | 72, 75 | Partial E2: lexical precursors | P2–P3/P11: correlate proxy/WAF/auth/application outcomes; test authorization abuse and payload attacks with independent target evidence. |
 | S12 | Adaptive inspection | 74 | Planned | P10/P13: policy-authorized escalation with measured capacity/privacy limits, expiry, audit and a useful result when inspection is unavailable. |
-| S13 | Multi-vendor firewall collection | 12, 79 | Planned | P7/P13: read-only configuration, objects, routes, NAT, interfaces, zones, VPN, security profiles, logs and counters from each qualified adapter. |
-| S14 | Canonical firewall policy model | 13 | Planned | P7: preserve rule order, context, inheritance, applications/users, schedules, logging and security profiles; retain unsupported vendor semantics explicitly. |
-| S15 | Universal rule search | 14 | Planned | P7/P9: context-aware search across qualified normalized policies, with effective match and indeterminate results distinguished. |
-| S16 | Object/group resolution | 13, 25–27 | Planned | P7/P8: nested address/service groups, ranges, exclusions, cycles and dynamic objects with reproducible expansion and uncertainty. |
-| S17 | Historical policy tracking | 41 | Planned | P7: immutable snapshot/revision lineage for policy, objects, routing, NAT and profiles with event time and collection freshness. |
+| S13 | Multi-vendor firewall collection | 12, 79 | Partial E7: manual file input only | P7/P13: read-only configuration, objects, routes, NAT, interfaces, zones, VPN, security profiles, logs and counters from each qualified adapter. |
+| S14 | Canonical firewall policy model | 13 | Partial E7: ordered header subset | P7: preserve rule order, context, inheritance, applications/users, schedules, logging and security profiles; retain unsupported vendor semantics explicitly. |
+| S15 | Universal rule search | 14 | Partial E7: per-snapshot query only | P7/P9: context-aware search across qualified normalized policies, with effective match and indeterminate results distinguished. |
+| S16 | Object/group resolution | 13, 25–27 | Partial E7: address objects/groups | P7/P8: nested address/service groups, ranges, exclusions, cycles and dynamic objects with reproducible expansion and uncertainty. |
+| S17 | Historical policy tracking | 41 | Partial E7: local model snapshot history | P7: immutable snapshot/revision lineage for policy, objects, routing, NAT and profiles with event time and collection freshness. |
 | S18 | Rule usage history | 15 | Planned | P7/P8: durable usage windows with reset/wrap/reorder detection, hit/byte/session units and measured observation coverage. |
 | S19 | Behavioral rule usage | 66–67 | Planned | P8/P10: join evidence to effective rule revision/NAT context; retain unknown and ambiguous attribution without inventing per-rule hit counts. |
 
@@ -98,7 +99,7 @@ Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful
 | S41 | Behavioral policy-risk analysis | 36–37, 65 | Planned | P10: explain exposure, behavior, asset/vulnerability context and uncertainty; support versioned custom risk profiles. |
 | S42 | Compliance analysis | 38 | Planned | P10: versioned selected network-control mappings, evidence and exceptions; unsupported/unobserved controls cannot pass. |
 | S43 | Continuous compliance | 39 | Planned | P10: scheduled and post-change evaluation with drift, failure/staleness alerts and retained report lineage. |
-| S44 | Change monitoring | 41 | Planned | P7/P11: compare durable snapshots, reconcile events and retain actor attribution when authoritative logs provide it. |
+| S44 | Change monitoring | 41 | Partial E7: structural imported-model diffs | P7/P11: compare durable snapshots, reconcile events and retain actor attribution when authoritative logs provide it. |
 | S45 | Unplanned-change detection | 42 | Planned | P11: reconcile authorized requests, effective revisions and actor/time evidence; handle emergency changes and delayed audit events. |
 | S46 | Rule ownership/business justification | 43 | Planned | P7/P11: owner, requester, business unit, application, ticket, reason and expiry with versioned review history. |
 | S47 | Rule recertification | 44 | Planned | P11: scheduled/event-triggered owner reviews, certify/decertify decisions, escalation and evidence retention. |

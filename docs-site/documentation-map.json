@@ -3,6 +3,10 @@
   "fallback_pages": ["docs-site/developers/maintenance.mdx"],
   "rules": [
     {
+      "sources": ["Controller/firewall_policy.py", "Controller/policy_store.py", "Controller/policy_http.py", "scripts/policy_inventory.py", "examples/policies/*.json"],
+      "pages": ["docs-site/deployment/policy-workbench.mdx", "docs-site/developers/policy-workbench-code-tour.mdx"]
+    },
+    {
       "sources": ["Controller/home_sensor.py", "Controller/site_features.py", "scripts/audit_home_data.py", "Controller/scripts/apf-home.service", "Controller/requirements-home.txt"],
       "pages": ["docs-site/deployment/home-collection.mdx", "docs-site/security/shadow-policy.mdx"]
     },

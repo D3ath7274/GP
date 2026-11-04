@@ -1,0 +1,19 @@
+---
+title: "Home collection read API"
+description: "Collection health, schema and shadow-policy observations on port 8081."
+---
+
+The separate home collector serves these read routes on loopback port 8081. See [home collection](/deployment/home-collection) and [shadow policy](/security/shadow-policy). The source contract is docs-site/collection-openapi.json. Through a running sensor's lightweight reader it is also available at http://127.0.0.1:8081/docs/collection-openapi.json. The source JSON filename is not a Mintlify page route.
+
+| GET route | Response |
+| --- | --- |
+| /ips/status | Collection mode, capture state, ML OFF and disabled enforcement. |
+| /ips/collection | Schema/run, rows/profiles, quality/storage counters, parser settings and the shadow_policy view. |
+| /ips/schema | Exact ordered CSV columns and collection settings. |
+| /ips/policy | Current-run shadow findings, quality/identity/eligibility counts, candidate summaries and explicit reviewed-profile identities. |
+| /ips/metrics | Dashboard host metrics when available; model availability and enforcement disabled. |
+| /ips/alerts | Empty collection alert list. Shadow findings use /ips/policy. |
+| /ips/blocked | Empty collection block list. |
+| /ips/switches | Empty list and count zero. |
+
+CSV labels remain UNKNOWN. Quality states and descriptive profile residuals are not maliciousness probabilities. The service does not run qualified site-v3 RF/AE inference or automatically invoke a firewall adapter. This contract differs from legacy Ryu management and the read-only policy workbench on port 8082.

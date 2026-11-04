@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Adaptive IPS framework Ryu management API",
-    "description": "Legacy Ryu management contract. Home collection has a separate contract in collection-openapi.json, including the read-only /ips/policy route. Those additional routes are not implemented by Ryu.",
+    "description": "Legacy Ryu management contract. Home collection has a separate contract in collection-openapi.json, including /ips/policy. The read-only policy workbench on port 8082 has policy-openapi.json. Those additional routes are not implemented by Ryu.",
     "version": "1.0.0"
   },
   "servers": [

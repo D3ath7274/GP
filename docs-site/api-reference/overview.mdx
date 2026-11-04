@@ -2,10 +2,12 @@
 title: "Management API"
 ---
 
+The new read-only [policy workbench](/deployment/policy-workbench) is a separate loopback service on port 8082. Its [policy API reference](/api-reference/policy-workbench) documents model status, snapshots/provenance, per-snapshot search and structural diffs. It accepts operator descriptions imported through the CLI; it has no native vendor parser or firewall write endpoint. These routes are not part of the Ryu or home-collection API.
+
 The dashboard uses the same origin as the controller WSGI service. The OpenAPI specification uses the runbook's loopback example on port 8081. Set the actual port at launch. Responses are controller state and can precede verification on a switch.
 
 The write endpoints affect forwarding. Use a disposable test client and a restricted management network. The UDP control client is documented under [Detection modes and controls](/operations/modes).
 
 The OpenAPI reference describes the Ryu deployment. The [passive sensor](/deployment/passive-sensor) implements the dashboard and read endpoints only. Its status includes `deployment_mode: passive` and a capture state.
 
-The [home collector](/deployment/home-collection) additionally serves /ips/collection, /ips/schema and /ips/policy. The latter reports [shadow policy findings and review eligibility](/security/shadow-policy), while /ips/collection embeds the shadow_policy view. Its separate [collection specification](/collection-openapi.json) describes the supported read routes. The service also exposes /docs as a local reader of the checked-out Mintlify sources. These collection routes are unavailable on the legacy Ryu service.
+The [home collector](/deployment/home-collection) additionally serves /ips/collection, /ips/schema and /ips/policy. The latter reports [shadow policy findings and review eligibility](/security/shadow-policy), while /ips/collection embeds the shadow_policy view. Its separate [collection reference](/api-reference/collection) describes the supported read routes. The service also exposes /docs as a local reader of the checked-out Mintlify sources. These collection routes are unavailable on the legacy Ryu service.

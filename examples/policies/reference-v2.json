@@ -1,0 +1,28 @@
+{
+  "format": "apf-policy-v1",
+  "source_kind": "operator_description",
+  "tenant": "demo",
+  "site": "lab",
+  "device": "reference-firewall",
+  "context": "forward-example",
+  "vendor": "unassigned",
+  "policy_revision": "reference-2",
+  "collected_at": "2026-11-04T01:00:00Z",
+  "default_action": "deny",
+  "unmodeled_context": [],
+  "objects": {
+    "workstation": {"kind": "address", "values": ["192.0.2.10/32"]},
+    "lab_segment": {"kind": "address", "values": ["192.0.2.128/25"]},
+    "trusted_clients": {"kind": "address_group", "members": ["@workstation", "@lab_segment"]},
+    "application_clients": {"kind": "unresolved", "reason": "Native application identity needs a qualified vendor parser"}
+  },
+  "rules": [
+    {"id": "allow-web", "position": 10, "enabled": true, "sources": ["@trusted_clients"], "destinations": ["198.51.100.20/32"], "protocol": "tcp", "source_ports": "any", "destination_ports": [443, 8443], "action": "allow", "logging": true, "owner": "lab-operator", "comment": "Example broadening for a snapshot diff; not a recommended change", "constraints": []},
+    {"id": "deny-ssh", "position": 20, "enabled": true, "sources": ["any"], "destinations": ["198.51.100.20/32"], "protocol": "tcp", "source_ports": "any", "destination_ports": [22], "action": "deny", "logging": true, "owner": "lab-operator", "comment": "Reference explicit denial", "constraints": []},
+    {"id": "application-8443", "position": 30, "enabled": true, "sources": ["@application_clients"], "destinations": ["198.51.100.20/32"], "protocol": "tcp", "source_ports": "any", "destination_ports": [8443], "action": "allow", "logging": null, "owner": null, "comment": "Unresolved condition must remain possible", "constraints": ["Application identity not available in a header-only query"]},
+    {"id": "deny-8443", "position": 40, "enabled": true, "sources": ["any"], "destinations": ["198.51.100.20/32"], "protocol": "tcp", "source_ports": "any", "destination_ports": [8443], "action": "deny", "logging": true, "owner": "lab-operator", "comment": "Cannot override uncertainty in an earlier rule", "constraints": []},
+    {"id": "disabled-2222", "position": 50, "enabled": false, "sources": ["any"], "destinations": ["198.51.100.20/32"], "protocol": "tcp", "source_ports": "any", "destination_ports": [2222], "action": "allow", "logging": false, "owner": null, "comment": "Searchable when requested but never effective in the model", "constraints": []},
+    {"id": "allow-dns", "position": 60, "enabled": true, "sources": ["@trusted_clients"], "destinations": ["198.51.100.53/32"], "protocol": "udp", "source_ports": "any", "destination_ports": [53], "action": "allow", "logging": true, "owner": "lab-operator", "comment": "Reference UDP case", "constraints": []},
+    {"id": "allow-v6", "position": 70, "enabled": true, "sources": ["2001:db8::/64"], "destinations": ["2001:db8:1::20/128"], "protocol": "tcp", "source_ports": "any", "destination_ports": [443], "action": "allow", "logging": true, "owner": "lab-operator", "comment": "Reference IPv6 case", "constraints": []}
+  ]
+}

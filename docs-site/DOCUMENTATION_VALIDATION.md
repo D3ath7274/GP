@@ -1,5 +1,15 @@
 # Validation
 
+## First read-only policy workbench · 2026-11-04
+
+Sixty-three Python tests passed, including 20 new model/store/CLI/HTTP tests. The new tests cover duplicate/unsupported input fields, strict CIDRs, port ranges/bools, object cycles/missing/unresolved references, work limits, ordered unknown/disabled/default cases, IPv6/UDP, source-port missingness, result truncation, same-context diffs, repeat imports, mismatched raw/model rejection, forced transactional rollback, unrelated/missing databases, read-only connection enforcement and raw/normalized corruption. HTTP reads left database bytes unchanged and rejected writes. These are reference-description tests, not native vendor or live forwarding tests.
+
+Compilation and embedded viewer JavaScript syntax checks passed. Imported both sanitized fixtures into a Git-ignored local store on the workstation path containing spaces. Browser interaction verified V1's unresolved 8443 result, V2's earlier decisive allow and the expected changed port/comment fields. The loopback viewer is a separate process on port 8082. HTTP checks returned 200 for the new runbooks/code tour/API reference pages and the running workbench's /docs/policy-openapi.json. Raw JSON contracts at the Mintlify source root were not served as page routes; authored API pages and OpenAPI navigation now replace those links.
+
+The home collection path and original schema/model/enforcement code were not changed. Actual t530 capture accuracy/throughput, ISP H188A mirror capabilities, native firewall parsing, authenticated enterprise access and real containment remain unverified. The home guide requires PC/phone request-and-response visibility before long collection. S13–S17/S44 now have partial operator-model foundations; all 70 service IDs remain present, with 16 partial, four lab and 50 planned entries.
+
+Mintlify build/validation, link and accessibility checks passed on the final navigation/API pages, with the existing AA-versus-AAA color advisory. The staged documentation guard and diff whitespace checks passed. The workbench OpenAPI has five read operations; the Ryu contract links to it as a separate service. GitHub-hosted checks and actual vendor/hardware qualification remain separate verification.
+
 ## Product rename and final-service traceability · 2026-11-04
 
 Compared the supplied specification's Section 85 directly with the authored service matrix: all 70 capability names match in order, each appears once under S01–S70, and every row has source-section references and delivery/acceptance criteria. Current-source review classifies 10 rows as partial foundations, four as legacy lab capabilities and 56 as planned. These classifications do not establish production readiness. Additional custom-risk, audit-reporting, application-profile and evidence-contract requirements are recorded outside the numbered table. The requirements source filename and SHA-256 are preserved in the matrix.

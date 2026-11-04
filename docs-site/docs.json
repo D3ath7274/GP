@@ -40,7 +40,10 @@
           "deployment/passive-sensor",
           "deployment/nftables-lab",
           "deployment/home-collection",
-          "deployment/documentation-access"
+          "deployment/documentation-access",
+          "deployment/policy-workbench",
+          "deployment/home-pilot-step-by-step",
+          "developers/policy-workbench-code-tour"
         ]
       },
       {
@@ -54,6 +57,8 @@
         "group": "API",
         "pages": [
           "api-reference/overview",
+          "api-reference/collection",
+          "api-reference/policy-workbench",
           "reference/control-protocol",
           "reference/change-log"
         ]
@@ -61,6 +66,10 @@
       {
         "group": "REST endpoints",
         "openapi": "/openapi.json"
+      },
+      {
+        "group": "Policy workbench endpoints",
+        "openapi": "/policy-openapi.json"
       }
     ]
   },
