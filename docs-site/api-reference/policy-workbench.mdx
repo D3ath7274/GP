@@ -12,11 +12,14 @@ The workbench binds http://127.0.0.1:8082 and serves a read-only browser at /. S
 | /policy/snapshots/SNAPSHOT_ID | Lowercase 64-character SHA-256 ID | Normalized policy and up to 20 latest import observations with returned raw hashes checked. |
 | /policy/search | snapshot, source, destination, protocol; transport ports as applicable | Candidate rule matches plus ordered header-model result, witnesses, uncertainty, count and truncation. |
 | /policy/diff | before and after snapshot IDs | Same-context structural rule/object changes, changed-field values, defaults and revisions. Actor attribution is unavailable. |
+| /policy/audit | snapshot ID | Bounded operator-header-subset duplicate/shadow/redundant/overlap, metadata and model-scoped object findings with witnesses. No cleanup or firewall writes. |
 
 Search protocols are tcp, udp, icmp and icmpv6. Source/destination must share an address family. TCP/UDP require destination_port; source_port is optional, but a constrained source port becomes unknown when omitted. Omit transport ports for ICMP. Optional limit is 1–200 and include_disabled is exactly true or false. Disabled rules may be displayed but never determine the effective header-model result. Unknown/repeated query parameters are rejected.
 
 Model outcomes are ALLOW, DENY, REJECT or INDETERMINATE. A relevant unresolved earlier rule or global condition prevents a definite result. Display limits do not skip evaluation of later admitted rules. These are operator-model answers, not native vendor correctness, route/NAT/session analysis or live enforcement evidence.
 
 Success returns JSON with HTTP 200. Invalid request/model/integrity input returns 400, unknown snapshot/route 404 and SQLite/store unavailability 503. POST is unsupported and the underlying HTTP handler returns 501. There is no HTTP import, apply or delete operation. CLI import is the only workbench mutation and changes only the private local database.
+
+The [audit route](/deployment/policy-audit) admits at most 200 rules, 4,096 regions per rule/residual, 250,000 symbolic work units and 4,096 findings. Budget failure is 400 without a complete result. Unknown selectors/context remain explicit, and INDETERMINATE is a valid 200 response. ANY is restricted to the supported TCP/UDP/ICMP/ICMPv6 domain. Native schedules/profiles/routes/NAT/usage and actual reachability are unassessed; no finding authorizes deletion. Unknown or repeated query parameters are rejected as on the other routes.
 
 The prototype has no login or authenticated tenant isolation. Keep it on loopback/SSH; tenant/site labels are descriptive. Policy strings are displayed as text and query URLs are omitted from access logs. File permissions, private backups and local account boundaries remain important.

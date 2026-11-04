@@ -3,6 +3,8 @@ title: "Shadow policy and reviewed baselines"
 description: "Set device roles before collection, hold unsuitable windows and approve descriptive profiles offline."
 ---
 
+Collection, offline baseline review and [daily quality reports](/deployment/pretest-qualification) now share Controller/collection_io.py's nonblocking OS lease. Stop collection before a review/report; a competing owner is refused, and process exit releases ownership. The baseline review keeps its existing stop-first error contract. A report checks paired evidence and run totals before summarizing eligibility; neither a successful audit nor restarting the process approves a baseline or resolves an incident. New source/environment fingerprints live in run manifests, and malformed persisted observed profiles fail restoration. Candidate/approved separation and the shadow-only action boundary remain unchanged.
+
 The home collector can now evaluate an operator-defined TCP initiation policy while recording site-v3.0 data. It writes separate evidence records, withholds unsuitable windows from candidate summaries and compares observations with explicitly reviewed profiles. **This path is shadow-only. It never invokes a firewall adapter, trains a model, promotes a model or declares a device malicious.** The legacy Ryu detector is a separate entry point.
 
 ## What can start before data collection

@@ -124,3 +124,7 @@ Each service has a stable S ID in the matrix. Requirements from the specificatio
 5. Add P8 analysis and P9 path witnesses before using policy context to recommend broad changes. Develop P10/P11 reporting and approval interfaces before broad P12 execution.
 
 For each implementation PR, identify affected S IDs, update current status with code/test evidence, update the relevant Mintlify page and dated changelog, update OpenAPI for contract changes and record the checks actually run. A plan entry does not pass a release gate.
+
+## Pre-test implementation update — 2026-11-04
+
+Delivered prerequisite preflight, independent 142-check golden packet qualification, accelerated restart/fault exercises, source-bound run manifests, stopped daily quality reports and an independently reviewed campaign scorecard. See docs-site/deployment/pretest-qualification.mdx and docs-site/deployment/security-campaigns.mdx. First P8 work now supplies bounded duplicate/union-shadow/redundant/partial-overlap and model-scoped object/metadata findings, with CLI/API/UI witnesses and an independent exhaustive oracle. S20–S23/S26–S30 are partial E8 foundations. Native semantics, actual t530 capture/soak, independently labeled campaigns and calibrated site-v3 models remain required; no new model or automatic firewall action was enabled.

@@ -1,0 +1,10 @@
+{
+  "version": "visibility-v1",
+  "interface": "example0",
+  "networks": ["192.0.2.0/24"],
+  "valid_from": "2026-11-04T10:00:00+00:00",
+  "valid_until": "2026-11-04T11:00:00+00:00",
+  "reviewer": "replace-after-actual-tests",
+  "tested_paths": [{"alias":"phone-to-pc-owned-probe","family":"IPv4","request_seen":false,"response_seen":false,"reference":"private evidence ledger"}],
+  "limitations": ["Example only; no mirror has been verified. List every bypass or untested path."]
+}

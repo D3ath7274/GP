@@ -14,26 +14,17 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Controller"))
 from site_policy import (BASELINE_VERSION, POLICY_VERSION, PROFILE_FIELDS, QUALITY_FAILURES,
                          ShadowPolicy, digest, load_json, timestamp, update_summary, validate_policy)
+from collection_io import collection_lease
 
 
 @contextmanager
 def stopped_collection(directory):
     """Use the collector's OS-managed lock, rather than assuming files are closed."""
-    with (directory / ".collection.lock").open("a+b") as lock:
-        try:
-            if os.name == "posix":
-                import fcntl
-                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            else:
-                import msvcrt
-                lock.seek(0)
-                lock.write(b"0")
-                lock.flush()
-                lock.seek(0)
-                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-        except OSError as error:
-            raise ValueError("Stop the collector before reviewing its files") from error
-        yield
+    try:
+        with collection_lease(directory):
+            yield
+    except BlockingIOError as error:
+        raise ValueError("Stop the collector before reviewing its files") from error
 
 
 def file_hash(path):

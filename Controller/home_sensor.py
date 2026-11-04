@@ -3,6 +3,7 @@
 import argparse
 from collections import Counter
 import csv
+import hashlib
 from datetime import datetime, timezone
 from functools import partial
 from http.server import ThreadingHTTPServer
@@ -12,10 +13,12 @@ import logging
 import math
 import os
 from pathlib import Path
+import platform
 import shutil
 import signal
 import socket
 import struct
+import sys
 import threading
 import time
 import uuid
@@ -27,6 +30,7 @@ from scapy.utils import PcapReader
 from passive_ids import DashboardHandler
 from site_features import DeviceWindow, FeatureHistory, SCHEMA_VERSION, decode
 from site_policy import ShadowPolicy, digest, load_json
+from collection_io import collection_lease
 
 
 LOGGER = logging.getLogger("apf.home")
@@ -38,6 +42,22 @@ META_COLUMNS = ["schema_version", "run_id", "window_start_utc", "window_end_utc"
 
 def utc(timestamp):
     return datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+
+
+def collection_contract(networks, metadata=False, content=False, max_sources=128):
+    """Pure construction: preflight and runtime must compare the same contract."""
+    feature_names = list(FeatureHistory().features("schema", DeviceWindow(), 0, 5, Counter()))
+    return {"schema_version": SCHEMA_VERSION, "columns": META_COLUMNS + feature_names,
+            "networks": [str(ipaddress.ip_network(n, strict=True)) for n in networks],
+            "metadata": metadata, "content": content, "window_seconds": 5,
+            "max_sources": max_sources, "cardinality_limit": 128,
+            "ground_truth_default": "UNKNOWN",
+            "bytes_unit": "captured Ethernet bytes, normally excluding FCS",
+            "profile_semantics": "observed history, unverified",
+            "parsers": {"G11_G14": "header summaries, no full TCP session reassembly",
+                        "G15": "single-question UDP DNS only",
+                        "G16": "complete ClientHello in one TCP packet, custom fingerprint",
+                        "G17": "complete HTTP/1 request headers in one TCP packet"}}
 
 
 def atomic_json(path, data):
@@ -69,6 +89,11 @@ class HomeCollection:
         self.lock = threading.RLock()
         self.health = Counter()
         self.capture_source = capture_source
+        import scapy
+        self.runtime_provenance = {"python": sys.version.split()[0], "scapy": scapy.__version__,
+            "system":platform.system(),"kernel":platform.release(),
+            "source_sha256":{name:hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+                for name in ("home_sensor.py","site_features.py","site_policy.py","collection_io.py")}}
         self.policy = ShadowPolicy(load_json(policy) if policy else None,
                                    [load_json(path) for path in approved_baselines])
         for device in self.policy.devices.values():
@@ -86,18 +111,8 @@ class HomeCollection:
         self.error = None
         self.last_checkpoint = 0
         self.first_event_time = None
-        feature_names = list(FeatureHistory().features("schema", DeviceWindow(), 0, 5, Counter()))
-        self.columns = META_COLUMNS + feature_names
-        self.contract = {"schema_version": SCHEMA_VERSION, "columns": self.columns,
-                         "networks": [str(n) for n in self.networks], "metadata": metadata,
-                         "content": content, "window_seconds": 5, "max_sources": max_sources,
-                         "cardinality_limit": 128, "ground_truth_default": "UNKNOWN",
-                         "bytes_unit": "captured Ethernet bytes, normally excluding FCS",
-                         "profile_semantics": "observed history, unverified",
-                         "parsers": {"G11_G14": "header summaries, no full TCP session reassembly",
-                                     "G15": "single-question UDP DNS only",
-                                     "G16": "complete ClientHello in one TCP packet, custom fingerprint",
-                                     "G17": "complete HTTP/1 request headers in one TCP packet"}}
+        self.contract = collection_contract(networks, metadata, content, max_sources)
+        self.columns = self.contract["columns"]
         self.contract_hash = digest(self.contract)
         if any(profile["collection_schema_sha256"] != self.contract_hash
                for profile in self.policy.approved.values()):
@@ -114,12 +129,23 @@ class HomeCollection:
             if state.get("schema_version") != SCHEMA_VERSION:
                 raise ValueError("Incompatible profile snapshot")
             profiles = state["sources"]
-            if len(profiles) > max_sources:
+            if not isinstance(profiles, list) or len(profiles) > max_sources:
                 raise ValueError("Profile snapshot exceeds configured source cap")
             for key, profile in profiles:
-                if (len(profile["peers"]) > 1024 or profile["windows"] < 0 or
-                        profile["ttl_mean"] is not None and not math.isfinite(profile["ttl_mean"])):
+                if (not isinstance(key, str) or "@" not in key or key in self.history.sources or
+                        not isinstance(profile, dict) or set(profile) != {"peers", "windows", "ttl_mean"} or
+                        not isinstance(profile["peers"], list) or len(profile["peers"]) > 1024 or
+                        any(not isinstance(peer,str) for peer in profile["peers"]) or
+                        len(set(profile["peers"])) != len(profile["peers"]) or
+                        type(profile["windows"]) is not int or profile["windows"] < 0 or
+                        profile["ttl_mean"] is not None and (type(profile["ttl_mean"]) not in (int,float) or
+                            not math.isfinite(profile["ttl_mean"]) or not 0 <= profile["ttl_mean"] <= 255)):
                     raise ValueError("Invalid profile snapshot")
+                address = ipaddress.ip_address(key.split("@",1)[0])
+                if not any(address.version == network.version and address in network for network in self.networks):
+                    raise ValueError("Profile snapshot device outside collection networks")
+                for peer in profile["peers"]:
+                    ipaddress.ip_address(peer)
                 self.history.sources[key] = profile
         self._check_storage()
 
@@ -231,7 +257,8 @@ class HomeCollection:
             atomic_json(self.directory / "profile-state.json", {
                 "schema_version": SCHEMA_VERSION, "sources": list(self.history.sources.items()),
                 "note": "TTL and destination history restored. Rolling hourly buckets restart."})
-            atomic_json(self.directory / ("run-" + self.run_id + ".json"), self.snapshot())
+            atomic_json(self.directory / ("run-" + self.run_id + ".json"),
+                        dict(self.snapshot(), runtime_provenance=self.runtime_provenance))
             self.last_checkpoint = time.monotonic()
 
     def read(self, path):
@@ -363,20 +390,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     args.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     # OS-managed lock releases even when the process crashes.
-    with (args.data_dir / ".collection.lock").open("a+b") as lock:
-        try:
-            if os.name == "posix":
-                import fcntl
-                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            else:
-                import msvcrt
-                lock.seek(0)
-                lock.write(b"0")
-                lock.flush()
-                lock.seek(0)
-                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-        except OSError:
-            parser.exit(78, "Another collector owns this data directory\n")
+    with collection_lease(args.data_dir):
         try:
             collector = HomeCollection(args.data_dir, args.lan, args.metadata, args.http,
                 int(args.min_free_gib * 1024**3), int(args.max_data_gib * 1024**3),
@@ -414,4 +428,7 @@ if __name__ == "__main__":
         main()
     except StorageLimitError as error:
         LOGGER.error("%s", error)
+        raise SystemExit(78)
+    except BlockingIOError:
+        LOGGER.error("Another collector or offline reader owns this data directory")
         raise SystemExit(78)

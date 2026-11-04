@@ -84,6 +84,8 @@ The original plan lists additional research features for each group. This releas
 
 ## Storage, restart and privacy
 
+Use [pre-test qualification](/deployment/pretest-qualification) before a long run. It adds a noncreating preflight, independent golden extraction and bounded restart exercise. The upgraded stopped-collector audit now pairs CSV with shadow evidence, checks hashes/provenance and cross-run intervals, and reports daily/device/parser/held-window summaries. It shares the writer/reviewer's OS lease. New run manifests retain source/Python/Scapy/OS/kernel fingerprints without changing the 71-column contract or collection REST response. Old unversioned runs remain review items. The restart loader rejects malformed, nonfinite/out-of-range or wrong-network profiles rather than restoring them silently.
+
 - Files rotate by **UTC day**, with a separate run ID per restart. schema.json records the feature contract. run-ID.json stores health and run state. profile-state.json stores bounded unverified destination and TTL history.
 - policy-events-DATE-RUN.jsonl stores one shadow evidence record per new CSV row. Policy snapshots are saved per configured run. These private files share the disk budget. Candidate summaries and incident holds reset per run; offline-reviewed profiles load only when explicitly supplied.
 - Profiles and cardinalities have explicit caps. When caps are reached, counters record the affected truncation or eviction. Rates and byte counts continue within admitted device windows. Review capped cardinalities as lower bounds.

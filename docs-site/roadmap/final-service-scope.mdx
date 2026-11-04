@@ -39,6 +39,7 @@ The intended contribution is evidence-backed behavioral input to policy decision
 | E5 | Controller/nft_quarantine.py and Controller/scripts/apf-quarantine.nft | Operator-run scoped temporary IPv4 set changes, read-back and removal; no commercial policy collector or automatic detector-to-adapter connection. |
 | E6 | Controller/site_policy.py and scripts/review_site_baseline.py | Expiring inventory, TCP-initiation role findings, quality/incident holds, candidate summaries and explicit frozen descriptive profiles; no authenticated discovery, calibrated decision or automatic promotion. See [shadow policy](/security/shadow-policy). |
 | E7 | Controller/firewall_policy.py, Controller/policy_store.py, Controller/policy_http.py and scripts/policy_inventory.py | Operator-described file models, bounded address/group resolution, local snapshot/raw import history, per-snapshot ordered-header queries, structural diffs and a read-only viewer. No native vendor parser, automatic polling, route/NAT analysis or firewall writes. See [the workbench runbook](/deployment/policy-workbench). |
+| E8 | Controller/policy_audit.py, scripts/policy_inventory.py audit, GET /policy/audit and tests/test_policy_audit.py | Bounded operator-header subset for duplicate/union-shadow/redundant/overlap witnesses and model-scoped object/metadata findings. ANY restricted to TCP/UDP/ICMP/ICMPv6; no native deletion proof, usage/path qualification or automatic cleanup. See [audit procedure](/deployment/policy-audit). |
 
 Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful subset exists with the limits above. **Planned** means the service is not implemented in the reviewed runtime. No row establishes production readiness. P0–P6 retain the existing IPS qualification roadmap; P7–P13 add the policy-management services. A phase listed before another is a dependency where stated, not a release date.
 
@@ -70,17 +71,17 @@ Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful
 
 | ID | Required final capability | Source section | Current status | Delivery and acceptance evidence |
 | --- | --- | --- | --- | --- |
-| S20 | Duplicate rule detection | 17 | Planned | P8: semantic match/action equivalence fixtures including order, schedule, logging, security profile and context differences. |
-| S21 | Redundant rule detection | 18 | Planned | P8: prove whole effective match space is covered with equivalent behavior; return a witness/counterexample when unsafe. |
-| S22 | Shadowed rule detection | 19 | Planned | P8: compute prior-rule coverage, including unions and implicit/inherited policy; verify unreachable-rule results. |
-| S23 | Partial-overlap detection | 20 | Planned | P8: partition residual/intersecting address-port-protocol space and produce concrete witness tuples. |
+| S20 | Duplicate rule detection | 17 | Partial E8: bounded supported-region equivalence | P8: semantic match/action equivalence fixtures including order, schedule, logging, security profile and context differences. |
+| S21 | Redundant rule detection | 18 | Partial E8: effective predecessor behavior subset | P8: prove whole effective match space is covered with equivalent behavior; return a witness/counterexample when unsafe. |
+| S22 | Shadowed rule detection | 19 | Partial E8: known union coverage subset | P8: compute prior-rule coverage, including unions and implicit/inherited policy; verify unreachable-rule results. |
+| S23 | Partial-overlap detection | 20 | Partial E8: covered/residual witnesses | P8: partition residual/intersecting address-port-protocol space and produce concrete witness tuples. |
 | S24 | Unused rule detection | 15, 40 | Planned | P8: declare coverage, time horizon and counter gaps; report unobserved/insufficient-history separately from a reviewed retirement candidate. |
 | S25 | Expired rule detection | 21 | Planned | P8/P11: compare timezone-aware schedules/expiry with owner exceptions and renewal workflows. |
-| S26 | Disabled rule detection | 22 | Planned | P8: preserve disabled state, ownership and change history without recommending unexplained deletion. |
-| S27 | Missing logging detection | 23 | Planned | P8/P10: assess explicit/inherited logging and collection reachability against versioned policy requirements. |
-| S28 | Missing documentation detection | 24 | Planned | P8/P11: flag missing owner, justification, ticket, expiry and approved exceptions with governance evidence. |
-| S29 | Unused object detection | 25 | Planned | P8: compute all rule/NAT/VPN/group/profile/application references before labeling an object unreferenced. |
-| S30 | Duplicate object detection | 26 | Planned | P8: compare resolved semantics within scope, retaining names, ownership and dynamic/FQDN differences. |
+| S26 | Disabled rule detection | 22 | Partial E8: explicit disabled metadata | P8: preserve disabled state, ownership and change history without recommending unexplained deletion. |
+| S27 | Missing logging detection | 23 | Partial E8: explicit logging-false metadata | P8/P10: assess explicit/inherited logging and collection reachability against versioned policy requirements. |
+| S28 | Missing documentation detection | 24 | Partial E8: owner/comment gaps only | P8/P11: flag missing owner, justification, ticket, expiry and approved exceptions with governance evidence. |
+| S29 | Unused object detection | 25 | Partial E8: model-only reference graph | P8: compute all rule/NAT/VPN/group/profile/application references before labeling an object unreferenced. |
+| S30 | Duplicate object detection | 26 | Partial E8: resolved static address sets | P8: compare resolved semantics within scope, retaining names, ownership and dynamic/FQDN differences. |
 | S31 | Misaligned object detection | 27 | Planned | P8/P11: compare intended shared objects across contexts/vendors; distinguish approved site-specific variations. |
 | S32 | Broad-rule tuning | 29 | Planned | P8/P10/P12: propose constrained sources/services with coverage, dependency exceptions and before/after path validation. |
 | S33 | Rule consolidation | 28 | Planned | P8/P12: prove effective behavior and audit/logging semantics preserved before preparing an approved merge. |

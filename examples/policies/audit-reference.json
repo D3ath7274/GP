@@ -1,0 +1,20 @@
+{
+  "format":"apf-policy-v1","source_kind":"operator_description","tenant":"demo","site":"lab","device":"audit-reference","context":"forward-example","vendor":"unassigned",
+  "policy_revision":"audit-example-1","collected_at":"2026-11-04T10:00:00+00:00","default_action":"deny","unmodeled_context":[],
+  "objects":{
+    "whole":{"kind":"address","values":["192.0.2.0/24"]},
+    "same":{"kind":"address_group","members":["@whole"]},
+    "dynamic":{"kind":"unresolved","reason":"Native application identity unavailable"}
+  },
+  "rules":[
+    {"id":"left","position":10,"enabled":true,"sources":["192.0.2.0/25"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[80],"action":"allow","logging":true,"owner":"lab","comment":"First half","constraints":[]},
+    {"id":"right","position":20,"enabled":true,"sources":["192.0.2.128/25"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[80],"action":"allow","logging":true,"owner":"lab","comment":"Second half","constraints":[]},
+    {"id":"whole","position":30,"enabled":true,"sources":["@whole"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[80],"action":"allow","logging":true,"owner":"lab","comment":"Covered by the union of the first two rules","constraints":[]},
+    {"id":"duplicate","position":40,"enabled":true,"sources":["@same"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[80],"action":"allow","logging":true,"owner":"lab","comment":"Duplicate address/service behavior","constraints":[]},
+    {"id":"partial","position":50,"enabled":true,"sources":["@whole"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[80,443],"action":"allow","logging":true,"owner":"lab","comment":"Port 443 remains reachable in the model","constraints":[]},
+    {"id":"unreachable-deny","position":60,"enabled":true,"sources":["@whole"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[443],"action":"deny","logging":true,"owner":"lab","comment":"Shadowed with a different action","constraints":[]},
+    {"id":"unknown","position":70,"enabled":true,"sources":["@dynamic"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[8443],"action":"allow","logging":true,"owner":"lab","comment":"Unresolved selector","constraints":[]},
+    {"id":"later-8443","position":80,"enabled":true,"sources":["@whole"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[8443],"action":"deny","logging":true,"owner":"lab","comment":"Unknown predecessor prevents a reachability assertion","constraints":[]},
+    {"id":"disabled","position":90,"enabled":false,"sources":["@whole"],"destinations":["198.51.100.20/32"],"protocol":"tcp","source_ports":"any","destination_ports":[1234],"action":"allow","logging":false,"owner":null,"comment":"","constraints":[]}
+  ]
+}

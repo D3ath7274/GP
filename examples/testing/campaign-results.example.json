@@ -1,0 +1,24 @@
+{
+  "version": "campaign-results-v1",
+  "records": [{
+    "id": "replace-with-unique-window-id",
+    "campaign": "isolated-lab-campaign-01",
+    "scenario": "recon",
+    "subject": "disposable-test-client",
+    "truth": "unknown",
+    "truth_reference": "replace-with-independent-target-and-source-evidence",
+    "detector_revision": "replace-with-frozen-code-model-settings-hash",
+    "verdict": "abstain",
+    "arrival_verified": false,
+    "coverage_qualified": false,
+    "quality_ok": false,
+    "activity_started_at": "2026-11-04T10:00:00+00:00",
+    "observation_ended_at": "2026-11-04T10:00:30+00:00",
+    "detected_at": null,
+    "block_requested_at": null,
+    "rule_readback_at": null,
+    "traffic_block_verified_at": null,
+    "benign_continuity_verified": null,
+    "outcome_reference": "replace-with-private-evidence-references-no-secrets"
+  }]
+}

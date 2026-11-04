@@ -1,0 +1,75 @@
+---
+title: "Audit the supported firewall-policy subset"
+description: "Inspect duplicate, jointly shadowed and partially overlapping model rules with bounded deterministic evidence."
+---
+
+This is the first P8 implementation for partial S20/S21/S22/S23/S26/S27/S28/S29/S30. It extends [the read-only workbench](/deployment/policy-workbench) with CLI/API/UI analysis. Inputs remain operator descriptions in apf-policy-v1. Native firewall parsing, schedules, zones, applications/users, security profiles, NAT, routes, actual traffic paths and rule-usage collection remain outside this audit. No cleanup or firewall write occurs.
+
+## Supported proof domain
+
+The analyzer represents source/destination address sets and source/destination port intervals as disjoint rectangular header regions, separately for IPv4/IPv6 and TCP/UDP/ICMP/ICMPv6. ANY is restricted to those protocol cases for this assessment; other IP protocols are not covered. A result is always scoped to this model subset. It must not be used as proof that deleting a native firewall rule preserves all behavior.
+
+It subtracts earlier enabled-rule regions from a later rule's region. This correctly handles coverage by the union of several predecessors. First-match precedence determines which earlier action/logging behavior owns an intersecting region. Logging false and logging true are distinct behaviors; null logging prevents an equivalence assertion. Ownership/comment differences are retained in the snapshot but are not packet-match predicates.
+
+Unresolved objects and explicit unmodeled conditions are never converted to ANY or empty sets. A rule with those selectors/constraints cannot supply a known coverage proof. An unknown predecessor prevents a residual-reachability or equivalent-behavior assertion. Independently known predecessor coverage can still prove that a target is never reached within the supported subset, regardless of whether an unknown earlier rule might also match. A global unmodeled context prevents rule-space proofs throughout the policy. Unknown cases remain visible in indeterminate_rules and status.
+
+## Run the reference audit
+
+From the repository root, use a new local store or the existing reference workbench store. This writes only the private local snapshot database.
+
+```powershell
+$store = '.local/policy-workbench/policies.sqlite3'
+$imported = python scripts/policy_inventory.py import --input examples/policies/audit-reference.json --store $store | ConvertFrom-Json
+$snapshot = $imported.snapshot_id
+python scripts/policy_inventory.py audit --store $store --snapshot $snapshot
+```
+
+On Ubuntu, capture the import result and extract its ID with the same Python environment:
+
+```bash
+mkdir -p .local/policy-workbench
+python3 scripts/policy_inventory.py import \
+  --input examples/policies/audit-reference.json \
+  --store .local/policy-workbench/policies.sqlite3
+read -r -p 'snapshot_id from import: ' SNAPSHOT_ID
+python3 scripts/policy_inventory.py audit \
+  --store .local/policy-workbench/policies.sqlite3 --snapshot "$SNAPSHOT_ID"
+```
+
+The normalized reference ID is fab8f4bc15352927a80b8bab65308207d559cd99050b7c32f7ad1fdaf46b2632. It identifies nine rules and three address objects. The overall result is INDETERMINATE because the 8443 branch contains an unresolved predecessor; independently supported findings for other branches are still returned.
+
+| Expected finding | What the fixture demonstrates |
+| --- | --- |
+| FULLY_SHADOWED for whole | left and right jointly cover the entire source /24 on TCP 80; neither predecessor alone covers it. |
+| REDUNDANT_BEHAVIOR for whole | The effective earlier actions and explicit logging values equal whole's behavior within this subset. |
+| DUPLICATE_RULE for duplicate | Its resolved header region, action and explicit logging equal whole; different object names do not imply different address sets. |
+| PARTIAL_OVERLAP for partial | Earlier rules cover port 80, while a residual witness on port 443 reaches this rule in the supported model. |
+| FULLY_SHADOWED for unreachable-deny | partial already permits 443. Shadowed does not mean equivalent intent; REDUNDANT_BEHAVIOR is not asserted for this deny. |
+| indeterminate_rules includes unknown/later-8443 | Unresolved earlier sources prevent a definite effective-result assertion for the later branch. |
+| DISABLED_RULE / EXPLICIT_LOGGING_DISABLED / MISSING_DOCUMENTATION | disabled is not effective; its metadata needs review. Missing owner/comment is not a full governance/ITSM audit. |
+| DUPLICATE_ADDRESS_SET | whole and same resolve to the same static address set in this model. |
+
+## Use the viewer and API
+
+Start or restart the [loopback viewer](/deployment/policy-workbench) after updating code. Reload the page, select the imported snapshot and click **Audit supported header subset**. Results appear as structured JSON with finding types, affected IDs, covering predecessor IDs and concrete witnesses. This is the same algorithm as the CLI.
+
+GET /policy/audit?snapshot=SNAPSHOT_ID returns the report and snapshot ID. Unknown/repeated query parameters are rejected. See [the API contract](/api-reference/policy-workbench). Success includes source_kind operator_description, automatic_cleanup false, reachability NOT_EVALUATED and enforcement NOT_ATTEMPTED. INDETERMINATE is a valid HTTP 200 analysis result. Budget/invalid input returns 400, unknown snapshot 404 and store failure 503. CLI errors are nonzero. The endpoint never writes to the database or firewall.
+
+## Findings and limits
+
+| Type | Meaning and limitation |
+| --- | --- |
+| DUPLICATE_RULE | Resolved supported region, action and explicit logging match an earlier enabled rule. Does not authorize native deletion. |
+| FULLY_SHADOWED | Known earlier enabled regions jointly cover the current supported region. The rule cannot be reached within this modeled subset. |
+| REDUNDANT_BEHAVIOR | Effective known predecessor behavior agrees on the covered region, with no unknown predecessor/logging ambiguity. |
+| PARTIAL_OVERLAP | Some known predecessor coverage and some residual remain. covered_witness and residual_witness show both; residual reachability is indeterminate if an earlier unknown rule exists. |
+| EMPTY_SUPPORTED_REGION | No valid intersection in the supported family/protocol subset. Not a claim about unsupported native semantics. |
+| DISABLED_RULE | The model explicitly disables this rule. No deletion recommendation follows. |
+| EXPLICIT_LOGGING_DISABLED | The model explicitly records logging false. No organization logging requirement or compliance verdict is assumed. |
+| MISSING_DOCUMENTATION | owner/comment fields are absent/blank. Tickets, expiry, recertification and authoritative administrator attribution remain unimplemented. |
+| UNREFERENCED_OBJECT_IN_MODEL | No reference from any modeled rule, including disabled rules, or a reachable nested object. Native NAT/VPN/application references are not known, so this is not an unused-object deletion proof. |
+| DUPLICATE_ADDRESS_SET | Fully resolved static sets agree. Object ownership/name intent and dynamic/native references still need review. |
+
+The prototype admits up to 200 rules, 4,096 regions per rule/residual, 250,000 symbolic work units and 4,096 findings. Address resolution retains the workbench's separate caps. A cap failure aborts the audit instead of returning a partial proof labeled complete. Large models can still be imported/searched under those commands' own limits, but cannot bypass the audit cap by treating arbitrary chunks as full-policy coverage.
+
+Tests compare the analyzer with an independently written exhaustive oracle over 40 seeded, eight-rule small policy spaces. They cover union coverage, differing actions/logging, effective precedence, unknown/global context, disabled rules, source ports, IPv6, object scopes, resource failures and real CLI/HTTP read-only behavior. These are algorithm-subset tests, not native firewall or live routing qualification. See [the implementation rationale](/developers/qualification-code-tour) before extending the algebra to new predicates.

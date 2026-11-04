@@ -19,6 +19,7 @@ PAGE = b'''<!doctype html><html lang="en"><meta charset="utf-8">
 <p id="status" role="status">Loading snapshots...</p>
 <label>Snapshot <select id="snapshot" aria-label="Policy snapshot"></select></label>
 <button id="details">Show policy and provenance</button>
+<button id="audit">Audit supported header subset</button>
 <form id="search"><h3>Concrete header query</h3>
 <label>Source IP <input id="source" value="192.0.2.10" required></label>
 <label>Destination IP <input id="destination" value="198.51.100.20" required></label>
@@ -34,6 +35,7 @@ const el=id=>document.getElementById(id);
 async function load(path){const r=await fetch(path,{cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data;}
 async function display(path){try{el('result').textContent=JSON.stringify(await load(path),null,2);}catch(e){el('result').textContent=e.message;}}
 el('details').onclick=()=>display('/policy/snapshots/'+encodeURIComponent(el('snapshot').value));
+el('audit').onclick=()=>display('/policy/audit?'+new URLSearchParams({snapshot:el('snapshot').value}));
 el('search').onsubmit=e=>{e.preventDefault();const p=new URLSearchParams({snapshot:el('snapshot').value,source:el('source').value,destination:el('destination').value,protocol:el('protocol').value});if(el('dport').value)p.set('destination_port',el('dport').value);if(el('sport').value)p.set('source_port',el('sport').value);display('/policy/search?'+p);};
 el('protocol').onchange=()=>{const ports=['tcp','udp'].includes(el('protocol').value);el('dport').disabled=!ports;el('sport').disabled=!ports;if(!ports){el('dport').value='';el('sport').value='';}};
 el('diff').onclick=()=>display('/policy/diff?'+new URLSearchParams({before:el('before').value,after:el('snapshot').value}));
@@ -79,6 +81,10 @@ def read_policy_api(store, path, parameters):
         values = _arguments(parameters, ("before", "after"), ("before", "after"))
         return dict(diff_policies(store.get_snapshot(values["before"]), store.get_snapshot(values["after"])),
                     before=values["before"], after=values["after"])
+    if path == "/policy/audit":
+        values = _arguments(parameters, ("snapshot",), ("snapshot",))
+        from policy_audit import audit_policy
+        return dict(audit_policy(store.get_snapshot(values["snapshot"])), snapshot_id=values["snapshot"])
     return None
 
 

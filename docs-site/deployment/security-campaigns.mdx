@@ -1,0 +1,93 @@
+---
+title: "Run independent security campaigns"
+description: "Separate benign baselines, ground truth, detector verdicts and verified firewall outcomes."
+---
+
+This pack supplies a repeatable evaluation procedure and machine-readable scorecard for P3/P4/P5 and S04–S07/S11/S58/S59/S70. It does not introduce a new detector, label home captures automatically or connect home collection to mitigation. The home collector still produces UNKNOWN observations and shadow findings only. Qualify [capture correctness](/deployment/pretest-qualification) before evaluating detectors.
+
+## Freeze the experiment before generating traffic
+
+1. Use an isolated test segment, a disposable owned target and an owned test client. Keep the ordinary household baseline separate from attack captures. Record local aliases privately and verify source/target identity and both observation directions.
+2. Freeze code/settings/schema/model and signature revisions. Record hashes, rule versions, parser switches, observation topology and the detector lane under test. Do not tune against the final evaluation campaigns.
+3. Run one detector lane at a time, then the combined configuration. The legacy Ryu Snort/rate/DAI/RF/AE path and the site-v3 collection/shadow path have different capabilities and schemas. A legacy RF bundle cannot score the new 71-column site contract without a separately trained compatible pipeline. The policy workbench is an offline model analyzer, not a packet detector.
+4. Reserve later times, tools, rates and campaigns for evaluation; separate related sessions when splitting. Home traffic familiarity and family membership do not independently prove benignness. Review updates/reconnects/streaming/gaming as difficult normal controls.
+5. Confirm target-side observations independently. A signature or RF verdict cannot be its own truth label. Use test-client transmission records, target captures/service logs and the predeclared test intent/outcome. Sanitized lexical canaries validate collection; they do not prove an exploit succeeded.
+
+## Campaign matrix
+
+Run each campaign with a new client and, later, a previously observed test client's changed behavior. Repeat rates and schedules without changing the frozen evaluation model. Start with bounded transactions; only raise load after measuring lab capacity and a stop condition. The scenario IDs below are accepted by the scorer.
+
+| Scenario ID | Mechanism and collected evidence | Benign lookalike/control | Independent truth/outcome |
+| --- | --- | --- | --- |
+| recon | SYN/NULL/FIN/XMAS probes, destination/service fan-out, replies and minute/hour diversity; G11/G13. | Owned diagnostic inventory, reconnects and concurrent application connections. | Sent probe list, target capture and actual listening ports. |
+| syn-load | Incomplete initiation pressure, rates/window flags and reply behavior; G11/G14. | Bounded connection/load test with completed sessions. | Source/target captures plus server connection state; five-second SYN count is not exact session completeness. |
+| udp-load | Datagrams/rates, destinations, payload lengths and ICMP errors; G11–G14. | Gaming/voice, DNS, legitimate UDP throughput. | Source rate and target receipt/drop counters, independently measured. |
+| icmp-load | ICMP counts/rates/size/arrival behavior. | Diagnostic ping and topology checks. | Actual transmitted/received sequence counts. IPv6 evidence must be qualified separately. |
+| arp-conflict | Forged/conflicting bindings and identity consistency; legacy DAI/ARP observations. | Device reconnect, DHCP address changes, legitimate gratuitous ARP. | Endpoint neighbor tables, observed legitimate binding and the injected conflict. Site-v3 has no trained ARP detector. |
+| auth-attempts | New SYNs to authentication service ports and peer novelty; G14. | Reconnect and successful ordinary authentication. | Authorized test-account authentication logs distinguish failures/success; TCP attempts alone cannot do so. |
+| http-canary | Complete cleartext HTTP/1 lexical URI measures; G17 opt-in. | Encoded legitimate queries, unusual methods and search strings. | Owned dummy-server request logs and the exact harmless canary. No SQLi/XSS exploit or HTTPS inspection claim. |
+| dns-tls-metadata | Owned unusual DNS queries/response codes, complete TLS ClientHello metadata; G15/G16 opt-in. | CDN changes, updates, legitimate high-entropy names and ECH. | Owned resolver/server outcomes. Hash/entropy/fingerprint novelty alone does not establish malicious C2. |
+| benign-control | Gaming/work/streaming/download/idle/update/reconnect workflow. | Repeated later-day/firmware workflow. | Operator activity ledger and supporting endpoint/service evidence; unexplained intervals stay unknown. |
+
+## First bounded reconnaissance test
+
+On the owned Kali test client, choose only a disposable target in the isolated segment. Preserve the collector's management path. This example checks a short explicit port list at a bounded rate; it does not scan an Internet address range.
+
+```bash
+read -r -p 'Owned disposable lab target IPv4 address: ' LAB_TARGET
+sudo nmap -sS -Pn -n -p 22,23,53,80,443,445,1883,3389 \
+  --max-rate 10 --max-retries 1 --host-timeout 30s "$LAB_TARGET"
+```
+
+Record source and target evidence with UTC timestamps before/after the test. Compare observed probes with the sensor's matching IP/VLAN windows; background traffic contributes to the same device summary. A low-rate eight-port scan may not cross a detector threshold. Record a miss if the campaign is independently malicious, qualified and no alert occurs; do not relabel it benign or lower a threshold after seeing the result. A harmless scan for collector qualification can instead have unknown test truth until its evaluation intent is declared.
+
+For an HTTP collection canary, run a dummy server serving only a new test directory as in the [visibility guide](/deployment/home-pilot-step-by-step), then issue a harmless request from the owned client:
+
+```bash
+read -r -p 'Owned dummy HTTP server IPv4 address: ' LAB_WEB
+curl --path-as-is --max-time 5 "http://$LAB_WEB:8088/probe.txt?canary=%41%42%43"
+```
+
+Enable --http in a separate deliberately selected collection directory. Failure to parse a split request is a known parser limitation, not proof that the request did not occur. For volumetric, ARP and authentication tests, use the existing [incident/verification workflow](/troubleshooting/verification) and a reviewed lab-specific traffic budget. This release does not generate unattended flood or credential attacks.
+
+## Populate the private results contract
+
+Copy examples/testing/campaign-results.example.json outside the repository. Its default result is deliberately unknown/unqualified. Each record is one nonoverlapping observation interval, up to one hour, for a campaign and subject alias. Use consecutive windows when measuring sustained activity. IDs must be unique; overlaps for one campaign/subject and mixed detector revisions are rejected. Different detector configurations need separate reports. Campaign windows sharing a host/session are correlated and must not be advertised as independent scientific trials.
+
+| Fields | Fill from |
+| --- | --- |
+| id, campaign, scenario, subject | Stable private interval/campaign/alias identifiers; scenario from the matrix. |
+| truth and truth_reference | malicious, benign or unknown based on an independent review and referenced evidence. |
+| detector_revision | Frozen code/model/signature/settings revision or manifest hash. |
+| activity_started_at, observation_ended_at | Offset-aware interval boundaries. Events must lie within these boundaries. |
+| verdict and detected_at | alert/clear/abstain and first actual alert time. Only alert has a detection timestamp. Missing detector evidence should be abstain. |
+| arrival_verified | Evidence that the tested traffic reached the relevant observation boundary. An upstream-blocked probe may never reach a LAN sensor. |
+| coverage_qualified and quality_ok | Previously verified sensor/parser path and interval quality, not a guess from seeing broadcasts. |
+| block_requested_at | Actual action request timestamp; null if no request. |
+| rule_readback_at | Independent read-back showing the owned rule/set member installed; null if unmeasured. |
+| traffic_block_verified_at | Independent source/target transaction evidence of effective containment; null if unmeasured. |
+| benign_continuity_verified | true/false/null for a simultaneous allowed control transaction. Null means not measured. |
+| outcome_reference | Private capture/log/result references supporting the response outcome. |
+
+Null timestamps are required for unmeasured stages. Rule installation/read-back does not itself show that the attacker stopped reaching the target. A printed BLOCKED log is also insufficient. Record pre-action target receipt, post-action failure, continuing innocent-client service, SOC reversal/expiry and restored legitimate connectivity as separate evidence. Clock order must be consistent; investigate negative latencies rather than taking absolute values.
+
+## Generate the scorecard
+
+```bash
+read -r -p 'Private reviewed campaign JSON: ' CAMPAIGN_FILE
+.venv/bin/python scripts/evaluate_security_campaign.py --input "$CAMPAIGN_FILE"
+```
+
+Optionally supply --output with a new private report path; existing files are refused. The input file is capped at 32 MiB/100,000 records. Output records its exact input SHA-256, frozen detector revision, counts by campaign/scenario, exclusions and median/p95/max latency with sample sizes. The template itself returns NO_QUALIFIED_EVIDENCE with null metrics and exit 2. Valid measurable input returns exit 0, even if detection results are poor; input/contract errors return 1. Exit 0 is not a security pass.
+
+- Qualified malicious alert: TP. Qualified malicious clear or abstain: FN, with abstentions also reported separately.
+- Qualified benign alert: FP. Qualified benign clear: TN. Benign abstention remains a separate count and is included in the qualified benign denominator for false-alert frequency.
+- Unknown truth, unverified arrival, inadequate coverage or bad quality: excluded with reasons, never counted as a true negative. Also report exclusion volume so failed capture cannot hide missing recall evidence.
+- Recall is TP / (TP + FN); precision is TP / (TP + FP). Zero denominators produce null. False alerts per qualified benign window and abstention rate are explicit. There is no fabricated ROC/AUC, probability calibration or confidence interval from correlated manually entered windows.
+- Detection latency begins at independently recorded activity start. Request-to-readback and request-to-traffic-confirmation are separate distributions. Unverified requests, benign block requests and continuity failures remain visible.
+
+## Gates before automated response
+
+Keep home collection passive while independent benign/attack campaigns establish error rates. Retrain site-v3-compatible candidates only on reviewed, version-bound data; calibrate on separate later-time/campaign inputs. Compare each detector and the fusion logic at a fixed false-action budget. Preserve unsupported/encrypted/reassembled traffic as missing evidence. Evaluate cold starts, drift, poisoning and legitimate changes before any model promotion.
+
+After choosing an industrial firewall, qualify read-only import against native fixtures first. Then test a narrowly scoped temporary response with owned-rule identity, backup/concurrency handling, read-back, actual containment, allowed-service continuity and tested reversal. Vendor-specific action/rollback support and cross-site confidence remain future gates; this pack provides measurements to assess them.

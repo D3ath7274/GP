@@ -3,6 +3,14 @@
   "fallback_pages": ["docs-site/developers/maintenance.mdx"],
   "rules": [
     {
+      "sources": ["Controller/collection_io.py", "Controller/collection_report.py", "scripts/home_preflight.py", "scripts/qualify_home_collection.py", "scripts/qualify_home_runtime.py", "scripts/evaluate_security_campaign.py", "examples/testing/*.json", "tests/fixtures/*.json"],
+      "pages": ["docs-site/deployment/pretest-qualification.mdx", "docs-site/deployment/security-campaigns.mdx", "docs-site/developers/qualification-code-tour.mdx"]
+    },
+    {
+      "sources": ["Controller/policy_audit.py"],
+      "pages": ["docs-site/deployment/policy-audit.mdx", "docs-site/developers/qualification-code-tour.mdx"]
+    },
+    {
       "sources": ["Controller/firewall_policy.py", "Controller/policy_store.py", "Controller/policy_http.py", "scripts/policy_inventory.py", "examples/policies/*.json"],
       "pages": ["docs-site/deployment/policy-workbench.mdx", "docs-site/developers/policy-workbench-code-tour.mdx"]
     },

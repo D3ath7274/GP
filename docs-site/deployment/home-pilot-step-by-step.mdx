@@ -60,6 +60,8 @@ This validates only the tested paths, protocol, time and addresses. Also verify 
 
 ## 4. Run a short collector qualification
 
+The [pre-test qualification tools](/deployment/pretest-qualification) now provide a preflight, independent golden packet check, accelerated restart exercise and stronger daily reports. You may perform steps 1–3 of this guide while those offline checks run. Stop before the multi-day phase until actual visibility and short-capture quality pass; an ordinary LAN cable still does not create a mirror.
+
 Only after the observation path passes, follow [home collection](/deployment/home-collection) to create the venv and install Controller/requirements-home.txt. From the repository root:
 
 ```bash
@@ -78,7 +80,7 @@ Use the existing SSH tunnel on port 8081 to view the collection dashboard. Gener
 sudo .venv/bin/python scripts/audit_home_data.py /var/lib/apf/home-qualification
 ```
 
-Exit 0 means tested file invariants passed with no listed quality counters; exit 1 indicates integrity/missing data; exit 2 requires quality review. None proves benign traffic. Investigate losses, truncation, stale timing, cap/eviction events and unavailable statistics before continuing. Optional parser limitations must be evaluated separately.
+Exit 0 means tested file/evidence invariants passed without listed review conditions; exit 1 indicates integrity/missing data or an unavailable writer lease; exit 2 requires quality/held/partial-window review. The upgraded audit requires a stopped collector, checks paired evidence and final run totals, and provides daily/device/gap/parser summaries. None proves benign traffic. Investigate losses, truncation, stale timing, cap/eviction events and unavailable statistics before continuing. Optional parser limitations must be evaluated separately.
 
 ## 5. Collect ordinary operating cycles
 
@@ -89,6 +91,8 @@ Record ordinary gaming/work, streaming/social media, updates, downloads, backups
 Candidate summaries cannot promote themselves. Explicitly reviewed profiles are descriptive; they do not establish attack confidence. A run-latched quality/incident hold requires investigation and may require a new qualified run. Stop the service before auditing closed files or approving a profile. State which workflows are absent, including infrequent/monthly behavior, before treating the capture as representative.
 
 ## 6. Keep later attack testing separate
+
+Use [the independent campaign guide and scorecard](/deployment/security-campaigns) to freeze detector revisions, record truth/arrival/coverage separately and measure misses, false alerts, abstentions and independently verified containment. It does not turn the passive home collector into an enforcing detector.
 
 Freeze reviewed baseline candidates before isolated Kali campaigns. Use an owned disposable target and record source/target/time/tool/rate and independently observed outcomes. Separate a new bridged device from a familiar test client's changed behavior. Reserve tools, rates and campaigns for evaluation; maintain benign gaming/streaming controls. A bridged VM on home LAN is an insider. For an outside test, use a controlled WAN/LAN firewall lab and record traffic before/after filtering; upstream-rejected traffic may never reach a LAN sensor.
 

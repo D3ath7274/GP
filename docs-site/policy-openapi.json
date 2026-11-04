@@ -11,6 +11,22 @@
     }
   ],
   "paths": {
+    "/policy/audit": {
+      "get": {
+        "summary": "Audit the bounded operator header-model subset",
+        "description": "Read-only P8 subset: duplicate, union shadow/behavior coverage and partial overlap with witnesses; metadata and model-scoped object findings. IPv4/IPv6 TCP/UDP/ICMP/ICMPv6 only; ANY restricted to that domain. No native semantics, routes/NAT/usage, deletion proof or firewall writes. Up to 200 rules, 4096 regions per rule/residual, 250000 work units and 4096 findings. Caps abort instead of returning a partial proof. Unknown conditions remain indeterminate.",
+        "parameters": [{"name":"snapshot","in":"query","required":true,"schema":{"type":"string","pattern":"^[0-9a-f]{64}$"}}],
+        "responses": {
+          "200": {
+            "description": "Scoped analysis, possibly INDETERMINATE, with findings, witnesses, limits, automatic_cleanup false and enforcement NOT_ATTEMPTED.",
+            "content": {"application/json":{"schema":{"type":"object","required":["version","status","snapshot_id","findings","automatic_cleanup","enforcement"],"properties":{"version":{"type":"string","enum":["policy-audit-v1"]},"status":{"type":"string","enum":["INDETERMINATE","COMPLETE_FOR_SUPPORTED_SUBSET"]},"automatic_cleanup":{"type":"boolean","enum":[false]},"enforcement":{"type":"string","enum":["NOT_ATTEMPTED"]}},"additionalProperties":true}}}
+          },
+          "400": {"description":"Invalid/repeated/unknown parameters, invalid model/integrity or exceeded audit budget"},
+          "404": {"description":"Unknown snapshot"},
+          "503": {"description":"Policy store unavailable"}
+        }
+      }
+    },
     "/policy/status": {
       "get": {
         "summary": "Read scope and authority boundaries",

@@ -149,15 +149,15 @@ provenance retrieves at most 20 latest import records, checks each returned raw 
 
 | Source lines | Component and rationale |
 | --- | --- |
-| 1–40 | Imports and fixed PAGE HTML/CSS/JavaScript. The viewer is operator convenience; it uses no CDN or frontend build. It explicitly labels the model limits. |
-| 21–39 inside PAGE | Snapshot selector, header query and diff form. URLSearchParams encodes inputs; DOM textContent displays data without treating policy comments as HTML. This UI never calls an import/write endpoint. |
-| 44–50 | _arguments rejects unknown/repeated query parameters and missing required values. Different interpretations of duplicate parameters must not affect a security query. |
-| 53–82 | read_policy_api routes status/list/show/search/diff. It converts query numbers, validates boolean choices and delegates semantics to the shared model/store. HTTP cannot invent an alternative matching algorithm. |
-| 86–109 | do_GET parses a bounded query, serves the fixed page or documentation and creates a read-only SQLite connection per request. This avoids sharing a connection across HTTP threads. Errors become explicit 400/404/503 responses. |
-| 111–112 | json_response serializes finite JSON. Invalid Infinity-style values must not break a browser or masquerade as valid output. |
-| 114–122 | respond sends type/length, disables caching and sets nosniff/CSP headers before writing bytes. These headers help keep a local viewer's data and execution context predictable. |
-| 124–125 | Suppress access logs because query URLs can contain private device addresses. Operational errors still need explicit handling/reporting. |
-| 128–133 | make_server validates an existing store, binds only 127.0.0.1 and records the store path on the server. It never binds the LAN automatically. |
+| 1–42 | Imports and fixed PAGE HTML/CSS/JavaScript. The viewer is operator convenience; it uses no CDN or frontend build. It explicitly labels the model limits. |
+| 21–41 inside PAGE | Snapshot selector, header query, diff form and supported-subset audit button. URLSearchParams encodes inputs; DOM textContent displays data without treating policy comments as HTML. This UI never calls an import/write endpoint. |
+| 46–52 | _arguments rejects unknown/repeated query parameters and missing required values. Different interpretations of duplicate parameters must not affect a security query. |
+| 55–88 | read_policy_api routes status/list/show/search/diff/audit. It converts query numbers, validates boolean choices and delegates semantics to the shared model/store. HTTP cannot invent an alternative matching algorithm. |
+| 92–115 | do_GET parses a bounded query, serves the fixed page or documentation and creates a read-only SQLite connection per request. This avoids sharing a connection across HTTP threads. Errors become explicit 400/404/503 responses. |
+| 117–118 | json_response serializes finite JSON. Invalid Infinity-style values must not break a browser or masquerade as valid output. |
+| 120–128 | respond sends type/length, disables caching and sets nosniff/CSP headers before writing bytes. These headers help keep a local viewer's data and execution context predictable. |
+| 130–131 | Suppress access logs because query URLs can contain private device addresses. Operational errors still need explicit handling/reporting. |
+| 134–139 | make_server validates an existing store, binds only 127.0.0.1 and records the store path on the server. It never binds the LAN automatically. |
 
 Local loopback and an SSH tunnel are the current management boundary. Tenant/site labels in a shared database are not authenticated tenant isolation. ThreadingHTTPServer is a prototype serving choice; enterprise authentication, rate control, transport hardening and scale qualification remain P11/P13 work.
 
@@ -165,7 +165,7 @@ Local loopback and an SSH tunnel are the current management boundary. Tenant/sit
 
 Lines 1–11 import standard-library modules and place Controller on the import path relative to this script, so it can run from the repository without installing Ryu or a package. The path comes from __file__, not user text.
 
-main, lines 14–84, declares validate/import/list/show/search/diff/serve argument contracts. validate parses and reports the content ID without opening a database. import validates before opening a writable store. All remaining data commands use read-only connections. serve validates the port and runs the loopback viewer; Ctrl+C ends it. search builds the same concrete query as HTTP. diff retains before/after snapshot IDs. JSON output is suitable for scripted result capture; controlled errors return nonzero rather than printing a success-shaped result.
+main, lines 14–90, declares validate/import/list/show/search/diff/audit/serve argument contracts. validate parses and reports the content ID without opening a database. import validates before opening a writable store. All remaining data commands use read-only connections. serve validates the port and runs the loopback viewer; Ctrl+C ends it. search builds the same concrete query as HTTP. diff retains before/after snapshot IDs. JSON output is suitable for scripted result capture; controlled errors return nonzero rather than printing a success-shaped result.
 
 Argument parsing, port choice and human-readable indentation are interface choices. Keeping imports explicit, scopes visible, failed operations nonzero and read/write authority separate is necessary for this milestone's claims. The main guard prevents argument parsing or listeners when the module is imported in tests.
 
@@ -176,3 +176,5 @@ examples/policies/reference-v1.json is a sanitized seven-rule/four-object contra
 tests/test_policy_workbench.py exercises malformed/ambiguous input, object cycles/missing references, strict CIDRs, port ranges/bools, order/default/disabled/unknown behavior, IPv6/UDP, limit-independent decisions, structural diffs, repeat import, raw/normalized corruption, forced transactional rollback, read-only/missing/unrelated stores and real CLI/HTTP requests. A POST is rejected and HTTP reads leave the database bytes unchanged. Native vendor correctness and t530 resource performance are not established by these fixtures.
 
 To understand the critical boundary, trace one query through CLI/HTTP, query, PolicyEvaluator.search, match, AddressResolver and _port_match. Identify which missing value changes MATCH to POSSIBLE and why that prevents a definitive later result. Then inspect the forced-import-failure test and explain why no snapshot or raw row remains. Those two traces connect the code directly to semantic correctness and durable evidence.
+
+The first P8 audit uses the same read-only snapshot boundary. See [its source rationale](/developers/qualification-code-tour) and [witness-based audit runbook](/deployment/policy-audit) for the bounded symbolic algorithm, uncertainty and native-policy limits.

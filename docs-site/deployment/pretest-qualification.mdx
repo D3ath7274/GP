@@ -1,0 +1,111 @@
+---
+title: "Qualify collection before a long pilot"
+description: "Run preflight, independent packet expectations, restart/failure checks and closed daily quality reports."
+---
+
+You can perform the [home pilot visibility test](/deployment/home-pilot-step-by-step) now. Stop before the multi-day phase until the known transactions and short-capture checks pass. This page supplies executable preparation for P1/P2/P3/P6 and services S01/S02/S08/S10/S68. It does not enable model scoring, approve traffic as benign or connect a firewall write adapter.
+
+## What was added and why
+
+| Addition | Delivered behavior | Evidence still needed |
+| --- | --- | --- |
+| One-command preflight | Dependency, Linux/raw-socket permission, interface state, clock synchronization assertion, disk, loopback port, policy and schema checks; optional dated visibility attestation. | Actual request/response visibility on each monitored path; upstream losses; t530 execution. |
+| Golden packet qualification | Generates sanitized PCAP files and compares all 58 feature columns plus nonzero G11–G17 subsets with hand-derived expectations. | Unrepresented protocol variants, live capture equivalence and independent traffic measurements. |
+| Failure/restart qualification | Tests interrupted checkpoints, competing processes, crash lease release, storage refusal, corrupt profiles and incomplete CSV/evidence pairs. Accelerated soak retains unverified history across restart. | Actual Ubuntu service restarts, kernel capture/loss and multi-day resource behavior. |
+| Daily quality report | Closed-file evidence hashes/alignment, rates, numeric values, cross-run overlap, run totals, daily/device summaries, gaps and parser counts. | Meaning of gaps and representative device/workflow coverage; operator review. |
+| Campaign evaluation pack | Versioned private template and scorer for qualified observation intervals, misses, false alerts, abstentions and independently verified outcomes. | Actual independently labeled attack and benign-control campaigns. |
+| Deterministic policy audit | Bounded duplicate/shadow/redundant/overlap analysis with witnesses and metadata/object review findings. | Native firewall parsing, vendor semantics and complete path/usage qualification. |
+
+## 1. Prepare the checkout
+
+Use the branch containing these files. Run the following from its repository root on Ubuntu. The golden qualifier needs tests/fixtures/site-v3-golden.json, so retain the tests directory. If deploying a separate /opt/apf copy, copy the sanitized tests directory alongside Controller, scripts, Dashboard and docs-site before running qualification there.
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r Controller/requirements-home.txt
+.venv/bin/python -m unittest discover -s tests
+```
+
+psutil is optional for dashboard CPU/RAM and sampled process RSS. Without it those resource readings are unavailable and preflight reports REVIEW. The mandatory collection environment remains Scapy and Markdown; no Ryu, model bundle or firewall credentials are required for these checks. Preserve the operating system's python3 executable.
+
+## 2. Run the independent feature check
+
+Choose a new output directory each time. Synthetic fixtures contain documentation-only address ranges and no household captures.
+
+```bash
+.venv/bin/python scripts/qualify_home_collection.py \
+  --output-dir .local/qualification-01
+```
+
+Expected result is PASS, 142 numeric/missing-value comparisons and no failures. The command writes the PCAPs, actual daily CSV/evidence/run records and qualification.json. The committed golden file's SHA-256 identifies the expected values. The first two windows check every feature column; additional application/fragment/IPv6 fixtures exercise nonzero parser and header subsets. A feature list change fails coverage instead of silently skipping a new column.
+
+The core fixture has four outgoing VLAN-tagged frames of 58, 58, 60 and 58 bytes: 234 bytes over five seconds gives 46.8 bytes/s and 0.8 packets/s. Two incoming frames total 104 bytes, giving a directional byte ratio of 2.25. TTL values 64, 62, 64 and 62 have mean 63 and sample standard deviation about 1.1547. The next window's TTL mean 62 has residual -1 against prior history. Expected numbers are written independently of the extractor. This is fixture correctness evidence, not proof that all possible packets are handled correctly.
+
+## 3. Exercise bounded runtime and restart behavior
+
+```bash
+.venv/bin/python scripts/qualify_home_runtime.py \
+  --output-dir .local/runtime-01 --windows 1000 --devices 4
+```
+
+Expected result is PASS with 4,000 checked rows and two run IDs. This accelerates event time and deliberately reloads persisted TTL/destination history halfway through. Rates, novelty, labels and closed-file integrity must remain consistent. The report records elapsed wall time, artifact bytes, retained profile count and sampled RSS when psutil is available. Windows must be 4–10,000 and devices 1–16; larger arguments fail. This is not a 14-day soak, live packets-per-second benchmark or memory-leak proof.
+
+The unit suite also verifies that a process exit releases the lease, another owner prevents access, atomic checkpoint replacement failure preserves the old checkpoint, low disk stops writes, invalid timestamps are counted, corrupt profile values are rejected and a missing evidence row fails the report. An abrupt crash can still lose the pending window/latest uncheckpointed history. A two-file CSV/JSONL write is not a database transaction: the auditor detects a torn pair, which requires investigation rather than automatic repair or approval.
+
+## 4. Preflight the actual t530
+
+Use the same interface, ordered networks, parser flags, policy and budgets that you will use for collection. Stop the collector first; a running collector owns its directory and port. This command does not create the directory, change interface modes, configure a mirror or alter firewall rules. The raw-socket probe opens/closes a socket without receiving packets. The loopback port check temporarily binds and closes a socket. Results apply only at that time.
+
+```bash
+read -r -p 'Sensor interface: ' SENSOR_IFACE
+read -r -p 'Actual local IPv4 CIDR: ' LAN_CIDR
+sudo .venv/bin/python scripts/home_preflight.py \
+  --interface "$SENSOR_IFACE" --lan "$LAN_CIDR" \
+  --data-dir /var/lib/apf/home-qualification
+```
+
+Repeat --lan for actual additional IPv4/IPv6 prefixes and add --metadata/--http only when deliberately selecting those parsers. Existing schema settings must match exactly; use a new data directory when changing settings. Optional --policy and repeated --approved-baseline validate the same inventory/profile contracts as runtime. Source SHA-256 fingerprints identify the checked collector/feature/policy/lease code. New run manifests also retain source fingerprints, Python/Scapy versions and OS/kernel information. These hashes identify bytes; they do not authenticate a deployment or prove that its clock/mirror is correct.
+
+Exit 0 means prerequisite checks passed within their stated scope, 1 means FAIL, and 2 means REVIEW. A missing observation attestation produces REVIEW even if every dependency works. Unsynchronized/unqueryable time, an interface state other than up, optional unavailable resource/docs modules or an existing profile checkpoint also require review. Runtime still validates the checkpoint's contents. Do not promote REVIEW to an assertion of full capture coverage.
+
+### Record actual visibility evidence
+
+Privately copy examples/testing/visibility.example.json outside the repository. Replace its interface, ordered networks, reviewer, valid interval, tested paths and references after performing the guide's transactions. Set the direction booleans only from observed results. Include each phone/PC path and relevant Internet/IPv6 tests; list bypasses and limitations. The sample deliberately has false results and expires. A path needs an alias, family IPv4/IPv6, request_seen, response_seen and reference. Times need offsets. Every configured IP family needs at least one test, but this syntactic check cannot establish that you tested every device or segment.
+
+```bash
+read -r -p 'Private visibility JSON path: ' VISIBILITY_FILE
+sudo .venv/bin/python scripts/home_preflight.py \
+  --interface "$SENSOR_IFACE" --lan "$LAN_CIDR" \
+  --data-dir /var/lib/apf/home-qualification \
+  --visibility-evidence "$VISIBILITY_FILE"
+```
+
+This is an operator attestation bound to interface/settings/time. It is not authenticated proof from the router. It does not modify the separate shadow policy's observation record: if configuring shadow learning, record corresponding independently reviewed coverage there too. Evidence must be renewed when the topology or identities change. Do not blindly copy the example dates or mark failed transactions successful.
+
+## 5. Review short and daily captures
+
+Follow the [home guide](/deployment/home-collection) for capture and systemd installation. During collection, use the dashboard/health records. For a consistent daily report, cleanly stop collection and run the audit under the account that owns the private directory. A manual foreground collector ends with Ctrl+C; a service ends with the first command below.
+
+```bash
+sudo systemctl stop apf-home
+sudo /opt/apf/.venv/bin/python /opt/apf/scripts/audit_home_data.py \
+  /var/lib/apf/collection
+```
+
+Inspect the report and resolve errors requiring action. Then resume with sudo systemctl start apf-home. To retain the report, add --output with a new private path outside the collection directory; existing files are refused, with mode 0600 on Unix. Output contains device identities and must remain private; review Windows ACLs separately. The CLI takes the same nonblocking OS lease as the writer/reviewer, so an active owner is refused. Only the small lease file may be created; source CSV/evidence/run files are not rewritten. Stopping/restarting creates a new run, resets candidate summaries/incident holds and warms short-term history. Investigate existing holds first; a restart does not resolve an incident.
+
+| Report field | Interpretation |
+| --- | --- |
+| integrity_issues | Schema/provenance/hash/count/rate/overlap or malformed data problems. FAIL requires investigation; no automatic repair. |
+| quality_counters | Drops, caps, parse errors, unclosed/replay/unversioned runs, unavailable loss measurement and partial windows. These require review. |
+| capture_totals | Captured/parsed/unsupported byte/frame counters and available kernel statistics across final run manifests. Not proof that an upstream mirror delivered all traffic. |
+| days_utc and devices | Observed rows, partial/held/review-eligible windows, parser counts and per-device observation intervals. Local-to-local frames contribute to both endpoint rows. |
+| unobserved_gap_seconds | Gaps between observed windows, not measured packet loss. Idle/offline devices and bypass paths can cause the same pattern. |
+| parser_settings and parser counts | Distinguish disabled parsers from successful bounded parses. Zero TLS/HTTP parses cannot establish no application traffic or no attacks. |
+| runs | Final state, row totals, revision/environment fingerprints and capture source. Replay and unclosed runs cannot qualify live learning. |
+
+Exit 0 means checked invariants passed without the listed review conditions, 1 means integrity/operational failure, and 2 means quality or held-window review. Ambient labels remain UNKNOWN. The report uses a temporary disk-backed interval index, caps scanning at two million rows and 4,096 device bindings, and fails rather than certifying an incomplete scan. Archive complete closed collection periods before those limits. Reports do not approve baselines or prove that an observation was benign.
+
+## Next gate
+
+Only after short measurements agree with independent evidence should you start the initial 14-day cycle. Audit after the first hour/day and daily, recording missed workflows and downtime. Representative household data supports baseline and false-alert evaluation. Use [independent campaigns](/deployment/security-campaigns) for attack recall/action evaluation and [policy audit](/deployment/policy-audit) for offline rule analysis. See [the code rationale](/developers/qualification-code-tour) before extending these paths. Native industrial firewall qualification and automatic containment remain separate release gates.

@@ -39,6 +39,9 @@ def main():
     compare.add_argument("--store", type=Path, required=True)
     compare.add_argument("--before", required=True)
     compare.add_argument("--after", required=True)
+    audit = commands.add_parser("audit")
+    audit.add_argument("--store", type=Path, required=True)
+    audit.add_argument("--snapshot", required=True)
     serve = commands.add_parser("serve")
     serve.add_argument("--store", type=Path, required=True)
     serve.add_argument("--port", type=int, default=8082)
@@ -74,6 +77,9 @@ def main():
                 elif args.command == "diff":
                     result = dict(diff_policies(store.get_snapshot(args.before), store.get_snapshot(args.after)),
                                   before=args.before, after=args.after)
+                elif args.command == "audit":
+                    from policy_audit import audit_policy
+                    result = dict(audit_policy(store.get_snapshot(args.snapshot)), snapshot_id=args.snapshot)
                 else:
                     point = query(args.source, args.destination, args.protocol, args.destination_port, args.source_port)
                     result = dict(PolicyEvaluator(store.get_snapshot(args.snapshot)).search(point, args.limit, args.include_disabled),

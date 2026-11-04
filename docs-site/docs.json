@@ -43,6 +43,10 @@
           "deployment/documentation-access",
           "deployment/policy-workbench",
           "deployment/home-pilot-step-by-step",
+          "deployment/pretest-qualification",
+          "deployment/security-campaigns",
+          "deployment/policy-audit",
+          "developers/qualification-code-tour",
           "developers/policy-workbench-code-tour"
         ]
       },
