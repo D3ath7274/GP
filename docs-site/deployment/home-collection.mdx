@@ -1,0 +1,151 @@
+---
+title: "Collect home traffic for two weeks"
+description: "Run the site-v3 collector on Ubuntu with daily CSVs, observation history and capture health."
+---
+
+The dedicated home collector writes the versioned **site-v3.0** dataset and serves the dashboard on loopback port 8081. Its five-second rows summarize each local IP address and VLAN. Historical profiles describe observed behavior. Ground truth stays **UNKNOWN** until you independently review activity.
+
+The current contract has 71 columns. Its device/window measurements are a separate dataset from the legacy 102-column per-flow v2 files. Store and train each schema separately. The runtime writes the exact field order to schema.json.
+
+<Steps>
+<Step title="Verify the observation path">
+Configure a TAP, SPAN destination or controlled forwarding path so both directions reach a dedicated t530 interface. An ordinary router LAN port receives only the frames delivered to that port. Check a known transaction from each device segment. Preserve management connectivity and record the covered and uncovered paths.
+</Step>
+<Step title="Prepare Ubuntu">
+Run the following from a checkout containing the new collector. The examples use the repository under your home directory for the first foreground test.
+
+```bash
+cat /etc/os-release
+ip -br link
+ip -br addr
+df -h /
+timedatectl status
+cd ~/GP
+sudo apt update
+sudo apt install -y python3-venv tcpdump
+python3 -m venv .venv
+.venv/bin/python -m pip install -r Controller/requirements-home.txt
+```
+
+Use a collection directory outside the repository. You can optionally install psutil into this venv for CPU/RAM/disk dashboard metrics. The collection health counters require only the shipped requirements.
+</Step>
+<Step title="Run a short qualification capture">
+Set the actual mirror interface and local subnet. The documentation addresses below must be replaced with your own interface and LAN CIDR. Repeat --lan for additional IPv4 or IPv6 subnets.
+
+```bash
+SENSOR_IFACE=enx0123456789
+LAN_CIDR=192.0.2.0/24
+sudo .venv/bin/python Controller/home_sensor.py \
+  --interface "$SENSOR_IFACE" --lan "$LAN_CIDR" \
+  --data-dir /var/lib/apf/collection
+```
+
+From your workstation, use an SSH tunnel and open http://127.0.0.1:8081/.
+
+```bash
+ssh -N -L 8081:127.0.0.1:8081 operator@t530
+```
+
+The header reports collection state and the collection panel shows row count, retained profiles, kernel drops, late packets, omissions, cardinality overflow and free space. An empty threat feed during collection supplies no evidence about security. It reflects that collection has no qualified detector verdicts.
+</Step>
+<Step title="Validate measurements before leaving it running">
+Capture a short independent Ethernet PCAP at the same observation point, record the capture tool's loss counters, and generate a known exchange between owned endpoints. Compare counts, lengths and timing with equivalent direction, protocol and VLAN filters. Bytes are captured Ethernet lengths, normally excluding FCS. Each local endpoint gets a directional row, so local-to-local packets contribute to two device rows. Global capture counters count the frame once.
+
+Stop the sensor cleanly with Ctrl+C. Run the file audit while the files are closed.
+
+```bash
+sudo .venv/bin/python scripts/audit_home_data.py /var/lib/apf/collection
+```
+
+Exit 0 means file invariants passed with no listed quality counters. Exit 1 means an integrity issue or missing rows. Exit 2 means files passed, but loss, truncation, eviction, failure or unavailable kernel loss measurements require review. PCAP replay has no live kernel-loss measurements. These outcomes do not establish malicious or benign labels. Check DNS/TLS/HTTP parse coverage separately, including encrypted and segmented traffic.
+</Step>
+</Steps>
+
+## New feature coverage
+
+| Group | Collected measurements | Conditions and limits |
+| --- | --- | --- |
+| Base/device | Counts, byte rates, online packet-size and inter-arrival moments, prior-window destination novelty, observed source MAC count | Event time and fixed five-second windows. First and final windows are marked incomplete. Historical novelty is limited to the retained destination set. |
+| G11 recon | NULL/XMAS/FIN-without-ACK counts, SYN counts, incoming resets and ICMP port-unreachable counts, destination and service-edge diversity | Header behavior. Incoming resets are device-level observations, without exact probe/response session attribution. |
+| G12 headers | TTL/hop-limit mean and dispersion, residual against prior observed TTL mean, TCP window statistics, zero-window and fragment counts | Fragmented IP packets contribute outer header and volume evidence without full transport reassembly. |
+| G13 long horizon | Destination cardinality and outgoing byte counts in minute buckets, repeated window contacts, mean per-pair interval CV with sample support | Ten-minute/hour horizons use bounded minute buckets. Pair histories retain at most 32 peers with 64 contacts each. A pair needs at least three intervals. These are window contacts, with resolution limited by five-second aggregation. |
+| G14 service behavior | New SYN rate, SYN count to selected auth ports, outgoing/incoming byte ratio, outgoing payload byte count | Packet evidence. Login outcomes, HTTP response codes, completed sessions and slow-connection lifetime need richer session/application evidence. |
+| G15 DNS | Query/response counts, NXDOMAIN fraction of responses, qname length/entropy, distinct qname hashes, TXT/NULL query counts | Enable --metadata. Single-question UDP DNS on port 53 only. Full qnames are transient and are reduced to statistics/hashes. Hashes can still be sensitive. |
+| G16 TLS | Complete ClientHello count, missing SNI count, ECH extension count, custom fingerprint diversity | Enable --metadata. Complete first ClientHello in one TCP packet. The fingerprint is project-specific. TCP stream reassembly, QUIC and certificate validation are pending. |
+| G17 HTTP | Complete request count, rare-method count and URI length/entropy/encoding/special-character statistics | Enable --http. Complete cleartext HTTP/1 request headers in one packet, bounded to 8 KiB. HTTPS contents and application authorization outcomes are unavailable. |
+
+Metadata/content flags are off by default. Add --metadata and, if explicitly appropriate, --http before creating the collection directory to collect these measurements. Changing parser options, networks, source cap or schema requires a new directory. Storage budgets can be adjusted independently. Missing statistics are blank, while explicit counts can be zero. Flags in each row and the schema manifest establish whether an optional parser was enabled. Segmented or unsupported protocol evidence remains outside the parser's coverage. No URI, payload or full domain strings are written to the feature CSV.
+
+The original plan lists additional research features for each group. This release implements the measurements in this table. The broader signatures, authorization evidence, complete session reconstruction and later G18–G24 groups have separate qualification work.
+
+## Storage, restart and privacy
+
+- Files rotate by **UTC day**, with a separate run ID per restart. schema.json records the feature contract. run-ID.json stores health and run state. profile-state.json stores bounded unverified destination and TTL history.
+- Profiles and cardinalities have explicit caps. When caps are reached, counters record the affected truncation or eviction. Rates and byte counts continue within admitted device windows. Review capped cardinalities as lower bounds.
+- Source windows default to at most 128 local IP/VLAN pairs. Historical profiles have the same cap, with at most 1,024 remembered destinations each. Hourly sets cap each source/minute at 128 peers and 128 ports. Short-term histories warm up after a restart, which is recorded in rows. Address reassignment still needs independent identity review.
+- Capture health includes observed truncation, kernel loss and unsupported IPv6 jumbograms. A zero local kernel-drop count cannot establish whether an upstream mirror lost frames. Compare endpoint-generated test counts as well as an independent capture. The Linux socket reports its actual receive-buffer size in the run health record.
+- Live Linux capture requests nanosecond kernel receive timestamps so Python decoding delays do not become packet arrival times. Records use floating-point seconds, which have less than nanosecond precision. Missing kernel timestamps and socket truncation are counted. PCAP replay uses its stored timestamps. Clock changes and reordered timestamps need review before using timing features.
+- By default, collection stops when directory use reaches 5 GiB or disk free space falls below 1 GiB. Checks run at window boundaries and periodically during idle capture. Files are retained for you to archive. Estimate the site's daily size during the first hour and adjust --max-data-gib deliberately if needed. A single completed window can exceed a budget boundary slightly.
+- Directory permissions default to 0700. Store exports privately. Restarting with the same settings creates a fresh CSV run while restoring bounded empirical history. A process lock prevents two collectors from writing the same directory. Up to the current five-second window and the latest minute of profile changes can be lost on a crash. The file audit flags malformed records. Checkpoint files update about once per minute and at clean shutdown.
+
+## Run across reboots with systemd
+
+For the service template, prepare a **readable deployment copy** at /opt/apf, a Python venv at /opt/apf/.venv, and a dedicated user. Clone the pushed branch containing this implementation or copy the same versioned checkout there. Keep code ownership administrative and give the service only its state directory.
+
+For a copy from your checked-out repository, run these once from the repository root. Verify that this checkout contains Controller/home_sensor.py first. Repeat the code copy after a reviewed update while the service is stopped. The /docs pages are read from this deployment copy.
+
+```bash
+sudo install -d -m 755 /opt/apf
+sudo cp -a Controller Dashboard docs-site scripts /opt/apf/
+sudo chmod -R a+rX /opt/apf/Controller /opt/apf/Dashboard /opt/apf/docs-site /opt/apf/scripts
+sudo python3 -m venv /opt/apf/.venv
+sudo /opt/apf/.venv/bin/python -m pip install -r /opt/apf/Controller/requirements-home.txt
+```
+
+```bash
+sudo useradd --system --user-group --home-dir /var/lib/apf --shell /usr/sbin/nologin apf
+sudo install -d -m 755 /etc/apf
+sudoedit /etc/apf/home.env
+```
+
+If a foreground test already created /var/lib/apf/collection as root, stop that process before handing the directory to the service account.
+
+```bash
+sudo install -d -o apf -g apf -m 700 /var/lib/apf
+sudo chown -R apf:apf /var/lib/apf/collection
+```
+
+Run the chown command only when that APF collection directory already exists. For a fresh service installation, the service creates it inside its state directory.
+
+In home.env set APF_INTERFACE and APF_LAN to the actual interface/subnet, one assignment per line. APF_FEATURE_ARGS can enable the optional parsers. For example, APF_FEATURE_ARGS=--metadata enables DNS/TLS measurements. Use APF_FEATURE_ARGS="--metadata --http" to also measure complete cleartext HTTP/1 headers. Leaving it unset selects header-only collection. Additional subnets can be configured using a systemd ExecStart override. Use a new collection directory when parser or network settings change.
+
+```bash
+sudo install -m 644 /opt/apf/Controller/scripts/apf-home.service /etc/systemd/system/apf-home.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now apf-home
+sudo systemctl status apf-home
+sudo journalctl -u apf-home -n 50 --no-pager
+```
+
+The service runs as apf with CAP_NET_RAW and writable state under /var/lib/apf. Storage-limit/configuration exit 78 prevents a restart loop. Investigate failures before restarting. Review the dashboard and journal after an hour, after the first day, and daily afterwards. Before auditing or backing up closed files, stop the service briefly, run the audit, then restart. Record the monitoring gap.
+
+## How long to collect
+
+**Fourteen days** is the recommended first home baseline. Treat seven days as a pilot. Cover two weekends, weekday/daytime/evening behavior, reconnects, streaming, backups and software updates. Extend to 21–30 days when key devices are intermittent or important workflows remain absent. Collect a known monthly operation separately rather than assuming any chosen duration includes it.
+
+Use the first seven days for candidate training, the next three for calibration and the final four for an untouched benign check after grouping related sessions. Keep early partial windows, quality-degraded intervals, attack tests and unexplained activity out of any approved normal training set. A calendar split needs sufficient device coverage and independent campaigns to be useful. Home benign data supports false-alert evaluation. Later attack recall, tool generalization and action confidence require independently labeled attack campaigns in an isolated lab. Model artifacts trained on v2 require a separate qualification and retraining for site-v3.0.
+
+Maintain a separate private activity ledger with UTC start/end times, a device alias, the known activity and a review status. Include normal streaming, backups, updates, reconnects and new-device setup. Keep ambient intervals unverified. Use rows_written and data_bytes after the first hour to estimate daily storage, then reserve additional headroom before committing to two weeks. Audit once after qualification, again after 24 hours, and then daily. Time span is one dimension of coverage alongside device participation, normal workflows and capture quality.
+
+## Detection experiments to develop after collection
+
+| Technique | Hypothesis and experiment |
+| --- | --- |
+| Device and role baselines | Compare a camera with its own prior behavior and with cameras doing the same job. Hold out firmware updates and reconnects as hard negatives. Test whether the cohort reduces cold-start errors without hiding compromise. |
+| Temporal service graph | Track new device-to-service edges and their order. Test whether a scan followed by new authentication and outbound transfer adds evidence beyond independent rate alarms. Authentication and transfer impact need corroborating logs. |
+| Multiple timescales | Compare five-second activity with minute/hour summaries. Test periodic contacts with jitter, missed observations and legitimate telemetry. Low timing variation alone is insufficient evidence of C2. |
+| Change-point evidence | Compare cumulative deviations with isolated spikes. Test gradual exfiltration and sudden legitimate backups separately. Measure latency and false alerts rather than choosing thresholds to fit one example. |
+| Approved and candidate histories | Keep future enforcement baselines fixed while learning changes in a candidate. Use reviewed intervals and deliberate slow-poisoning scenarios to qualify promotion. The current collector stores empirical observations and assigns no approved-safe status. |
+| Independent evidence | Pair a network finding with a relevant protocol, authentication or endpoint outcome. Keep shared inputs visible so two models scoring the same row cannot be counted as two independent confirmations. |
+
+Before introducing a feature into automatic decisions, compare the detector with and without it at the same false-alert budget, using campaign-separated and later-time data. Record the memory, capture-loss and compute cost. These experiments are development work beyond the measurements collected by this release.

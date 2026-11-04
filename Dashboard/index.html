@@ -139,6 +139,11 @@
   </header>
 
   <main>
+    <div class="card" id="collection-card" hidden style="grid-column:1/-1">
+      <div class="card-h"><h3 class="card-t">Home data collection · <a href="/docs/deployment/home-collection">Guide</a></h3></div>
+      <div class="card-c"><p id="collection-details">Waiting for collection health…</p>
+        <p class="card-d">Observed traffic has UNKNOWN ground truth. Review capture quality and activities before training.</p></div>
+    </div>
     <!-- KPI: threat -->
     <div class="card">
       <div class="card-h"><h3 class="card-t">Threat level <span id="threat-ic"></span></h3></div>
@@ -251,9 +256,23 @@
       const ml = status.ml_mode || "—";
       setBadge($("ml"), ml==="AUTHORIZE"?"b-bad":ml==="OBSERVE"?"b-warn":"b-secondary", "ML " + ml);
       $("sw").textContent = (status.switches ?? "—") + " switch" + (status.switches===1?"":"es");
-      if(status.deployment_mode === "passive"){
-        $("detect").textContent = "PASSIVE IDS";
+      if(status.deployment_mode === "passive" || status.deployment_mode === "collection"){
+        $("detect").textContent = status.deployment_mode === "collection" ? "COLLECTING · UNKNOWN LABELS" : "PASSIVE IDS";
         $("sw").textContent = status.capture_state.replaceAll("_", " ");
+      }
+      $("collection-card").hidden = status.deployment_mode !== "collection";
+      if(status.deployment_mode === "collection"){
+        const collection = await getJSON("/ips/collection");
+        if(collection){
+          const health = collection.health || {};
+          $("collection-details").textContent =
+            "Schema " + collection.schema_version + " · Rows " + collection.rows_written +
+            " · Profiles " + collection.device_profiles + " · Kernel drops " + (health.kernel_drops || 0) +
+            " · Late packets " + (health.late_packets || 0) +
+            " · Source omissions " + (health.source_window_omissions || 0) +
+            " · Cardinality overflows " + (health.cardinality_overflows || 0) +
+            " · Disk free GiB " + ((health.disk_free_bytes || 0) / 1073741824).toFixed(2);
+        }
       }
 
       const [blk, m, al] = await Promise.all([
@@ -275,6 +294,7 @@
       const label = ["CLEAR","ELEVATED","UNDER ATTACK"][lvl];
       const tone  = ["ok","warn","bad"][lvl];
       const t=$("threat"); t.textContent=label; t.className="stat t-"+tone;
+      if(status.deployment_mode === "collection"){ t.textContent="LEARNING DATA"; t.className="stat t-info"; }
       $("threat-ic").innerHTML = svg(lvl===0?"shield":"alert","hsl(var(--"+tone+"))");
       $("attackers").textContent = attackers;
       $("a60").textContent = a60;
@@ -295,7 +315,7 @@
       const bt = m?.by_tier || {};
       const tiers = [
         {k:"Snort 3", v:bt.snort, d:"signatures (Tier 1)", icon:"radio", on:m?.snort_running},
-        {k:"Rate + DAI", v:bt.rate_dai, d:"counters (Tier 2)", icon:"activity", on:m?.deployment_mode !== "passive"},
+        {k:"Rate + DAI", v:bt.rate_dai, d:"counters (Tier 2)", icon:"activity", on:m?.deployment_mode !== "passive" && m?.deployment_mode !== "collection"},
         {k:"Random Forest", v:bt.rf, d:"supervised (Tier 3)", icon:"brain", on:m?.rf_loaded},
         {k:"Autoencoder", v:bt.ae, d:"anomaly (Tier 4)", icon:"layers", on:m?.ae_loaded},
       ];

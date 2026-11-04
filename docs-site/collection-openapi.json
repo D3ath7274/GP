@@ -1,0 +1,141 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "APF home collection read API",
+    "version": "site-v3.0",
+    "description": "Loopback-only collection service. Requests do not change enforcement. Ground truth is UNKNOWN."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8081"
+    }
+  ],
+  "paths": {
+    "/ips/status": {
+      "get": {
+        "summary": "Service mode and current capture state",
+        "responses": {
+          "200": {
+            "description": "Service mode and current capture state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/collection": {
+      "get": {
+        "summary": "Run ID, rows, profiles, parser options and cumulative capture/storage quality counters",
+        "responses": {
+          "200": {
+            "description": "Run ID, rows, profiles, parser options and cumulative capture/storage quality counters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/schema": {
+      "get": {
+        "summary": "Exact ordered CSV columns, schema version, collection settings and parser contract",
+        "responses": {
+          "200": {
+            "description": "Exact ordered CSV columns, schema version, collection settings and parser contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/metrics": {
+      "get": {
+        "summary": "Dashboard metrics. Model availability and enforcement are disabled during collection",
+        "responses": {
+          "200": {
+            "description": "Dashboard metrics. Model availability and enforcement are disabled during collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/blocked": {
+      "get": {
+        "summary": "Empty block list for collection",
+        "responses": {
+          "200": {
+            "description": "Empty block list for collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/alerts": {
+      "get": {
+        "summary": "Empty alert list for collection",
+        "responses": {
+          "200": {
+            "description": "Empty alert list for collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ips/switches": {
+      "get": {
+        "summary": "Empty switch list for collection",
+        "responses": {
+          "200": {
+            "description": "Empty switch list for collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

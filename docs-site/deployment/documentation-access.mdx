@@ -1,0 +1,13 @@
+---
+title: "Documentation access and updates"
+---
+
+The home sensor and passive sensor serve the checked-out documentation at **/docs** on their dashboard origin. Through the same SSH tunnel, open http://127.0.0.1:8081/docs. This lightweight local reader loads MDX/Markdown pages from docs-site on each request. After pulling a code/documentation update, refresh the page. The page matches that checkout's version. Native Mintlify search, interactive API components and Mermaid rendering use the Mintlify site; the local reader presents Markdown, tables, code, simple cards and step headings.
+
+Every implementation change belongs with updated pages and a dated entry in the [implementation changelog](/reference/change-log). New routes require the corresponding OpenAPI update. The versioned commit hook and PR documentation guard check for an update record. Reviewers check accuracy and coverage.
+
+## Keep the hosted Mintlify website current
+
+Connect the repository D3ath7274/GP in your Mintlify account. Select the branch containing your reviewed changes. Enable the setting that docs.json is in a subdirectory and set the directory to **/docs-site**. After the GitHub connection is authorized, Mintlify builds the connected branch when updates arrive. Your public site URL is supplied by the Mintlify account. See [Mintlify's repository and folder setup](https://www.mintlify.com/library/publish-open-source-local-docs-on-mintlify).
+
+The locally served pages are available while the sensor runs, including across reboots when its systemd service is enabled. The hosted site can stay available independently of the sensor. Confirm the connected branch and update the t530 checkout deliberately so that the hosted and installed versions agree.

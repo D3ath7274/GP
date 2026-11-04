@@ -115,6 +115,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path == "/docs" or path.startswith("/docs/"):
+            from local_docs import document
+            status, content_type, data = document(path)
+            self.respond(status, content_type, data)
+            return
         if path == "/":
             data = (ROOT.parent / "Dashboard" / "index.html").read_bytes()
             self.respond(200, "text/html; charset=utf-8", data)

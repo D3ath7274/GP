@@ -36,3 +36,33 @@ Send an ordinary connection between known devices, check for both directions in 
 ## Coverage
 
 This entry point covers Ethernet IPv4 flows and ARP observations. It reuses the v2 collector and RF/AE loaders. It does not start Snort, run DAI or install firewall rules. The existing Ryu deployment retains its OpenFlow IPS path. Firewall write adapters, IPv6 qualification and guarded model promotion are later phases. Keep household CSV files private and manage their disk retention. The shipped model scores need site validation before they can support enforcement.
+
+## Home collection readiness
+
+Start with a short qualification capture. Validate the path and the measurements before designating data as a training baseline.
+
+| Gate | Means of verification | Current status |
+| --- | --- | --- |
+| Observe the intended devices | Generate known bidirectional transactions from each monitored segment and confirm both directions at the sensor | Requires site verification |
+| Match packet and byte counts | Compare accepted IPv4/ARP observations with an independent capture from the same interface and time span, after matching direction and filtering | Requires site verification |
+| Explain feature values | Test timing, destination novelty, directionality and protocol features against deterministic inputs | Destination novelty has a confirmed defect |
+| Bound loss and memory | Measure kernel socket drops, unsupported packets, processing failures and memory growth during load | Full health accounting and resource bounds remain pending |
+| Preserve provenance | Keep start/end times, interface, collection mode, software version and a separate activity ledger | Operator-managed |
+| Assign ground truth | Review known benign activities separately from ambient unknown traffic | Capture labels alone are insufficient |
+
+The 2026-11-04 review reproduced a destination-novelty error. Repeating a previously seen destination after resetting recent tracking produced `device_new_dst_ratio=1.0`, where historical novelty should be zero. Correct the feature under a new version and regenerate or retrain compatible inputs before using it as a trustworthy novelty signal.
+
+In v2, one observed 60-byte packet produces `flow_duration=0.001`, `packets_per_second=1000.0` and `network_total_pps=0.2` with a five-second configured window. The flow rate uses first-to-last packet duration with a minimum duration. The network rate uses the configured window. Record these different denominators when validating the data. Add a separately versioned window-rate feature if a window average is required.
+
+Inter-arrival computation randomly subsamples timestamps above 2,000 packets, after storing packet tuples. That changes interval statistics and does not cap the accumulation list. Flush scheduling also includes processing time before the next sleep. Measure actual window timing and capture loss before treating configured windows as exact physical intervals.
+
+The parser currently omits IPv6. Profiles use IP addresses and restart with the process. The capture-only label defaults to normal, and profile updates occur before the later model decision. Keep ambient traffic unverified in the activity ledger and exclude intentional tests and unexplained intervals from approved baseline training.
+
+## Qualify the first session
+
+1. Confirm Ubuntu version, interface names, free disk space and clock synchronization on the t530. Record the repository revision and capture command.
+2. Establish a mirror, TAP or managed forwarding path. Connecting the t530 to an ordinary router LAN port only exposes the traffic that port receives. Wireless and locally switched traffic can bypass it.
+3. Run `passive_ids.py` with `--capture-only` for an initial 10-minute session. Keep an independent Ethernet PCAP from the same observation point with an appropriate capture tool, and record its loss counters. Store it locally with restricted access. The PCAP allows corrected features to be regenerated later.
+4. Use a controlled test client and owned destination for a known number of echo requests, an HTTP transaction or a file transfer. Include idle time, one-packet flows and repeated destinations. Record both endpoint activity and network observations.
+5. Compare packet counts, captured byte lengths, protocols and timing using the same observation boundary. Ethernet frame sizes, IP lengths and application bytes have different meanings. Account for mirror duplication, direction, offloads and unsupported IPv6.
+6. Review the first CSV and capture health before extending to a one-hour pilot. Keep long-running baseline collection behind the outstanding measurement and resource gates above. Start model OBSERVE experiments only after distinguishing capture correctness from model detection quality.

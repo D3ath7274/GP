@@ -1,5 +1,7 @@
 # Preview and publish
 
+The running home or passive sensor also serves a lightweight documentation reader at `/docs` on its loopback dashboard origin. See [documentation access](deployment/documentation-access.mdx) and [home collection](deployment/home-collection.mdx). It reads this checkout on each request. The hosted Mintlify site updates after the connected GitHub branch is pushed and built.
+
 Install `mint` with npm. From `docs-site`, run `mint dev`, `mint validate` and `mint broken-links`. Select this directory as the source in the Mintlify deployment configuration. Review visibility before publication.
 
 [Mintlify CLI](https://www.mintlify.com/docs/cli/install) · [Navigation reference](https://docs.retellai.com/general/introduction)

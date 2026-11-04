@@ -1,0 +1,31 @@
+[Unit]
+Description=APF home network feature collection
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=apf
+Group=apf
+EnvironmentFile=/etc/apf/home.env
+ExecStart=/opt/apf/.venv/bin/python /opt/apf/Controller/home_sensor.py --interface ${APF_INTERFACE} --lan ${APF_LAN} --data-dir /var/lib/apf/collection $APF_FEATURE_ARGS
+Restart=on-failure
+RestartPreventExitStatus=78
+RestartSec=15
+TimeoutStopSec=30
+StateDirectory=apf
+StateDirectoryMode=0700
+UMask=0077
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

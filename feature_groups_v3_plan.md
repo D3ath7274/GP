@@ -1,5 +1,7 @@
 # Feature Groups v3 — Covering the Blind Spots
 
+Implementation update, 2026-11-04. The home-collection entry point implements a separately versioned site-v3.0 schema with a qualified subset of G11–G17 measurements. See [the implemented coverage and collection guide](docs-site/deployment/home-collection.mdx). The append-only v2 proposal below remains a historical design. Use the runtime schema.json for exact columns and parser limits.
+
 Design for new feature groups that close the system's detection blind spots (reconnaissance,
 web-application abuse, slow attacks, command-and-control, spoofing). They also build the
 evidence base the firewall-audit direction needs: you can't audit whether a firewall stops
