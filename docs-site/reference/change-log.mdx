@@ -6,6 +6,8 @@ title: "Implementation changelog"
 
 The annotated Ubuntu job identified HTTP 400 on the workbench landing page: Python 3.10's strict query parser rejects empty input. Treat absent/empty queries as an empty parameter map while retaining strict validation for nonempty malformed/unknown/repeated queries. Expanded the existing real HTTP regression to cover bare empty queries and malformed fields. Operators on Ubuntu 22.04 must restart the viewer after pulling. Policy semantics, database read-only behavior, API shape and native firewall authority are unchanged; verification is recorded in DOCUMENTATION_VALIDATION.md.
 
+Follow-up verification: [run 41859192491](https://github.com/D3ath7274/GP/actions/runs/41859192491) passed the Ubuntu 22.04/Python 3.10 offline suite and both documentation jobs for runtime commit 193c53e. Hardware capture and native enforcement remain unqualified.
+
 ## 2026-11-04 · Diagnose Ubuntu qualification failures
 
 The first Ubuntu 22.04/Python 3.10 offline job failed at the unit suite while the remote documentation/source-catalog guard passed. Added escaped unittest failure tracebacks to GitHub check annotations, preserving the failing exit status and normal test output. This makes target-environment failures diagnosable when job-log access is unavailable. Synthetic fixture data only is eligible for these public annotations; no runtime, network configuration or detector behavior changes. Actual failure diagnosis and the subsequent job outcome remain pending at this diagnostic change.
