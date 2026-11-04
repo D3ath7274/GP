@@ -33,6 +33,7 @@
           "architecture/data-flow",
           "deployment/placement",
           "security/configuration",
+          "security/shadow-policy",
           "integrations/snort",
           "architecture/detection",
           "developers/maintenance",

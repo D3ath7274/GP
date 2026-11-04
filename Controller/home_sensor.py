@@ -26,6 +26,7 @@ from scapy.utils import PcapReader
 
 from passive_ids import DashboardHandler
 from site_features import DeviceWindow, FeatureHistory, SCHEMA_VERSION, decode
+from site_policy import ShadowPolicy, digest, load_json
 
 
 LOGGER = logging.getLogger("apf.home")
@@ -54,7 +55,8 @@ class StorageLimitError(RuntimeError):
 
 class HomeCollection:
     def __init__(self, directory, networks, metadata=False, content=False,
-                 min_free_bytes=1024**3, max_data_bytes=5 * 1024**3, max_sources=128):
+                 min_free_bytes=1024**3, max_data_bytes=5 * 1024**3, max_sources=128,
+                 policy=None, approved_baselines=(), capture_source="unspecified"):
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.networks = [ipaddress.ip_network(network, strict=True) for network in networks]
@@ -66,6 +68,15 @@ class HomeCollection:
         self.run_id = uuid.uuid4().hex[:12]
         self.lock = threading.RLock()
         self.health = Counter()
+        self.capture_source = capture_source
+        self.policy = ShadowPolicy(load_json(policy) if policy else None,
+                                   [load_json(path) for path in approved_baselines])
+        for device in self.policy.devices.values():
+            ip = ipaddress.ip_address(device["ip"])
+            if not any(ip.version == network.version and ip in network for network in self.networks):
+                raise ValueError("Policy device is outside configured collection networks")
+        if self.policy.config:
+            atomic_json(self.directory / ("policy-" + self.run_id + ".json"), self.policy.config)
         self.history = FeatureHistory(max_sources)
         self.windows = {}
         self.start = None
@@ -87,6 +98,10 @@ class HomeCollection:
                                      "G15": "single-question UDP DNS only",
                                      "G16": "complete ClientHello in one TCP packet, custom fingerprint",
                                      "G17": "complete HTTP/1 request headers in one TCP packet"}}
+        self.contract_hash = digest(self.contract)
+        if any(profile["collection_schema_sha256"] != self.contract_hash
+               for profile in self.policy.approved.values()):
+            raise ValueError("Approved profile belongs to different collection settings/schema")
         contract_path = self.directory / "schema.json"
         if contract_path.exists():
             if json.loads(contract_path.read_text(encoding="utf-8")) != self.contract:
@@ -171,7 +186,8 @@ class HomeCollection:
         duration = max(0.000001, end - self.start)
         path = self.directory / ("features-" + datetime.fromtimestamp(self.start, timezone.utc).date().isoformat()
                                  + "-" + self.run_id + ".csv")
-        with path.open("a", newline="", encoding="utf-8") as output:
+        evidence_path = path.with_name(path.name.replace("features-", "policy-events-")).with_suffix(".jsonl")
+        with path.open("a", newline="", encoding="utf-8") as output, evidence_path.open("a", encoding="utf-8") as evidence:
             writer = csv.DictWriter(output, fieldnames=self.columns)
             if output.tell() == 0:
                 writer.writeheader()
@@ -186,19 +202,26 @@ class HomeCollection:
                            window_complete=int(complete and duration == 5 and self.first_event_time <= self.start))
                 row.update(self.history.features(key, window, self.start, duration, self.health))
                 writer.writerow(row)
+                record = self.policy.evaluate(row, window, self.health, self.capture_source, self.contract_hash)
+                evidence.write(json.dumps(record, allow_nan=False, separators=(",", ":")) + "\n")
                 self.rows_written += 1
             output.flush()
             os.fsync(output.fileno())
+            evidence.flush()
+            os.fsync(evidence.fileno())
         self.windows.clear()
 
     def snapshot(self):
         with self.lock:
             return {"schema_version": SCHEMA_VERSION, "run_id": self.run_id,
+                    "collection_schema_sha256": self.contract_hash,
                     "capture_state": self.state, "error": self.error,
                     "rows_written": self.rows_written, "device_profiles": len(self.history.sources),
                     "health": dict(self.health), "updated_at": utc(time.time()),
                     "metadata_enabled": self.metadata, "content_enabled": self.content,
                     "kernel_statistics_available": self.health["kernel_stats_reads"] > 0,
+                    "capture_source": self.capture_source,
+                    "shadow_policy": self.policy.snapshot(),
                     "model_scoring": False, "ground_truth": "UNKNOWN"}
 
     def checkpoint(self, force=False):
@@ -221,6 +244,9 @@ class HomeCollection:
             return self.snapshot()
         if path == "/ips/schema":
             return self.contract
+        if path == "/ips/policy":
+            with self.lock:
+                return self.policy.snapshot()
         if path == "/ips/blocked":
             return {"blocked": []}
         if path == "/ips/alerts":
@@ -270,6 +296,13 @@ def collect(args, collector, stop):
         capture.setsockopt(socket.SOL_SOCKET, timestamp_option, 1)
         capture.setsockopt(263, 1, struct.pack("=IHH8s", socket.if_nametoindex(args.interface), 1, 0, b""))
         capture.settimeout(.5)
+        def sample_kernel_statistics():
+            received, drops = struct.unpack("II", capture.getsockopt(263, 6, 8))
+            collector.health["kernel_packets"] += received
+            collector.health["kernel_drops"] += drops
+            collector.health["kernel_stats_reads"] += 1
+            collector.health["kernel_stats_at"] = time.time()
+
         next_health = time.monotonic() + 5
         while not stop.is_set():
             try:
@@ -295,15 +328,14 @@ def collect(args, collector, stop):
             except socket.timeout:
                 pass
             if time.monotonic() >= next_health:
-                received, drops = struct.unpack("II", capture.getsockopt(263, 6, 8))
-                collector.health["kernel_packets"] += received
-                collector.health["kernel_drops"] += drops
-                collector.health["kernel_stats_reads"] += 1
+                sample_kernel_statistics()
                 with collector.lock:
                     collector.advance(time.time())
                     collector._check_storage()
                 collector.checkpoint()
                 next_health = time.monotonic() + 5
+        # Include losses since the last periodic sample in the closed-run review gate.
+        sample_kernel_statistics()
 
 
 def main():
@@ -316,6 +348,9 @@ def main():
     parser.add_argument("--port", type=int, default=8081)
     parser.add_argument("--metadata", action="store_true", help="Measure DNS and complete TLS ClientHello metadata")
     parser.add_argument("--http", action="store_true", help="Measure complete HTTP/1 request header lexical features")
+    parser.add_argument("--policy", type=Path, help="Operator-approved inventory and TCP initiation rules (shadow only)")
+    parser.add_argument("--approved-baseline", type=Path, action="append", default=[],
+                        help="Offline-reviewed profile matching the policy hash. Repeat per device.")
     parser.add_argument("--min-free-gib", type=float, default=1)
     parser.add_argument("--max-data-gib", type=float, default=5)
     args = parser.parse_args()
@@ -323,6 +358,8 @@ def main():
         parser.error("Port and storage budgets must be positive and finite")
     if not math.isfinite(args.min_free_gib + args.max_data_gib):
         parser.error("Storage budgets must be finite")
+    if args.approved_baseline and not args.policy:
+        parser.error("--approved-baseline requires --policy")
     logging.basicConfig(level=logging.INFO)
     args.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     # OS-managed lock releases even when the process crashes.
@@ -342,7 +379,9 @@ def main():
             parser.exit(78, "Another collector owns this data directory\n")
         try:
             collector = HomeCollection(args.data_dir, args.lan, args.metadata, args.http,
-                int(args.min_free_gib * 1024**3), int(args.max_data_gib * 1024**3))
+                int(args.min_free_gib * 1024**3), int(args.max_data_gib * 1024**3),
+                policy=args.policy, approved_baselines=args.approved_baseline,
+                capture_source="pcap_replay" if args.pcap else "live_linux")
         except (ValueError, OSError, StorageLimitError) as error:
             parser.exit(78, str(error) + "\n")
         stop = threading.Event()

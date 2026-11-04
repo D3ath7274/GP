@@ -142,7 +142,10 @@
     <div class="card" id="collection-card" hidden style="grid-column:1/-1">
       <div class="card-h"><h3 class="card-t">Home data collection · <a href="/docs/deployment/home-collection">Guide</a></h3></div>
       <div class="card-c"><p id="collection-details">Waiting for collection health…</p>
-        <p class="card-d">Observed traffic has UNKNOWN ground truth. Review capture quality and activities before training.</p></div>
+        <p class="card-d">Observed traffic has UNKNOWN ground truth. Review capture quality and activities before training.</p>
+        <p><a href="/docs/security/shadow-policy">Shadow policy and baseline review</a></p>
+        <p id="policy-details">Waiting for shadow policy…</p>
+        <p id="policy-findings" class="card-d" style="white-space:pre-line"></p></div>
     </div>
     <!-- KPI: threat -->
     <div class="card">
@@ -272,6 +275,20 @@
             " · Source omissions " + (health.source_window_omissions || 0) +
             " · Cardinality overflows " + (health.cardinality_overflows || 0) +
             " · Disk free GiB " + ((health.disk_free_bytes || 0) / 1073741824).toFixed(2);
+          const policy = collection.shadow_policy || {};
+          const counts = policy.counts || {};
+          $("policy-details").textContent =
+            "Shadow policy " + (policy.configured ? "configured" : "unconfigured") +
+            " · Review-eligible windows " + (counts.review_eligible_windows || 0) +
+            " · Held windows " + (counts.held_windows || 0) +
+            " · Finding windows " + (counts.finding_windows || 0) +
+            " · Approved profiles " + (policy.approved_device_ids || []).length +
+            " · Automatic enforcement disabled";
+          $("policy-findings").textContent = (policy.recent_findings || []).slice(0, 4).map(record =>
+            record.window_start_utc + " · " + (record.device_id || record.device_ip) +
+            " · " + record.findings.map(f => f.type).join(", ") +
+            " · " + record.quality + " · " + record.identity
+          ).join("\n") || "No shadow findings recorded. This does not establish benign traffic.";
         }
       }
 

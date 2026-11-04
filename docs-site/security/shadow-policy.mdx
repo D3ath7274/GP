@@ -1,0 +1,98 @@
+---
+title: "Shadow policy and reviewed baselines"
+description: "Set device roles before collection, hold unsuitable windows and approve descriptive profiles offline."
+---
+
+The home collector can now evaluate an operator-defined TCP initiation policy while recording site-v3.0 data. It writes separate evidence records, withholds unsuitable windows from candidate summaries and compares observations with explicitly reviewed profiles. **This path is shadow-only. It never invokes a firewall adapter, trains a model, promotes a model or declares a device malicious.** The legacy Ryu detector is a separate entry point.
+
+## What can start before data collection
+
+Define the inventory, observation path and intended device roles now. Collect at least a qualified pilot before choosing behavioral thresholds. The existing [14-day collection recommendation](/deployment/home-collection) covers ordinary operating cycles; longer observation may be necessary for sparse devices. Independently labeled attack campaigns and benign lookalikes are required to qualify detection and automatic containment.
+
+| Implemented now | Requires later work and evidence |
+| --- | --- |
+| Operator-defined, expiring IP/VLAN/MAC bindings and role rules | Lease, switch-port, NAT and authenticated device identity integration |
+| TCP SYN-without-ACK destination/port checks | UDP session direction, complete sessions, application permissions and outcomes |
+| Quality states, incident holds and candidate summaries | Per-window loss attribution and independently measured end-to-end observation coverage |
+| Explicit offline approval with CSV/evidence checks | Poisoning resistance qualification against adaptive attackers |
+| Frozen reviewed means and diagnostic residuals | Calibrated RF/AE thresholds, multistage campaign correlation and qualified model promotion |
+| Read-only dashboard and evidence API | Authenticated SOC control and durable verified automatic enforcement |
+
+## Configure an inventory and role policy
+
+Copy Controller/site_policy.example.json to a private file. Its documentation subnet, example MAC and dates must be replaced with your actual inventory and review interval. Keep the private file outside Git. No npm or additional Python dependency is needed for this layer.
+
+```bash
+sudo install -d -m 755 /etc/apf
+sudo cp Controller/site_policy.example.json /etc/apf/site-policy.json
+sudoedit /etc/apf/site-policy.json
+python3 scripts/review_site_baseline.py validate --policy /etc/apf/site-policy.json
+```
+
+The service account must be able to read this root-controlled file. Do not put passwords or tokens in it. The example declares one camera, its intended recorder and permitted TCP destination ports. Add device entries and role rules deliberately. Unknown vendors can use manually assigned roles. Manufacturer profile ingestion is pending.
+
+- version is shadow-policy-v1. revision identifies the operator's policy revision. The runtime hashes the entire validated policy, including inventory and observation attestation.
+- Each device has an id, canonical IP, vlan, lowercase unicast mac, role, valid_from and valid_until. Validity timestamps must include a timezone. Use untagged or a decimal VLAN; stacked tags use dot-separated IDs. Duplicate device IDs or IP/VLAN bindings are rejected.
+- Each role has tcp_initiation_allow rules. Each rule contains a destination CIDR and an explicit list of TCP destination ports. An empty list of rules permits no TCP initiations for that role. There is no automatic learning of allow rules.
+- observation starts unverified. Test an owned transaction in both directions at the actual observation point, record the covered segments in a private ledger, then set bidirectional_verified to true, reference to that ledger reference and valid_from/valid_until to the attestation interval. Renew the attestation after topology changes. Editing the boolean alone does not verify a mirror.
+
+The inventory supports up to 128 bindings, 32 roles and 64 rules per role, with up to 128 ports per rule. A MAC match is an inventory consistency check, not cryptographic identity. At a routed mirror, the observed Ethernet source may be a gateway; such a binding will need a suitable observation point or future identity integration. Do not register a gateway MAC as proof of every downstream device's identity.
+
+## Collect with shadow policy
+
+Use the real mirror interface and collection subnets as described in the collection guide. Add the policy to the existing launch command:
+
+```bash
+sudo .venv/bin/python Controller/home_sensor.py \
+  --interface "$SENSOR_IFACE" --lan "$LAN_CIDR" \
+  --data-dir /var/lib/apf/collection --policy /etc/apf/site-policy.json
+```
+
+Optional --metadata and --http retain their existing opt-in semantics. For systemd, add --policy /etc/apf/site-policy.json to APF_FEATURE_ARGS in /etc/apf/home.env, alongside any parser flags. Restart the service after validation. Keep the service account's read access and the deployment copy under /opt/apf current. Policy/profile files load at startup and are not live-reloaded.
+
+The 71-column CSV and schema remain unchanged. Existing collection directories can continue with the same collection settings. New policy-events-UTC-DATE-RUN.jsonl files align one-to-one with new CSV rows. Each record includes the run, window, policy/schema hashes, identity state, quality, learning disposition, feature values, findings and an evidence digest. Old runs without these sidecars cannot be approved by the new review command. Daily evidence files share the existing storage budget, so re-estimate daily growth during the first hour.
+
+Only outgoing TCP SYN packets without ACK enter role checks. Established traffic, SYN-ACK replies, UDP, ICMP, ARP and payload content are unassessed by this policy checker. Their ordinary collection features remain available. Findings concern observed connection attempts, not proof of successful access or completed compromise. Retained initiation edges are capped at 128 per device/window; overflow degrades review eligibility and makes reported cardinalities lower bounds.
+
+## Understand quality and learning state
+
+| State | Meaning |
+| --- | --- |
+| SUFFICIENT | Complete window, current operator observation attestation, live Linux input, recent available kernel statistics and no known run-latched quality faults. Sufficient for shadow review only. |
+| DEGRADED | Partial window or known loss, truncation, reorder, parse error, tracking omission or eviction. |
+| UNAVAILABLE | Missing/expired observation attestation, replay/unmeasured input, unavailable kernel loss counters or stale statistics. |
+
+Kernel statistics are sampled periodically. SUFFICIENT is provisional relative to the latest sample; it does not establish zero loss upstream or exact per-window loss. Offline approval checks the final stopped-run counters, including a final socket-statistics read. Any tracked quality fault anywhere in a run rejects that run for approval. This conservative rule can require a new qualified run after investigation. Unsupported protocol traffic can remain outside the selected parser's coverage without producing a parse error.
+
+An observation becomes ELIGIBLE_FOR_REVIEW only when quality is SUFFICIENT, the unexpired binding matches the observed outbound MAC and the subject has no incident hold. All other windows are HOLD. A binding conflict/expiry or prohibited TCP initiation creates a shadow finding and latches an incident hold for that IP/VLAN for the remainder of the run. Later permitted traffic cannot clear it. Investigate before starting a new run. Restarts reset candidate summaries and holds; they are not an approval or a finding resolution. Persisted evidence remains available for review.
+
+Candidate summaries track counts, mean, variance accumulator and extrema for outgoing PPS, outgoing Ethernet bytes/s, new SYN rate and outgoing packet size. Candidate data remains unverified. It cannot overwrite a reviewed profile. The original feature history continues recording empirical observations, including held windows, and is not an approved enforcement baseline.
+
+## Approve a reviewed descriptive profile
+
+Stop collection cleanly, audit the closed files and independently review the selected device's activity and coverage ledger. The command requires the collector's exclusive directory lock and refuses active writers. Select a timezone-aware interval containing at least two full eligible windows; two windows are only a mathematical minimum for a descriptive summary, never sufficient evidence for production detection.
+
+```bash
+sudo systemctl stop apf-home
+sudo /opt/apf/.venv/bin/python /opt/apf/scripts/audit_home_data.py /var/lib/apf/collection
+sudo /opt/apf/.venv/bin/python /opt/apf/scripts/review_site_baseline.py approve \
+  --data-dir /var/lib/apf/collection --policy /etc/apf/site-policy.json \
+  --device-id camera-1 \
+  --start '2030-01-02T00:00:00Z' --end '2030-01-03T00:00:00Z' \
+  --reviewer operator --reason 'Reviewed activity and coverage in private ledger entry 12' \
+  --output /etc/apf/camera-1-reviewed.json
+```
+
+Replace the example dates and ledger reference. Fix integrity failures before review. The command refuses mismatched, missing, duplicated, overlapping, held or suspicious selected records, unfinished/degraded runs and PCAP replay. It verifies record digests, row identity/features and saved policy/schema hashes. It stores reviewer, reason, interval, counts and source file hashes. It does not overwrite an existing approval. Choose a new output file for a later review. Gaps and missing device activity still need independent coverage review.
+
+The command validates the supplied evidence, not the truth of the operator's reason. Hashes provide provenance/integrity checks without authenticating a remote source. Protect both the data directory and review artifacts. CSV ground truth remains UNKNOWN; the review does not train a model or relabel the dataset.
+
+To load the frozen profile, give the service account read permission and add --approved-baseline /etc/apf/camera-1-reviewed.json to APF_FEATURE_ARGS, then start the service. Repeat the flag for additional devices. Each profile must match the entire policy and collection schema/settings. A policy change therefore requires a new review against that revision. The profile's means remain fixed. Residuals are diagnostic differences with no probability, calibrated threshold or automatic response.
+
+## Inspect and qualify
+
+Through the existing SSH tunnel, open the dashboard and /docs/security/shadow-policy. The collection card shows eligible/held/finding windows, approved profile count and recent shadow findings. GET /ips/policy exposes the bounded current-run view. GET /ips/collection embeds the same shadow_policy view. /ips/alerts and /ips/blocked retain their empty collection responses.
+
+Before a longer capture, use a disposable owned lab client to try one permitted and one prohibited TCP service. Confirm a role finding and hold for the latter, unchanged firewall state, unchanged approved profile and continued CSV recording. Check a legitimate server reply and verify it is not classified as an outgoing initiation. Then exercise a short restart and review the run boundaries. Perform capture-loss and identity-conflict tests in isolated replay/tests rather than disrupting household connectivity.
+
+The release tests use synthetic live-health values to check gates and failure behavior. Actual Linux loss counters, observation attestation, t530 throughput/storage and site profiles require hardware validation. Calibrated high-confidence decisions, application-log joins, campaign correlation, automatic model promotion and automatic firewall response remain planned.

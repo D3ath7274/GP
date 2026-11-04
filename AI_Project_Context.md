@@ -1,5 +1,7 @@
 # Comprehensive Project Context — SDN-based IoT IPS (current state)
 
+**2026-11-04 home-collection addition:** Controller/home_sensor.py writes the separate 71-column site-v3.0 schema and UNKNOWN labels. Controller/site_policy.py adds optional expiring operator inventory, TCP initiation role checks, explicit quality/identity states and run-latched incident holds. Separate daily policy evidence and GET /ips/policy support shadow review. scripts/review_site_baseline.py validates policy and explicitly approves descriptive profiles from stopped, quality-qualified runs. Approved means stay fixed and match policy/schema hashes; candidate summaries cannot promote them. This path never invokes firewall adapters or model promotion. Real-data calibration, application-log joins, campaign correlation and automatic response remain future qualification work. The legacy Ryu entry point below has separate behavior. Current instructions and limitations: [shadow policy walkthrough](docs-site/security/shadow-policy.mdx) and [home collection](docs-site/deployment/home-collection.mdx).
+
 **Purpose:** master context file for any LLM/AI agent. It reflects the **current** system (a
 4-tier adaptive IPS with two ML models, a merged controller, REST API + dashboard, deployed on an
 HP t530 thin client). It **supersedes** earlier descriptions that mention "3 tiers", "49 features",

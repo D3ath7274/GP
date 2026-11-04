@@ -63,7 +63,8 @@ def audit(directory):
         for name in ("kernel_drops", "late_packets", "source_window_omissions", "cardinality_overflows",
                      "decoder_failures", "history_evictions", "destination_history_evictions", "pair_history_evictions",
                      "timestamp_reorders", "truncated_packets", "unsupported_jumbograms",
-                     "socket_truncated_frames", "missing_kernel_timestamps"):
+                     "socket_truncated_frames", "missing_kernel_timestamps", "invalid_timestamps",
+                     "dns_parse_errors", "tls_parse_errors", "http_parse_errors"):
             quality[name] += run["health"].get(name, 0)
         quality["failed_runs"] += run["capture_state"] in ("failed", "storage_limit")
         quality["unmeasured_kernel_loss_runs"] += not run.get("kernel_statistics_available", False)

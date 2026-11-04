@@ -1,0 +1,29 @@
+{
+  "version": "shadow-policy-v1",
+  "revision": "home-pilot-1",
+  "observation": {
+    "id": "mirror-1",
+    "bidirectional_verified": false,
+    "reference": "",
+    "valid_from": null,
+    "valid_until": null
+  },
+  "roles": {
+    "camera": {
+      "tcp_initiation_allow": [
+        {"destination": "192.0.2.20/32", "ports": [443, 554]}
+      ]
+    }
+  },
+  "devices": [
+    {
+      "id": "camera-1",
+      "ip": "192.0.2.10",
+      "vlan": "untagged",
+      "mac": "02:00:00:00:00:01",
+      "role": "camera",
+      "valid_from": "2030-01-01T00:00:00Z",
+      "valid_until": "2030-01-15T00:00:00Z"
+    }
+  ]
+}

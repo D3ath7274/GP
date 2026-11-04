@@ -1,5 +1,13 @@
 # Validation
 
+## Shadow policy and reviewed profiles · 2026-11-04
+
+Thirty-six Python tests passed, including the existing collection/quarantine tests and new checks for TCP initiation scope, role violations, binding conflicts/expiry, run-latched quality and incident holds, incomplete/replay/stale observations, immutable reviewed profiles, policy/schema mismatch rejection and detached API snapshots. Review tests reject active writers, missing/misaligned/tampered evidence and final-run faults reported after an initially eligible window. A CLI test created a loadable profile from synthetic reviewed windows and refused to overwrite it. A real home-collector CLI replay emitted shadow findings, separate evidence and UNKNOWN CSV rows. An HTTP test fetched the policy API, dashboard HTML and local policy guide, and confirmed POST rejection. Synthetic live-health counters exercise gate behavior without establishing actual Linux capture quality. The CSV contract remains 71 columns with UNKNOWN labels.
+
+Compilation and sample policy validation passed. Linux final socket-statistics read, actual device bindings/visibility, hardware throughput/storage, browser rendering and real-data calibration remain unverified. No automatic firewall integration, attack-sequence detector or model promotion was added by this change.
+
+Dashboard JavaScript and documentation JSON syntax checks passed. Mintlify build/validation, broken-link and accessibility checks passed from docs-site; the existing primary-color AA-versus-AAA advisory remains. The documentation guard passed against the staged implementation and documentation.
+
 ## Extended home collection · 2026-11-04
 
 Twenty Python tests passed, including corrected prior-history novelty, IPv4/IPv6 byte and rate accounting, Ethernet padding exclusion from payload length, daily rotation, state reload, settings mismatch rejection, late observations, source/cardinality limits, storage-stop behavior, DNS/HTTP opt-ins, complete/incomplete TLS, periodicity support, CSV corruption detection and local documentation traversal rejection. A separate CLI replay covered eight event-time dates, produced eight daily CSV files from sixteen packets and passed CSV integrity checks. The audit explicitly reported unavailable kernel-loss measurement during replay. This was a simulated date-span test, not a live multi-day soak.

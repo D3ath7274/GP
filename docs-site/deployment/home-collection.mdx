@@ -7,6 +7,8 @@ The dedicated home collector writes the versioned **site-v3.0** dataset and serv
 
 The current contract has 71 columns. Its device/window measurements are a separate dataset from the legacy 102-column per-flow v2 files. Store and train each schema separately. The runtime writes the exact field order to schema.json.
 
+The collector also writes separate [shadow policy evidence](/security/shadow-policy). Configure device roles before collection to identify prohibited TCP initiations and hold unsuitable observations out of candidate baseline summaries. The CSV stays unchanged and UNKNOWN. Read-only findings and explicit offline profile review are available now; calibrated models and automatic enforcement need later qualification.
+
 <Steps>
 <Step title="Verify the observation path">
 Configure a TAP, SPAN destination or controlled forwarding path so both directions reach a dedicated t530 interface. An ordinary router LAN port receives only the frames delivered to that port. Check a known transaction from each device segment. Preserve management connectivity and record the covered and uncovered paths.
@@ -81,6 +83,7 @@ The original plan lists additional research features for each group. This releas
 ## Storage, restart and privacy
 
 - Files rotate by **UTC day**, with a separate run ID per restart. schema.json records the feature contract. run-ID.json stores health and run state. profile-state.json stores bounded unverified destination and TTL history.
+- policy-events-DATE-RUN.jsonl stores one shadow evidence record per new CSV row. Policy snapshots are saved per configured run. These private files share the disk budget. Candidate summaries and incident holds reset per run; offline-reviewed profiles load only when explicitly supplied.
 - Profiles and cardinalities have explicit caps. When caps are reached, counters record the affected truncation or eviction. Rates and byte counts continue within admitted device windows. Review capped cardinalities as lower bounds.
 - Source windows default to at most 128 local IP/VLAN pairs. Historical profiles have the same cap, with at most 1,024 remembered destinations each. Hourly sets cap each source/minute at 128 peers and 128 ports. Short-term histories warm up after a restart, which is recorded in rows. Address reassignment still needs independent identity review.
 - Capture health includes observed truncation, kernel loss and unsupported IPv6 jumbograms. A zero local kernel-drop count cannot establish whether an upstream mirror lost frames. Compare endpoint-generated test counts as well as an independent capture. The Linux socket reports its actual receive-buffer size in the run health record.

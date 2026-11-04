@@ -15,6 +15,7 @@
 | Passive Ethernet capture, PCAP replay and dashboard | Test the passive sensor |
 | Dedicated nftables set, temporary quarantine and removal CLI | Test temporary firewall quarantine |
 | site_features.py, home_sensor.py, daily data audit and service | Collect home traffic for two weeks |
+| site_policy.py, site_policy.example.json, review_site_baseline.py, policy API and dashboard | Shadow policy and reviewed baselines |
 | Loopback documentation reader from Mintlify sources | Documentation access and updates |
 
 Advanced lab and setup steps remain in the repository runbooks.

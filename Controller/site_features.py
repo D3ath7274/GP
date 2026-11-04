@@ -225,6 +225,8 @@ class DeviceWindow:
     peers: set = field(default_factory=set)
     ports: set = field(default_factory=set)
     edges: set = field(default_factory=set)
+    # Shadow policy checks connection initiations, never TCP response destinations.
+    tcp_initiations: set = field(default_factory=set)
     macs: set = field(default_factory=set)
     dns_names: set = field(default_factory=set)
     fingerprints: set = field(default_factory=set)
@@ -268,6 +270,9 @@ class DeviceWindow:
                 self.tcp_window.add(packet["tcp_window"])
                 flags = packet["flags"]
                 self.syn += bool(flags & 2 and not flags & 16)
+                if flags & 2 and not flags & 16:
+                    bounded_add(self.tcp_initiations,
+                                (packet["dst"], packet["dport"], packet["protocol"]), health)
                 self.null += flags == 0
                 self.xmas += flags & 41 == 41
                 self.fin += bool(flags & 1 and not flags & 16)

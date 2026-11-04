@@ -3,7 +3,7 @@
   "info": {
     "title": "APF home collection read API",
     "version": "site-v3.0",
-    "description": "Loopback-only collection service. Requests do not change enforcement. Ground truth is UNKNOWN."
+    "description": "Loopback-only collection service. Requests do not change enforcement. Ground truth is UNKNOWN. GET /ips/policy and shadow_policy in GET /ips/collection describe current-run shadow findings, review eligibility and frozen reviewed profiles."
   },
   "servers": [
     {
@@ -11,6 +11,39 @@
     }
   ],
   "paths": {
+    "/ips/policy": {
+      "get": {
+        "summary": "Read bounded shadow policy findings and baseline review state",
+        "description": "Home collector only. No firewall changes or model promotion. Findings are observed policy/identity concerns, not calibrated maliciousness probabilities. Includes policy hash, per-state counts, per-device candidate summaries, approved profile hashes, incident-held subject count and at most 50 recent finding windows.",
+        "responses": {
+          "200": {
+            "description": "Current-run shadow policy state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["version", "mode", "configured", "enforcement_enabled", "counts", "candidates", "incident_held_subjects", "approved_profile_sha256", "approved_device_ids", "recent_findings", "ground_truth"],
+                  "properties": {
+                    "version": {"type": "string", "enum": ["shadow-policy-v1"]},
+                    "mode": {"type": "string", "enum": ["shadow"]},
+                    "configured": {"type": "boolean"},
+                    "policy_sha256": {"type": "string", "nullable": true},
+                    "enforcement_enabled": {"type": "boolean", "enum": [false]},
+                    "counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+                    "candidates": {"type": "object", "additionalProperties": true},
+                    "incident_held_subjects": {"type": "integer", "minimum": 0},
+                    "approved_profile_sha256": {"type": "object", "additionalProperties": {"type": "string"}},
+                    "approved_device_ids": {"type": "array", "items": {"type": "string"}},
+                    "recent_findings": {"type": "array", "maxItems": 50, "items": {"type": "object", "additionalProperties": true}},
+                    "ground_truth": {"type": "string", "enum": ["UNKNOWN"]}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ips/status": {
       "get": {
         "summary": "Service mode and current capture state",
