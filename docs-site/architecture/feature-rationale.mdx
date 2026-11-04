@@ -1,0 +1,252 @@
+---
+title: "Why each behavioral feature group exists"
+description: "Source-mapped rationale, benign lookalikes, limits and qualification plans for G1–G24 and supporting evidence."
+---
+
+The design goal is to recognize attack mechanisms across device vendors, tools and SD-WAN sites. A feature records evidence about behavior; it does not by itself establish malicious intent. No finite feature set guarantees detection of every attack from every device. The system must retain unknown/unobservable outcomes and measure misses rather than convert missing evidence to normal traffic.
+
+This catalog distinguishes **legacy lab implementation** in Controller/traffic_capture.py, the **bounded site-v3 collection subset** in Controller/site_features.py, and **planned extensions**. The home collector currently extracts observations and shadow findings; it does not run site-v3 RF/AE models or automatically block devices. Model inputs, signatures, policy decisions, independent truth and enforcement outcomes have separate roles.
+
+The machine-readable map docs-site/reference/feature-groups.json assigns every current column exactly once: 102 legacy columns and 71 site-v3 columns, including identifiers/labels/audit fields that must not become predictors. It includes G1–G24 plus six supporting categories below. Run python scripts/check_feature_catalog.py to verify source-name/heading/status coverage; --staged reads Git's index for commit checks. This verifies documentation coverage, not mathematical correctness or detection quality. A same-name meaning change still needs review, fixtures, schema/version decisions and retraining.
+
+## Measurement and decision contract
+
+| Property | Current implementation / planned discipline |
+| --- | --- |
+| Aggregation key | Legacy uses flow rows with device/network context; site-v3 uses local IP plus VLAN, five-second directional windows. These are different schemas, not interchangeable training rows. |
+| Time and units | Kernel/PCAP event time; captured Ethernet bytes normally excluding FCS; packets/s and bytes/s use recorded duration. Site timing is seconds; legacy burst_duration_avg is milliseconds. |
+| Statistical support | Site sample standard deviation needs two observations; interval CV needs supported positive mean. Missing is null, not a fabricated zero. Legacy zero/default conventions require separate preprocessing. |
+| History/state | Current site caps: 128 device windows/profiles, per-window sets 128, remembered destinations 1,024, contact histories 32 peers with 64 window contacts each. Evictions/caps degrade interpretation; they are not proof of an attack. |
+| Visibility | Require relevant paths/directions, correct pre/post-NAT and tunnel context, identity validity, clock and loss evidence. A one-NIC router-LAN connection without a verified mirror cannot supply whole-home evidence. |
+| Decision role | Protocol/policy invariants may support deterministic checks; supervised models learn qualified categories; anomaly models measure deviation. Qualified corroboration and independent outcomes determine response eligibility. |
+
+Terms such as scan, beacon, impersonation and exfiltration below describe **hypotheses to test**. Each card includes a benign control. A metric is retained only if it adds useful discrimination at the same false-alert/action budget and acceptable capture/resource cost.
+
+## BASE: Base traffic measurements
+
+**Implemented in both schemas, with different keys.** Packet/byte counts, duration, rates, packet-size and inter-arrival summaries quantify the scale and rhythm of activity. Site counters are per local device/VLAN; legacy also retains raw flow identifiers/protocol/flags/ports. Rate = observed count / declared duration. Legacy uses last-minus-first flow time with a 1 ms floor; site uses the actual aggregation duration, normally five seconds. Singleton rates therefore are not directly comparable. Raw identifiers provide joins and audit context, not a portable proof of attack identity.
+
+Rates are useful for load and resource pressure, while timing/size describe how traffic was produced. Gaming, streaming, backups, downloads and software updates can be large or bursty. Test matched normal loads and controlled pressure, varying MTU, encapsulation and workload. Qualify mirror duplication/loss, sampling and host offloads against independent counts; Mininet does not inherently justify a fixed two-times correction. A capture byte count is not application goodput.
+
+## DEVICE: Device-relative history
+
+**Implemented as legacy profiles and a smaller unverified site history; approved descriptive profiles are separate.** A camera, gaming PC and phone have different legitimate workloads. Comparing a device with its own reviewed history can expose change that a single network-wide rate threshold hides. Current site columns are device_new_dst_ratio, device_macs_observed and profile_windows_before; prior TTL residual is in G12. Legacy includes rate/size deviations, protocol distribution and maturity/context fields.
+
+Site novelty is current destinations absent from retained prior history divided by current destination count, computed before merging the window. Empty sets remain missing; evictions limit its meaning. Legacy's old novelty expression remains a migration issue and must not be described as the corrected site behavior. Cold start, DHCP reuse, privacy MACs, new applications, updates and role changes are hard negatives. MAC agreement is inventory consistency, not authentication. Device roles need independent provenance; [MUD](https://www.rfc-editor.org/info/rfc8520/) is a future source of intended communication context, not implemented manufacturer discovery or proof that a device is uncompromised.
+
+The legacy maturity heuristic of twenty flows and 180 seconds indicates limited support; it is not a statistical guarantee that a baseline is reliable. A device role may need many operating cycles and independently reviewed contexts before enforcement decisions can be calibrated.
+
+## NETWORK: Network-wide context
+
+**Legacy lab context exists; equivalent complete site-wide inference is not implemented.** Active flows, total rates, source/destination diversity and network entropy help distinguish one device's unusual behavior from a site-wide workload/change. They can also reveal distributed pressure whose per-source rate stays modest. Compare local and site/cohort deviations rather than assuming a single absolute threshold fits every SD-WAN branch.
+
+Legitimate failover, a software rollout, backup or CDN change may move many devices together. Mirrors at different points see different populations and duplicates; observation scope must accompany aggregate statistics. Legacy Snort alert counts/types are detector-derived context: exclude them when evaluating independent behavior-only detection and inspect actual artifact feature selection to prevent leakage. Correlated aggregate/device features are not independent votes. Qualification needs both single-source and distributed campaigns plus benign site-wide events.
+
+## LABELS: Independent truth and detector labels
+
+**Audit/evaluation category; excluded from predictive inputs.** Legacy label, attack_type and snort_sid record detector or collection decisions; site ground_truth stays UNKNOWN and is mapped with G10's audit metadata. These values describe evidence provenance and test labels, not measurements a predictor may use to infer its own answer.
+
+A Snort/rate-generated label is not independent proof that an attack occurred. Training directly on the same engine's decisions can teach a model to imitate that engine and make comparisons circular. Keep reviewed campaign truth, detector verdict, signature match, observation eligibility and actual containment distinct. Split campaigns before preprocessing and keep tool/scenario/source identifiers out of predictors. Unknown household activity is not automatically a normal training label. Label review errors need their own audit trail and uncertainty.
+
+## QUALITY: Observation quality and missingness
+
+**Current collection health, window flags and shadow eligibility gates exist; richer per-session attribution is planned.** Kernel losses, cap evictions, truncation, parser errors, missing directions, restart warm-up and stale identity/clock evidence determine which conclusions are supported. These are reliability conditions, not attack classes. A missing HTTP parse over HTTPS is a visibility limit, not evidence that no web attack occurred.
+
+Current health counters are often cumulative/run-latched. A final loss counter cannot identify exactly which earlier session was lost. Planned evidence must carry parser applicability, packet/session support, observation point, sampling/offload configuration and interval validity. Test one-sided mirrors, reordered/duplicate records, reduced capture lengths, parser failures, clock steps and overload. Degraded evidence should reduce action eligibility; it must not silently improve confidence. Shadow HOLD means review is required, not maliciousness or permission to ignore an incident.
+
+## POLICY: Behavior-to-policy context
+
+**Behavioral fusion is planned.** The current offline workbench analyzes operator-described header rules and hypothetical changes; it does not yet attribute live traffic to native firewall rules. A behavior finding becomes more actionable when joined to an identity, contemporaneous policy revision, intended service, route/NAT context and business exception.
+
+Possible future measurements include newly permitted service edges, traffic violating a declared role, and verified traffic continuing after a temporary containment request. A policy deny is not ground truth for maliciousness, and a policy allow is not evidence of safety. Rule read-back is not traffic containment. Require qualified vendor feedback and independent endpoint transactions. Keep policy semantics deterministic and behavioral confidence separately calibrated. Test stale snapshots, NAT ambiguity, shared IPs, concurrent edits and wrong-rule attribution before enabling automatic changes.
+
+## G1: Timing and burst rhythm
+
+**Legacy lab: seven timing/burst columns. Site equivalents are a smaller BASE subset.** Inter-arrival mean, spread/CV and burst summaries seek regular or pulsed generation patterns beyond mean PPS. CV = sample standard deviation / mean interval; two streams with the same volume can have different timing structures. Burst context can expose short pressure episodes hidden by a window average.
+
+Regularity is not inherently malicious: sensors, health checks, telemetry and game loops are periodic. An attacker can introduce jitter. Legacy bounded timestamp sampling changes the observed interval distribution at high volume; its burst threshold is heuristic, not a physical attack invariant. Current site has no full burst detector. Test periodic legitimate devices, jittered beacons, load bursts and sparse samples. Do not authorize a block solely because CV is low or claim that low-rate floods are always regular.
+
+## G2: Directionality and asymmetry
+
+**Legacy seven-column implementation; site packet/byte directions and G14 ratio are separate measurements.** Forward/reverse volume and size compare requests with responses. Unanswered initiation pressure or probes to absent services can be asymmetric. Directional context is more informative than one-way PPS alone and does not require reading application content.
+
+Downloads, uploads, multicast and small telemetry reports are also asymmetric. Reply counts are not one-response-per-request delivery probabilities. Legacy v2 reverse aggregation uses a broader source/destination/protocol grouping than exact TCP sessions and adds denominator smoothing; do not interpret its ratios as exact per-connection results. Uniform duplication might preserve a ratio, but unequal duplication/loss does not. Qualify both directions, stream key and sample support, including NAT/route asymmetry, before using response absence as attack evidence.
+
+## G3: TCP lifecycle proxies
+
+**Legacy four-column approximation; exact stateful session analysis remains planned.** SYN/ACK balance, approximate completed sessions, incomplete ratio and session duration aim to expose initiation without useful connection progress. The rationale follows TCP's connection state machine, not a particular flood tool. [TCP specification](https://www.rfc-editor.org/rfc/rfc9293.html)
+
+The present legacy calculation uses window flag evidence and pair aggregation. It does not follow every sequence/acknowledgment across a connection. Its smoothed incomplete_ratio for one observed initiation is 0.5 when incomplete, not a true population fraction approaching one. Connections spanning boundaries, retransmissions and one-sided capture confound it. Build bounded cross-window state with explicit timeouts and TCP validation before claiming accurate half-open counts. Test completed sessions crossing windows, resets, loss, asymmetric paths and SYN pressure; do not rename packet SYN rate as completed-session rate.
+
+## G4: Distribution entropy
+
+**Legacy payload_size_entropy, src_port_entropy and icmp_type_entropy exist.** Entropy H = -sum(p log2 p) measures concentration/diversity without treating category numbers as distances. A scan, concentrated service load and varying-size transfer can produce different distributions even with similar counts. Network destination-port entropy is supporting NETWORK context, not an additional independent vote.
+
+The legacy name payload_size_entropy currently uses captured packet sizes, not payload content entropy. Normal ICMP echo traffic can have zero type entropy; encrypted/compressed benign traffic can be diverse. Entropy depends on sample size/support and category cardinality; it does not measure maliciousness. Test concentrated/randomized attacks and matched benign traffic with the same cardinalities. Consider normalized entropy/support fields when comparing populations, versioning that change rather than silently replacing the current metric.
+
+## G5: ARP binding behavior
+
+**Legacy seven columns and DAI-related evidence exist; the site path does not implement the full group.** ARP rate, request/reply balance, gratuitous/unsolicited indicators and persistent claimed bindings expose a Layer-2 mechanism that IP/transport rates cannot describe. A conflicting claim about a known binding can be stronger evidence than unusual traffic volume.
+
+Current unsolicited logic is a window/request-target and baseline-conflict heuristic, not exact chronological request/reply matching. Legitimate address announcements, DHCP reassignment, redundancy/failover and multiple valid addresses must remain controls. [ARP conflict detection](https://www.rfc-editor.org/rfc/rfc5227.html) describes legitimate probes/announcements and conflict handling. An untrusted first-learned table may be poisoned. Bind evidence to verified leases/ports/time and qualify slow poisoning; ARP is IPv4-local and does not cover IPv6 neighbor discovery or remote identities. Do not classify every unsolicited/gratuitous ARP as an attacker.
+
+## G6: Packet-size distribution
+
+**Legacy standard deviation, variance and small/large ratios; site BASE keeps online moments.** Fixed-size pressure can differ from an application's mixture of headers/data, so size complements rate and timing. It is cheap to update and works without reading encrypted payloads. The actual legacy small threshold is below 64 captured bytes and large threshold above 1,000; earlier prose using 100 must not replace source semantics.
+
+Small ACK/control packets and fixed-size sensor messages are normal. Legitimate streams can be nearly constant-size; attacks can randomize size. Variance is standard deviation squared and often adds no independent information. Neither is robust to all outliers. Ethernet/VLAN/tunnel overhead, MTU and offloads affect measurements. Test the same application and attack across MTUs/padding/encapsulation, and perform group/within-group ablation before retaining redundant columns or calling size alone a universal signature.
+
+## G7: Port-use structure
+
+**Legacy six columns with host-scoped v2 diversity; site G11/G13 supply different cardinality measures.** Port concentration, service classes and adjacent-port density help distinguish sustained service use from exploration across services. Destination fan-out needs a source/window view; one flow pinned to a destination port cannot express a host-wide scan.
+
+The legacy sequential_port_score sorts unique destination ports before measuring adjacent differences. It therefore measures density of a sorted set, not the order probes arrived. Nmap itself randomizes scan order by default; -r selects ordered scanning. [Nmap reference](https://nmap.org/book/man-port-specification.html) Port-number standard deviation is a heuristic, not a principled categorical distance; service classes/top shares need comparison. The legacy ephemeral predicate is strictly above 49152, so boundary semantics need a versioned review. Test approved inventory scans, diverse browser/game connections and randomized/slow probes. Do not identify a tool or attacker solely from adjacent ports.
+
+## G8: Broadcast and multicast context
+
+**Legacy packet flag plus three network ratios.** Address-resolution, service discovery and topology changes explain traffic spikes that otherwise resemble pressure. Context should help discriminate a benign network event from abuse rather than force thresholds so high that smaller attacks disappear.
+
+Broadcast storms can also be harmful; the ratio must not automatically suppress detection. ARP/DHCP/mDNS and operational diagnostics are hard negatives, while deliberate broadcast exhaustion and loops need their own outcomes. Do not assume an inherent Mininet duplication factor, that pingall always generates thousands of frames, or that broadcasts are equivalent to ICMP floods. Qualify physical and emulated paths separately, including IPv6 multicast, membership changes and local AP forwarding. The site collector excludes broadcast/multicast destination profiles but does not replicate every legacy network-level ratio.
+
+## G9: Flow creation pressure
+
+**Legacy flows_per_window; no equivalent exact site session counter.** Many new distinct flow keys can pressure switch/controller state even when packet or byte volume is modest. This gives control-plane/state-exhaustion hypotheses a dimension that bandwidth alone misses.
+
+Flow keys are not successful connections, active hardware table entries or application sessions. Browsers, peer-to-peer software, games, telemetry fan-out and legitimate scans can create many. OVS/controller cache rules change what reaches packet_in. Qualify new-key rates against actual table occupancy, queue delay and connection progress. Tests need a controlled table-pressure workload and a normal high-connection workload at comparable volume, with capacity/omission counters preserved. G18 expands this rationale with real resource outcomes rather than pretending the proxy alone measures exhaustion.
+
+## G10: Audit metadata and provenance
+
+**Audit-only in both schemas; excluded from predictive inputs by this catalog.** Legacy tool/intensity/window/device-name/load/backlog fields and site run/window/schema/ground-truth/parser/warm-up fields explain how a row was produced. They are essential for reproducing experiments and identifying observation artifacts.
+
+Attack-tool names, metadata events and detector labels are particularly dangerous leakage. A model must not learn which test script or window generated an attack. Runtime flags/support may later be used as explicitly qualified missingness gates, but that requires a separate input contract and evaluation; this mapping does not authorize them as attack predictors. Preserve private identity/provenance outside public datasets. Test that preprocessing cannot admit audit/label columns, and keep source/model/schema hashes and campaign IDs for joins rather than features.
+
+## G11: Reconnaissance evidence
+
+**Partial site implementation:** TCP NULL/XMAS/FIN-without-ACK/SYN counts, incoming resets, IPv4 port-unreachable proxy, peer/port/service-edge diversity. Recon probes seek services or hosts; combining exploration, incomplete service progress and responses is more meaningful than one flag or a specific nmap command.
+
+Current replies are device summaries, not exact probe-response attribution. IPv6 port-unreachable type/code handling equivalent to IPv4 is not implemented by the current g11 counter. ACK-without-session, exact unanswered probes, ping sweep and validated options require later session/protocol work. Approved inventory, troubleshooting and application fan-out are controls. Evaluate vertical/horizontal/stealth/slow variants, randomized tools and sparse support. A permitted scan does not itself prove a service is reachable or that a probe succeeded; attach target response and policy context.
+
+## G12: Header and evasion evidence
+
+**Partial site implementation:** TTL/hop-limit moments/residual, TCP advertised-window moments/zero-window count and outer fragmentation/tiny-frame evidence. A changed stack/path or crafted fragment stream can depart from previous patterns; this provides header context beyond volume.
+
+TTL is not authenticated identity or proof of spoofing. SD-WAN rerouting, tunnel termination, legitimate OS updates and real receive-window pressure can explain change. Current fragments are not reassembled and do not establish malformed overlap/Teardrop success; transport inference is deliberately limited for fragments. The TTL mean is unverified empirical history with an exponential update, not an approved device baseline. Test normal path changes and mixed stacks alongside crafted cases, and distinguish capture truncation from on-wire fragmentation before proposing a block.
+
+## G13: Long-horizon contacts
+
+**Partial site implementation:** bounded minute buckets for ten-minute/hour diversity and bytes, repeated window contacts and supported per-peer interval CV. A low-and-slow scan or periodic contact can evade a five-second rate threshold while changing the longer-lived service graph.
+
+These are bucketed window contacts, not exact session start times; quantization, cap evictions and restart warm-up matter. A pair needs at least three intervals for current CV support. Normal telemetry, updates, monitoring and cloud push channels can be periodic. Planned additions include robust change points, jitter-aware periodicity, campaign-scoped service edges and true long-open/low-progress sessions. Compare beacons with legitimate polling at matched periods/volume and gradual benign backups with staged transfer; test history poisoning rather than assuming longer memory is always safer.
+
+## G14: Service initiation behavior
+
+**Partial site implementation:** new SYN packet rate, SYNs to selected authentication ports, directional byte ratio and outgoing payload length. Bursts of new attempts or a changed upload/service pattern can connect recon, pressure and credential/exfiltration hypotheses to a device role.
+
+SYNs are not logins and packet payload length is not an application transaction. Current code lacks authentication results, exact request/response sizes, response status and connection reuse. Download/upload direction depends on the role and observation point. Benign push reconnects, game launchers, updates and backup uploads are important controls. Add qualified session/application logs before claiming brute-force detection, slow-request exhaustion or successful exfiltration. Evaluate within each service role, not a universal camera-derived threshold imposed on a phone/PC.
+
+Future role-specific extensions should cover MQTT/CoAP broker outcomes and publish/subscribe/request patterns, and industrial protocol read/write/command semantics where authorized sources expose them. A control write can be dangerous at low rate. Topic/resource/command authorization requires G22-style policy/outcome evidence; a familiar port does not prove the application or command is legitimate. Encrypted or proprietary variants need a qualified broker/gateway/device adapter rather than guessed payload semantics. These fields are planned, not present in the current G14 implementation.
+
+## G15: DNS metadata
+
+**Partial site, --metadata opt-in:** one-question UDP port-53 queries/responses, NXDOMAIN fraction of observed responses, query-name length/character entropy, name-hash diversity and TXT/NULL query counts. Unusual name generation, failures and record patterns can corroborate DNS-mediated communication abuse. [MITRE's DNS technique](https://attack.mitre.org/techniques/T1071/004/) motivates a behavior class, not a rule that every unusual name is malicious.
+
+CDNs, tracking, service discovery, typos and legitimate TXT records are controls. Current code has no registrable-domain/public-suffix aggregation, resolver policy, full TCP DNS, full correlation or decoding of DoH/DoT. DoH transports DNS over HTTPS, so a passive port-53 parser cannot inspect it. [DoH specification](https://www.rfc-editor.org/rfc/rfc8484) Future measurements need resolver-side or authorized endpoint evidence, support-aware failure denominators and legitimate privacy-resolver exceptions. Hashes remain potentially identifiable and are not encryption/anonymization guarantees.
+
+## G16: TLS and QUIC evidence
+
+**Partial site TLS only, --metadata opt-in:** complete one-packet ClientHello count, absent SNI, ECH-extension presence and custom fingerprint diversity. These may reveal changed client software/handshake behavior when compared with reviewed context. The fingerprint is project-specific, not a conforming JA3/JA4 implementation or an authenticated application ID.
+
+Missing SNI, ECH, rare stacks and self-signed certificates can be legitimate. The current parser has no QUIC decoding, TLS stream reassembly, certificate trust validation or measured failed-handshake ratio. TLS 1.3 protects later handshake/application content, constraining passive inspection. [TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446) Plan outcome-rich evidence at approved termination points or endpoint/server logs, with explicit privacy scope. Test ordinary browser updates, embedded stacks, fragmentation and ECH before treating novelty as dangerous. Do not promise encrypted-payload attack detection from a fingerprint.
+
+## G17: HTTP behavior and lexical evidence
+
+**Partial site, --http opt-in:** complete cleartext HTTP/1 request headers in a packet, request/method counts and URI length/entropy/encoded/special-character measures. These are inexpensive precursors for unusual request construction or enumeration and can prioritize deeper authorized evidence.
+
+Legitimate search queries, APIs, signed URLs, unusual methods and percent-encoding are hard negatives. Current code lacks request stream reassembly, bodies, response status, cookies/session identity, HTTP/2/3, HTTPS content and application authorization. A lexical anomaly is not proof of SQLi/XSS/RCE. [HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110) informs future request/response contracts, not a universal payload classifier. Use proxy/WAF/application outcomes and synthetic vulnerable targets to compare semantic-normalization/sequence features with signatures. Report single-request misses explicitly; normal packet volume does not make a dangerous request benign.
+
+## G18: Resource and state exhaustion
+
+**Planned.** Add incomplete-session age, outstanding/active connections, progress per connection, retry/timeout behavior, queue occupancy and trusted server/controller resource outcomes. The rationale is to detect exhaustion of a finite resource, including attacks whose bandwidth is small. Normalize against role/capacity and distinguish packet rate from actual resource impact.
+
+Required inputs are bounded bidirectional session tracking and qualified service/switch/controller telemetry. Proposed horizons span seconds to minutes, with per-service support and memory budgets. Benign connection bursts, slow users, long-lived messaging/video and maintenance are controls. Qualify pressure/slow-request campaigns with target resource state and service continuity. Exceeding an observed baseline alone is insufficient; correlate pressure, low progress and resource symptoms. No new site-v3 columns or enforcement rule for this group are implemented yet.
+
+## G19: Identity conflict and reassignment
+
+**Planned unified identity group; existing G5/static inventory supplies narrower evidence.** Join DHCP/lease history, ARP/NDP claims, VLAN/port/AP attachment, source-of-truth inventory and binding validity. Proposed measures include simultaneous conflicting claims, impossible attachment changes and rate of reassignment under corroborated network context.
+
+The rationale is correct attribution: a confident behavioral score is unsafe if attached to yesterday's IP owner. MAC spoofing/randomization, roaming, DHCP renewals, dual-stack addresses, NAT/shared hosts and legitimate failover are controls. Require authoritative lease/attachment evidence or explicit ambiguity; a MAC/OUI cannot authenticate a device or classify an unknown vendor reliably. Test address reuse and spoofed claims with no wrong-device action. Role/cohort learning must not let an attacker choose an easier identity just by changing its address.
+
+## G20: Management and SD-WAN control plane
+
+**Planned.** Add authenticated configuration/admin events, route/neighbor churn, tunnel/SA changes, controller API activity, management-service exposure and deviation from approved routing/maintenance events. This addresses attacks on the system deciding paths and policy, beyond attacks carried by ordinary branch traffic.
+
+Use native router/firewall/controller audit and health telemetry with firmware/context/revision/time validity. Raw tunnel volume cannot prove a route was hijacked. Legitimate link failover, key rotation, upgrades and administrator changes are hard negatives. Correlate unexpected origin/change scope with routing and service outcomes. A sensor outside an encrypted tunnel sees outer endpoints rather than each inner device; [IPsec architecture](https://www.rfc-editor.org/rfc/rfc4301) motivates pre-encryption/post-termination observation or qualified endpoint exports. Current operator-model diffs are not management-plane intrusion detection.
+
+## G21: Credential abuse and lateral transitions
+
+**Planned.** Correlate failed/successful authentication outcomes, distinct account/service targets, MFA/session events and new post-authentication service edges. Password spraying can be low-rate per account, and a compromised device may use valid credentials; service/identity/time relationships matter more than a raw auth-port SYN count.
+
+Requires trusted authentication/service logs and valid user/device mappings with minimized account identifiers. Mistyped passwords, password changes, SSO reconnects, help-desk activity and approved administration are controls. Test spraying, repeated failures and abnormal successful lateral use against owned test identities, preserving independent server outcomes. Distinguish account/session action scope from a whole-device ban, especially on shared systems. No current site feature proves a successful login or lateral compromise; G14 is an initiation precursor only.
+
+## G22: Application authorization abuse
+
+**Planned.** Model relationships among authenticated principal/role, tenant, requested object/action, authorization decision and business workflow. A single patient-record request can be dangerous at normal volume if the requester lacks permission; transport statistics cannot establish that relationship. [OWASP's object-authorization category](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/) identifies this distinct problem.
+
+Requires approved application/API-gateway audit and policy context, not blanket passive decryption or retention of patient content. Proposed metrics include cross-tenant/object access deviations, denied-object sequences and workflow-inconsistent actions. Legitimate family/care-team delegation, role changes, shared workstations and emergency access are controls. Test synthetic cross-tenant/role cases with server-side authorization truth. A WAF signature or rare URI alone cannot prove business authorization, and the system must not infer medical/business eligibility from a network anomaly.
+
+## G23: Command-and-control and exfiltration
+
+**Planned fusion group; G13/G14/G15/G16 provide precursors.** Combine long-horizon contacts, changed service graphs, protocol metadata, upload/progress patterns and trusted endpoint/application evidence. The goal is to distinguish suspicious control/transfer chains from isolated novelty. A tool-independent mechanism can use DNS, HTTPS or normal cloud services.
+
+Periodic IoT telemetry, cloud sync, video uploads, backups, CDNs and software updates are controls. Byte volume/entropy alone cannot show that data was confidential or stolen. Proposed metrics include conditional edge surprise, staged contact/transfer sequences, role-relative outbound change and destination/task context, with applicability/support and calibrated temporal dependence. Require authorized endpoint/DLP/application outcomes where needed. Test jitter, low-volume schedules, shared infrastructure and held-out transports while reporting encrypted blind spots. Do not count correlated existing groups as separate independent confirmations.
+
+## G24: Exploitation outcome evidence
+
+**Planned.** Correlate a suspicious request with trusted service/endpoint consequences: abnormal child process, controlled canary access, forbidden file/action, verified crash or application state change. This addresses the gap between attempted attack, harmless unusual input and successful impact. It is outcome evidence rather than another packet-only fingerprint.
+
+Use isolated owned vulnerable targets and synthetic canaries; collect signed/controlled audit where available. Normal maintenance, legitimate interpreters, test canaries and service bugs are controls. Track event time, causally plausible sequence and competing explanations; a temporal correlation alone does not prove causation. Evaluate exploit attempts and benign lookalikes with independent target observations. Avoid circular training labels derived solely from the same signature. Retain outcome missingness explicitly when the endpoint source is absent, and do not promise this capability on an arbitrary vendor/device without integration.
+
+## How groups should contribute to a decision
+
+For each candidate group, record a versioned feature card: exact name/unit/key, window/horizon, formula, minimum sample support, history update order, parser applicability, identity/visibility assumptions, null convention, cap/eviction behavior, privacy scope and attack/control fixture IDs. The current map supplies source/name ownership; planned metrics above are research hypotheses, not installed columns.
+
+Build a mechanism evidence record with device/role, relevant peers/services, time order, deviation from independently reviewed context, protocol/service outcomes and quality. This is the useful interpretation of an attack's behavioral DNA: a tested combination of mechanisms. It is not a unique immutable fingerprint that every dangerous activity must share. A low-rate authorization exploit may need G22/G24 even when every volume feature looks normal.
+
+Tier 1 signatures provide explicit pattern/inspector evidence where inputs are visible. Tier 2 offers explainable rate/protocol/policy checks under valid assumptions and supplies a low-cost comparator. RF combines qualified feature interactions for known classes; AE measures reconstruction deviation relative to reviewed training data. A high RF vote or AE transformation is not calibrated certainty. A signature and two models sharing packet evidence are dependent; validate fusion as a separate decision policy.
+
+## Concrete research metrics to evaluate next
+
+The following are proposed definitions, not installed columns, thresholds or detector claims. They give future feature cards an executable mathematical hypothesis and a falsifiable control experiment.
+
+- **Support-aware service surprise (G13/G14/G23):** average -log((prior_count(edge) + alpha) / (prior_total + alpha * K)) over observed initiation edges, with a reserved unseen category and positive smoothing alpha. Freeze reviewed prior counts before scoring and record support/K. New software/CDNs are controls; an attacker reusing common edges may evade it. Compare against simple novelty before accepting the added complexity.
+- **Session progress deficit (G3/G18):** fraction of fully observable initiated sessions that fail a protocol/role-specific progress condition by a predeclared deadline. Keep censored/incomplete observations separate; no applicable sessions means missing. It needs bounded bidirectional session state and target progress, not current window SYN counts. Test slow legitimate clients and packet loss alongside pressure.
+- **Jitter-aware phase concentration (G13/G23):** for candidate period T, abs(sum(exp(2*pi*i*t/T))) / n over supported event times. Searching many T values requires multiple-search/null calibration and held-out periods; it is not a probability. Regular monitoring can score just as highly as a beacon. Qualify finite-sample support, clock loss, retries and legitimate schedules before use.
+- **Role-service violation share (G14/G21):** disallowed distinct qualified initiation edges divided by all applicable distinct initiation edges under a versioned reviewed role. This extends the existing shadow finding concept with a support-aware summary; it does not automatically label traffic malicious. Approved admin/maintenance workflows and incorrect role assignment are controls.
+- **Resource/progress mismatch (G18):** compare active/outstanding sessions with successful transaction progress and measured target queue/capacity, using consistent intervals and documented smoothing. It requires actual capacity/resource telemetry. A slow service or upstream outage is a competing explanation, so evaluate those cases rather than attributing all mismatch to an attacker.
+- **Identity-conflict evidence tuple (G19):** record simultaneous contradictory bindings, validity overlap and corroborating authoritative lease/attachment sources. Count independent source provenance, not repeated forged packets or duplicate logs, and preserve unresolved shared-address cases. Test DHCP reuse/roaming and deliberate claims with no wrong-device action.
+- **Inspection-gap fraction (QUALITY/G15–G24):** applicable sessions lacking the evidence required by a specific detector divided by all applicable sessions. The numerator must distinguish disabled parser, encryption, unsupported protocol, loss and absent integration. This is a coverage metric that limits conclusions, not malicious probability or an automatic block trigger.
+- **Verified post-action persistence (POLICY/G24):** independently observed target receipts after the scoped action's effective time, excluding the declared drain/in-flight interval and unrelated sessions. Persistent receipt can indicate enforcement/path/identity failure even if read-back succeeded. It is response feedback, not proof that the original classifier was correct.
+
+Each metric needs a schema-bound implementation, independent packet/log oracle, resource limit, matched benign controls and ablation on held-out campaigns. A proposed equation should be rejected or kept diagnostic if it adds no useful coverage at the chosen false-action budget.
+
+## Training, deployment and online adaptation
+
+Start with deterministic baselines and a schema-compatible RF; compare a tree-boosting candidate under the same splits/cost budget. Use an AE only after weights/scaler are trained for reviewed site inputs and its false alerts measured. Sequence/graph models are justified only if they improve slow/multistage results beyond simpler models at fixed false-action cost. Model selection is an experiment, not a promised accuracy ranking.
+
+Use separate outputs for supported known mechanism, anomaly/novelty, policy finding and observation uncertainty. Do not force unsupported protocols or out-of-distribution examples into normal simply because a multiclass classifier must choose one known label. Abstentions still count against mandatory observable attack recall, and their handling/action deadline must be evaluated as part of the system. Confidence must improve through evidence and calibration, not by artificially raising displayed scores or lowering a threshold until a demonstration blocks.
+
+Split by campaign/device/site and later time before imputation, scaling, feature selection or resampling. Keep normal workloads at realistic prevalence for evaluation; synthetic oversampling belongs only inside training partitions. Reserve calibration separately and report per-role support, missed/late/abstained attacks, false alerts per device-day, false actions and time to verified containment. Group/time-aware validation is documented in [scikit-learn's evaluation guide](https://scikit-learn.org/stable/modules/cross_validation.html). Never use a random row split as proof of unseen-campaign generalization.
+
+Compare with/without each group at the same operating budget, preserving campaign units and benign controls. Use paired campaign results and report uncertainty; low false-alert counts do not prove zero future error. Inspect probability reliability/Brier or log loss only when probability semantics are defined. [Calibration guidance](https://scikit-learn.org/stable/modules/calibration.html) supports this procedure; AE error requires its own action-threshold qualification and is not a posterior probability by definition.
+
+Deploy a frozen schema/preprocessing/model/threshold/parser contract with code/artifact hashes, shadow release evidence, resource/inference coverage and rollback. Do not silently feed 71-column site rows to legacy v2 models. Score against a frozen approved profile before updating eligible candidate history. Eligibility is a review condition, never an automatic normal label. Hold suspicious, ambiguous or degraded intervals; test slow poisoning, drift, legitimate updates and incident recovery before automatic promotion. The currently implemented descriptive profile/candidate mechanisms do not constitute an online trained detector.
+
+## Development sequence while physical visibility is unresolved
+
+1. **Now:** use source-mapped rationale, golden PCAP/capacity/quality tests, independent campaign contracts and offline policy audit/change proofs. Keep unverified household capture out of qualification claims.
+2. **Next parser foundation:** bounded bidirectional sessions, explicit response correlation, per-parser support/missingness and validated identity histories. Qualify G11–G14 and G18/G19 first with replay plus benign controls.
+3. **Richer authorized sources:** resolver/proxy/auth/application/endpoint and management adapters with versioned contracts. Extend G15–G17 and G20–G24 only when the mechanism is observable.
+4. **Real evidence:** qualified site collection, independently labeled lab campaigns, later-time/cross-site evaluation, model calibration and poisoning/drift experiments.
+5. **Response gate:** qualified vendor identity/context, narrowly scoped reversible action, read-back plus actual containment/allowed-service continuity and SOC reversal. Offline access equivalence or model confidence alone does not authorize an actual firewall change.
+
+Use [offline development and change testing](/deployment/offline-policy-changes), [the home visibility gate](/deployment/home-pilot-step-by-step) and [independent campaigns](/deployment/security-campaigns) for commands. Future additions must update this rationale and the map in the same commit; planned groups remain marked planned until code and release evidence exist.

@@ -1,0 +1,159 @@
+---
+title: "Develop and test while visibility is unresolved"
+description: "Exercise counterfactual policy changes, concrete impact witnesses and reproducible review receipts without a live firewall."
+---
+
+The H188A is currently both the router and access point. A cable from its ordinary LAN port to the one-NIC t530 has not established whole-home visibility. The external-AP topology is one possible future arrangement, not equipment already installed. Continue the following offline milestone now; resume [the home pilot](/deployment/home-pilot-step-by-step) only when a real observation path is available.
+
+This milestone extends the operator-model workbench with deterministic before/after impact, hypothetical rule disable/remove/reorder previews and replay-verifiable review receipts. It advances P8 and preparation for P12, including partial S34/S54. It does not train models, change the home network, import a hypothetical candidate automatically, authorize a native firewall change or prove actual reachability.
+
+## What the new analyzer answers
+
+| Question | Implemented answer |
+| --- | --- |
+| Did effective access expand or contract? | Partition supported IPv4/IPv6 TCP/UDP/ICMP/ICMPv6 header space and compare first-match outcomes. |
+| Which traffic demonstrates a difference? | Concrete source/destination/protocol/port witnesses, before/after action and responsible rule/default. |
+| Did explicit logging change? | Compare known boolean values separately from access. Unknown/default logging remains unqualified. |
+| Did the selected rule change despite the same verdict? | Report rule-attribution changes; these can matter for auditing and counters. |
+| Can unsupported conditions be ignored? | No. Possible match envelopes become INDETERMINATE, while unrelated supported regions can still show a definite change. |
+| Can a proposed disable/remove/reorder be tested safely? | Build an in-memory candidate against an exact base snapshot, compare it, then return a review-only receipt. |
+| Is a receipt still consistent? | Recompute its hash and replay the exact request against the same snapshot/engine. This is integrity, not approval or authentication. |
+
+The supported domain is the same header subset as [the audit](/deployment/policy-audit). ANY is restricted to those supported protocol cases. Native applications/users/profiles/schedules, routing/NAT/session state and real forwarding are unqualified. An access-equivalent result is not a native change-safety certificate.
+
+## 1. Import a known fixture — about two minutes
+
+From the repository root on Windows:
+
+```powershell
+$store = '.local/policy-workbench/policies.sqlite3'
+$import = python scripts/policy_inventory.py import --input examples/policies/change-reference-v1.json --store $store | ConvertFrom-Json
+$base = $import.snapshot_id
+python scripts/policy_inventory.py audit --store $store --snapshot $base
+python scripts/policy_inventory.py impact --store $store --before $base --after $base
+```
+
+On Ubuntu, no Ryu/model dependencies are needed for this policy-only lane:
+
+```bash
+mkdir -p .local/policy-workbench
+python3 scripts/policy_inventory.py import \
+  --input examples/policies/change-reference-v1.json \
+  --store .local/policy-workbench/policies.sqlite3
+BASE=ae96b3e0485c2bad83195eb23fd22174cef9c4e77d3b038260d99d6b130a9d6a
+python3 scripts/policy_inventory.py impact \
+  --store .local/policy-workbench/policies.sqlite3 --before "$BASE" --after "$BASE"
+```
+
+The fixture has five known rules: web allow, unreachable duplicate, one-half-source allow on 8080, a later deny on 8080 and an independent IPv6 allow. The shown ID hashes the normalized fixture; use the actual import ID for a different input. Identity/context must match before and after. Reimport deduplicates snapshot content while recording another import observation.
+
+Expected comparison with itself: access_equivalence EQUIVALENT_FOR_SUPPORTED_SUBSET and no known access change. logging_equivalence can be INDETERMINATE because the contract does not specify default logging. That is an intentional distinction, not a failed access proof.
+
+For an explicit expansion example, import the second fixture too:
+
+```powershell
+$later = python scripts/policy_inventory.py import --input examples/policies/change-reference-v2.json --store $store | ConvertFrom-Json
+python scripts/policy_inventory.py impact --store $store --before $base --after $later.snapshot_id
+```
+
+```bash
+python3 scripts/policy_inventory.py import \
+  --input examples/policies/change-reference-v2.json \
+  --store .local/policy-workbench/policies.sqlite3
+LATER=205fc83c819bc68940c06052fb19c33b98d0889a765f43f484930a163379cf9f
+python3 scripts/policy_inventory.py impact \
+  --store .local/policy-workbench/policies.sqlite3 --before "$BASE" --after "$LATER"
+```
+
+Expected: DIFFERENT access with ACCESS_EXPANDED witnesses on TCP 8443. The two reported expansion regions are symbolic partitions, not two observed connections. The logging result remains separately qualified. Both descriptions must be imported before selecting them for the browser comparison in step 4.
+
+## 2. Preview disabling a duplicate — about two minutes
+
+```powershell
+python scripts/policy_inventory.py propose --store $store --snapshot $base --request examples/policies/disable-duplicate.request.json --output .local/disable-duplicate.receipt.json
+python scripts/policy_inventory.py verify-proposal --store $store --input .local/disable-duplicate.receipt.json
+```
+
+Ubuntu equivalents:
+
+```bash
+python3 scripts/policy_inventory.py propose \
+  --store .local/policy-workbench/policies.sqlite3 --snapshot "$BASE" \
+  --request examples/policies/disable-duplicate.request.json \
+  --output .local/disable-duplicate.receipt.json
+python3 scripts/policy_inventory.py verify-proposal \
+  --store .local/policy-workbench/policies.sqlite3 \
+  --input .local/disable-duplicate.receipt.json
+```
+
+Use a new output filename on subsequent runs; existing files are refused. A Unix receipt is created mode 0600, and Windows ACLs remain the operator's responsibility. Keep real exports/receipts outside public Git. The example files contain documentation addresses only.
+
+Expected: the duplicate becomes disabled in candidate_policy, while access remains equivalent within the supported subset. The original stored snapshot stays unchanged. The receipt always says candidate_is_observed false, state OFFLINE_REVIEW_REQUIRED, automatic_apply false and enforcement NOT_ATTEMPTED. It is a hypothetical description, not an installed configuration or a source-of-truth read-back. Its collected_at field remains the base observation's timestamp; do not reinterpret it as candidate deployment time.
+
+verify-proposal requires the original snapshot in the read-only store. It checks the receipt digest and recomputes the entire candidate/impact against the current engine manifest. Changed code/dependency/Python fingerprints or altered evidence cause a mismatch; regenerate and review rather than editing a receipt to make it pass. A local administrator could recompute hashes, so verification does not authenticate authors or substitute for SOC approval/signatures.
+
+## 3. Demonstrate a harmful reorder — about two minutes
+
+```powershell
+python scripts/policy_inventory.py propose --store $store --snapshot $base --request examples/policies/move-deny.request.json --output .local/move-deny.receipt.json
+```
+
+```bash
+python3 scripts/policy_inventory.py propose \
+  --store .local/policy-workbench/policies.sqlite3 --snapshot "$BASE" \
+  --request examples/policies/move-deny.request.json \
+  --output .local/move-deny.receipt.json
+```
+
+Expected: moving deny-8080 ahead of allow-half-8080 produces DIFFERENT access, known_access_change_present true and an ACCESS_RESTRICTED witness on TCP 8080. The first-half source region previously reached an allow; now it reaches deny. This illustrates why rule order cannot be optimized from hit counts or duplicate labels alone. Removing allow-web instead would preserve access through duplicate-web but change attribution, which matters to log/counter lineage.
+
+## 4. Compare or preview through the browser
+
+Restart an existing viewer after pulling Python changes. Start a new foreground instance only if its port is free:
+
+```bash
+python3 scripts/policy_inventory.py serve \
+  --store .local/policy-workbench/policies.sqlite3 --port 8082
+```
+
+On Windows use python rather than python3 if that is your installed launcher. Open http://127.0.0.1:8082/ on the same host or use the [documented SSH tunnel](/deployment/policy-workbench) for the t530. This workbench does not need a traffic mirror. It remains loopback-only with no enterprise login/tenant authorization.
+
+- Select change-reference-1, choose Disable model rule and enter duplicate-web, then click Preview without applying.
+- Choose Move model rule before another, target deny-8080, before rule allow-half-8080, then preview. Inspect the restriction witness.
+- To compare two imported descriptions, paste the earlier snapshot ID and select the later snapshot, then click Compare modeled impact. Structural Compare earlier with selected remains available separately.
+
+Both new API operations are GET: /policy/impact with before/after and /policy/preview with snapshot/operation/rule and before_rule for a move. Optional limit is 1–200. They create only in-memory results; no database import or firewall mutation occurs. Unknown/repeated parameters, unsupported operations, stale bases and budget failures are explicit errors. See [the read API](/api-reference/policy-workbench).
+
+## Interpret the evidence
+
+| Result field | Meaning |
+| --- | --- |
+| access_equivalence | EQUIVALENT_FOR_SUPPORTED_SUBSET, DIFFERENT or INDETERMINATE. Deny/reject changes are preserved rather than collapsed into one generic block. |
+| known_access_change_present | A supported definite change exists, even when other regions remain unknown. |
+| coverage_status | COMPLETE_FOR_SUPPORTED_SUBSET or PARTIAL_UNKNOWN. A definite counterexample makes access DIFFERENT even if other regions are unknown. Without a counterexample, unknown regions prevent an equivalence claim. |
+| counts | Counts of symbolic partitions/categories, not real traffic volumes, attack prevalence or risk probabilities. |
+| examples / truncated | Bounded display list; full analysis continues before display truncation. |
+| witnesses_by_kind | Retains at least the first witness for every observed change category regardless of the display limit. |
+| logging_equivalence | Only explicit comparable booleans support equivalence/difference; unspecified default/rule logging remains indeterminate. |
+| RULE_ATTRIBUTION_CHANGED | A different rule/default supplies a definite verdict even if access agrees. |
+| structural_changes | Same-context field-level changes alongside the semantic subset analysis. |
+| engine_manifest / engine_sha256 | Source hashes for change/audit/header-model modules and Python version, captured when the module loads. Restart after updating code. This is reproducibility metadata, not code attestation. |
+
+An unknown rule receives only a conservative possible-header envelope. The engine never treats that as a proven permit; it marks potentially affected space unknown and keeps definite answers elsewhere. Unchanged unsupported rules may still prevent an overall equivalence claim. A global unmodeled context makes all supported space unknown. Disabled unknown rules do not determine effective access.
+
+Limits: 200 rules per snapshot, 4,096 effective/intersection/residual regions, 250,000 symbolic work units, 1–200 displayed examples and 1–16 proposal operations. One operation per target rule; a move needs another existing anchor. Proposals support disable_rule, remove_rule and move_rule_before only. Unknown fields/operations fail. Reordering renumbers hypothetical positions; it does not generate native insertion/commit commands. Input/receipt-file verification is capped at 8 MiB. Requests pin the exact base SHA-256 to prevent applying an old plan to a different model revision.
+
+Cap failures return no complete proof. HTTP 200 can contain an indeterminate result and does not mean a change was approved. CLI exit 0 means the requested analysis/receipt verification completed; it is not deployment authorization. No apply command exists. A real adapter still needs credentials/capabilities, effective-policy fidelity, scope, backup, concurrency, installation/read-back, traffic verification, expiry/rollback and SOC reversal.
+
+## Next implementation phases during the visibility pause
+
+| Phase | Requirements | Means and deliverable | Exit evidence |
+| --- | --- | --- | --- |
+| Offline semantic foundation, now | Versioned operator fixtures and supported semantics | Audit, counterfactual impact, review-only receipts, feature rationale and guards. | Independent exhaustive oracles, negative/cap cases, no stored/native mutation. |
+| Usage evidence, next | Read-only native counter/log samples, reset/boot/context identity and units | Versioned usage windows; reject unknown continuity and retain sparse/seasonal exceptions. | Counter reset/wrap/reorder/gap fixtures before any unused-rule claim. |
+| Session/identity foundation, next | Sanitized bidirectional PCAPs and trusted binding fixtures | Bounded cross-window sessions, IPv6 reply attribution, explicit sampling/missingness and time-bound identity. | Independent expected packet/session results and spoof/reassignment controls. |
+| First vendor, when known | Model/firmware export or lab read-only access | Adapter capability matrix and faithful policy/object/order/context normalization. | Native fixture parity; unsupported constructs stay visible. |
+| Site data, visibility dependent | Verified observation topology, coverage and sustained resources | The timed home pilot, independent truth ledger and reviewed candidate profiles. | Correct traffic counts/identity, qualified captures and representative workloads. |
+| Model/response release, later | Independent attack/benign campaigns plus qualified adapter | Schema-bound training/calibration, shadow release and narrowly scoped reversible response. | Held-out error/action results, poisoning/drift tests and actual containment/continuity/reversal. |
+
+The [feature rationale catalog](/architecture/feature-rationale) explains current G1–G17 and planned G18–G24, including why transport-only measurements cannot prove authorization abuse or successful exploitation. The [code tour](/developers/policy-change-code-tour) explains the new algorithms. These phases can progress in parallel where requirements exist; the unresolved mirror is not permission to fabricate live data, trained confidence or vendor compatibility.

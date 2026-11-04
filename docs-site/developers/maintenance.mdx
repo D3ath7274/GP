@@ -2,6 +2,12 @@
 title: "Develop and verify changes"
 ---
 
+Feature work must update [the source-mapped rationale](/architecture/feature-rationale) and docs-site/reference/feature-groups.json. Run python scripts/check_feature_catalog.py and its --staged variant; the local hook now runs it after documentation synchronization, and CI checks the committed snapshot. It parses column definitions without loading capture/models, rejects missing/duplicate/invented assignments and planned implementation claims, and requires rationale for all G1–G24/supporting categories. It does not verify mathematical definitions or a model's actual input selection. Formula/missingness changes still require independent tests, schema decisions and qualification.
+
+The offline-qualification CI job now targets Ubuntu 22.04/Python 3.10, installs only Controller/requirements-home.txt and runs the full offline unit/CLI/HTTP suite plus catalog check. It needs no live sensor, raw-socket permission, Ryu or firewall credential. Its remote status must be checked after push; adding a workflow is not evidence it has run. Replays do not replace actual t530 capture/capacity qualification. Require the relevant checks in repository branch rules if enforcing merges; those owner settings are separate.
+
+The [policy-change code tour](/developers/policy-change-code-tour) covers counterfactual partitioning, possible-match uncertainty, exact-base hypothetical requests, private new-only receipts and replay verification. Tests compare access changes/witnesses with an independent exhaustive oracle and require unchanged SQLite bytes across CLI/HTTP previews. No new dependency, runtime model, home feature column or native firewall write path is introduced by this milestone. Stop/restart the workbench after a code update to avoid mixing a loaded engine with a new checkout.
+
 | Area | Entry point |
 | --- | --- |
 | Controller and REST | `Controller/Controller_main_Claude.py` |

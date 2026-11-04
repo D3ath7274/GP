@@ -67,32 +67,32 @@ FLOW_COLUMNS = [
     'syn_count', 'ack_count', 'fin_count', 'rst_count', 'psh_count',
     'unique_src_ports', 'unique_dst_ports',
     # --- Group 1: Timing & Inter-Arrival Rhythm (7 features) ---
-    # Rationale III: inter_arrival_cv captures robotic regularity of attack tools
-    # regardless of attack volume — strongest universal discriminator.
+    # Timing regularity can support an attack hypothesis, but benign telemetry can
+    # be periodic too. See docs-site/architecture/feature-rationale.mdx, G1.
     'inter_arrival_mean', 'inter_arrival_std', 'inter_arrival_cv',
     'inter_arrival_min', 'inter_arrival_max',
     'burst_count', 'burst_duration_avg',
     # --- Group 2: Directionality & Asymmetry (7 features) ---
-    # Rationale IV: Attacks are asymmetric by definition. Ratio-based features
-    # are immune to Mininet's 2x TAP amplification.
+    # Directional imbalance needs protocol/role context and both observed paths.
+    # Unequal duplication or loss can distort ratios; no fixed Mininet factor is assumed.
     'fwd_packet_count', 'bwd_packet_count',
     'fwd_bwd_packet_ratio', 'fwd_bwd_bytes_ratio',
     'fwd_avg_packet_size', 'bwd_avg_packet_size', 'reply_rate',
     # --- Group 3: TCP Session Completeness (4 features) ---
     # Rationale V: Operationalizes the TCP lifecycle contract (RFC 793/9293).
-    # incomplete_ratio is a category-level zero-day indicator.
+    # The current incomplete_ratio is a smoothed window proxy, not an exact session fraction.
     'syn_ack_ratio', 'completed_sessions', 'incomplete_ratio', 'avg_session_duration',
     # --- Group 4: Per-Flow Entropy (3 features) ---
     # Rationale VI: Entropy captures distribution diversity as categorical measure,
     # invariant to port number magnitude. Multi-dimensional per Lakhina et al.
     'payload_size_entropy', 'src_port_entropy', 'icmp_type_entropy',
     # --- Group 6: Packet Size Distribution (4 features) ---
-    # Rationale VIII: Attack tools produce near-zero pkt_size_std.
+    # Low size variability can occur in attacks and in normal fixed-size telemetry.
     # small_pkt_ratio encodes SYN flood physical characteristics (RFC 793).
     'pkt_size_std', 'pkt_size_variance', 'small_pkt_ratio', 'large_pkt_ratio',
     # --- Group 7: Port Behavior Patterns (6 features) ---
     # Rationale IX: Floods and scans occupy opposite extremes of port diversity.
-    # sequential_port_score detects nmap default sequential scanning.
+    # sequential_port_score measures sorted-port density, not arrival order or a tool identity.
     'top_dst_port', 'top_dst_port_ratio', 'dst_port_std',
     'well_known_port_ratio', 'ephemeral_port_ratio', 'sequential_port_score',
     # --- Group 8: Broadcast Context (per-flow flag) ---
@@ -1388,8 +1388,8 @@ class TrafficCapture:
 
         # =====================================================================
         # GROUP 1: Timing & Inter-Arrival Rhythm (7 features)
-        # Rationale III: CV near 0 = robotic regularity (attack tool).
-        # CV >> 0 = natural irregularity (human/application traffic).
+        # CV measures timing dispersion; periodic normal devices and jittered attacks
+        # prevent interpreting it as a standalone malicious/benign discriminator.
         # =====================================================================
         timestamps = [p[3] for p in packets]
         if len(timestamps) >= 2:
@@ -1433,8 +1433,8 @@ class TrafficCapture:
 
         # =====================================================================
         # GROUP 2: Directionality & Asymmetry (7 features)
-        # Rationale IV: Attacks are asymmetric — attacker floods, victim silent.
-        # Ratio-based features immune to TAP 2x amplification (Rationale II.B).
+        # Directionality is contextual evidence. Legitimate uploads/downloads can be
+        # asymmetric, and unequal mirror duplication/loss affects these ratios.
         # =====================================================================
         # FIX(C) [v2 only]: Reverse-direction traffic lives in the pair (dst, src,
         # proto), a separate flow key. Look it up in reverse_agg so the
@@ -1502,7 +1502,7 @@ class TrafficCapture:
 
         # =====================================================================
         # GROUP 6: Packet Size Distribution (4 features)
-        # Rationale VIII: Attack tools produce near-zero pkt_size_std.
+        # Size variability is a hypothesis feature, not a universal attack signature.
         # =====================================================================
         if len(sizes) >= 2:
             pkt_size_std = round(statistics.stdev(sizes), 4)

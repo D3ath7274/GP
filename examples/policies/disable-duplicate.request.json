@@ -1,0 +1,6 @@
+{
+  "version":"policy-proposal-v1",
+  "base_snapshot":"ae96b3e0485c2bad83195eb23fd22174cef9c4e77d3b038260d99d6b130a9d6a",
+  "reason":"Review whether disabling the unreachable duplicate preserves modeled access. No native change is authorized.",
+  "operations":[{"operation":"disable_rule","rule":"duplicate-web"}]
+}

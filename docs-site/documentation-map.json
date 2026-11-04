@@ -3,6 +3,14 @@
   "fallback_pages": ["docs-site/developers/maintenance.mdx"],
   "rules": [
     {
+      "sources": ["Controller/policy_change.py"],
+      "pages": ["docs-site/deployment/offline-policy-changes.mdx", "docs-site/developers/policy-change-code-tour.mdx"]
+    },
+    {
+      "sources": ["scripts/check_feature_catalog.py"],
+      "pages": ["docs-site/architecture/feature-rationale.mdx", "docs-site/developers/maintenance.mdx"]
+    },
+    {
       "sources": ["Controller/collection_io.py", "Controller/collection_report.py", "scripts/home_preflight.py", "scripts/qualify_home_collection.py", "scripts/qualify_home_runtime.py", "scripts/evaluate_security_campaign.py", "examples/testing/*.json", "tests/fixtures/*.json"],
       "pages": ["docs-site/deployment/pretest-qualification.mdx", "docs-site/deployment/security-campaigns.mdx", "docs-site/developers/qualification-code-tour.mdx"]
     },

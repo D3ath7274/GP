@@ -69,6 +69,8 @@ Exit 0 means file invariants passed with no listed quality counters. Exit 1 mean
 
 ## New feature coverage
 
+The [G1–G24 rationale catalog](/architecture/feature-rationale) explains why each current/planned group exists, its actual source semantics, benign lookalikes, visibility/privacy limits and required experiments. Its machine-readable map covers every source column and is checked at commit/CI time. Planned groups are not silently added to this schema, and lab proxies must not be described as complete session/payload detection.
+
 | Group | Collected measurements | Conditions and limits |
 | --- | --- | --- |
 | Base/device | Counts, byte rates, online packet-size and inter-arrival moments, prior-window destination novelty, observed source MAC count | Event time and fixed five-second windows. First and final windows are marked incomplete. Historical novelty is limited to the retained destination set. |

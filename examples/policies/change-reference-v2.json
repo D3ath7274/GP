@@ -1,0 +1,122 @@
+{
+  "format": "apf-policy-v1",
+  "source_kind": "operator_description",
+  "tenant": "demo",
+  "site": "lab",
+  "device": "change-reference",
+  "context": "forward-example",
+  "vendor": "unassigned",
+  "policy_revision": "change-reference-2",
+  "collected_at": "2026-11-04T10:10:00+00:00",
+  "default_action": "deny",
+  "unmodeled_context": [],
+  "objects": {},
+  "rules": [
+    {
+      "id": "allow-web",
+      "position": 10,
+      "enabled": true,
+      "sources": [
+        "192.0.2.0/24"
+      ],
+      "destinations": [
+        "198.51.100.20/32"
+      ],
+      "protocol": "tcp",
+      "source_ports": "any",
+      "destination_ports": [
+        443,
+        8443
+      ],
+      "action": "allow",
+      "logging": true,
+      "owner": "lab",
+      "comment": "Offline reference broadens web access to 8443",
+      "constraints": []
+    },
+    {
+      "id": "duplicate-web",
+      "position": 20,
+      "enabled": true,
+      "sources": [
+        "192.0.2.0/24"
+      ],
+      "destinations": [
+        "198.51.100.20/32"
+      ],
+      "protocol": "tcp",
+      "source_ports": "any",
+      "destination_ports": [
+        443
+      ],
+      "action": "allow",
+      "logging": true,
+      "owner": "lab",
+      "comment": "Unreachable duplicate for model preview",
+      "constraints": []
+    },
+    {
+      "id": "allow-half-8080",
+      "position": 30,
+      "enabled": true,
+      "sources": [
+        "192.0.2.0/25"
+      ],
+      "destinations": [
+        "198.51.100.20/32"
+      ],
+      "protocol": "tcp",
+      "source_ports": "any",
+      "destination_ports": [
+        8080
+      ],
+      "action": "allow",
+      "logging": true,
+      "owner": "lab",
+      "comment": "Only the first source half is allowed",
+      "constraints": []
+    },
+    {
+      "id": "deny-8080",
+      "position": 40,
+      "enabled": true,
+      "sources": [
+        "192.0.2.0/24"
+      ],
+      "destinations": [
+        "198.51.100.20/32"
+      ],
+      "protocol": "tcp",
+      "source_ports": "any",
+      "destination_ports": [
+        8080
+      ],
+      "action": "deny",
+      "logging": true,
+      "owner": "lab",
+      "comment": "Moving before allow changes access",
+      "constraints": []
+    },
+    {
+      "id": "allow-v6",
+      "position": 50,
+      "enabled": true,
+      "sources": [
+        "2001:db8::/64"
+      ],
+      "destinations": [
+        "2001:db8:1::20/128"
+      ],
+      "protocol": "tcp",
+      "source_ports": "any",
+      "destination_ports": [
+        443
+      ],
+      "action": "allow",
+      "logging": true,
+      "owner": "lab",
+      "comment": "Independent IPv6 case",
+      "constraints": []
+    }
+  ]
+}

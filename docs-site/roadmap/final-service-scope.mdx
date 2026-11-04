@@ -40,6 +40,7 @@ The intended contribution is evidence-backed behavioral input to policy decision
 | E6 | Controller/site_policy.py and scripts/review_site_baseline.py | Expiring inventory, TCP-initiation role findings, quality/incident holds, candidate summaries and explicit frozen descriptive profiles; no authenticated discovery, calibrated decision or automatic promotion. See [shadow policy](/security/shadow-policy). |
 | E7 | Controller/firewall_policy.py, Controller/policy_store.py, Controller/policy_http.py and scripts/policy_inventory.py | Operator-described file models, bounded address/group resolution, local snapshot/raw import history, per-snapshot ordered-header queries, structural diffs and a read-only viewer. No native vendor parser, automatic polling, route/NAT analysis or firewall writes. See [the workbench runbook](/deployment/policy-workbench). |
 | E8 | Controller/policy_audit.py, scripts/policy_inventory.py audit, GET /policy/audit and tests/test_policy_audit.py | Bounded operator-header subset for duplicate/union-shadow/redundant/overlap witnesses and model-scoped object/metadata findings. ANY restricted to TCP/UDP/ICMP/ICMPv6; no native deletion proof, usage/path qualification or automatic cleanup. See [audit procedure](/deployment/policy-audit). |
+| E9 | Controller/policy_change.py, impact/propose/verify-proposal CLI, read-only impact/preview API and tests/test_policy_change.py | Supported header-model access/logging/attribution comparison, hypothetical exact-base candidates and reproducible offline receipts. No native plan, authorization, reachability or deployment/rollback proof. See [offline testing](/deployment/offline-policy-changes). |
 
 Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful subset exists with the limits above. **Planned** means the service is not implemented in the reviewed runtime. No row establishes production readiness. P0–P6 retain the existing IPS qualification roadmap; P7–P13 add the policy-management services. A phase listed before another is a dependency where stated, not a release date.
 
@@ -85,7 +86,7 @@ Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful
 | S31 | Misaligned object detection | 27 | Planned | P8/P11: compare intended shared objects across contexts/vendors; distinguish approved site-specific variations. |
 | S32 | Broad-rule tuning | 29 | Planned | P8/P10/P12: propose constrained sources/services with coverage, dependency exceptions and before/after path validation. |
 | S33 | Rule consolidation | 28 | Planned | P8/P12: prove effective behavior and audit/logging semantics preserved before preparing an approved merge. |
-| S34 | Safe rule reordering | 30 | Planned | P8/P12: prove precedence and security-profile equivalence; measure any performance benefit on the actual target platform. |
+| S34 | Safe rule reordering | 30 | Partial E9: hypothetical supported-header reorder only | P8/P12: prove precedence and security-profile equivalence; measure any performance benefit on the actual target platform. |
 | S35 | Network topology modeling | 31 | Planned | P9: graph devices, interfaces, zones, VLAN/VRF, subnet, VPN and cloud contexts with revision/freshness metadata. |
 | S36 | Routing analysis | 32 | Planned | P9: evaluate supported IPv4/IPv6 routing, policy routing, longest-prefix and alternate paths; mark unsupported cases indeterminate. |
 | S37 | NAT modeling | 33 | Planned | P7/P9: preserve pre/post translation tuples, order, reverse/stateful behavior and vendor-specific policy lookup stage. |
@@ -110,7 +111,7 @@ Status **Lab** means relevant legacy/lab code exists. **Partial** means a useful
 | S51 | Pre-change risk analysis | 49 | Planned | P10/P12: compare exposure/segmentation and critical-asset reachability against a frozen before/after snapshot. |
 | S52 | Pre-change compliance analysis | 50 | Planned | P10/P12: run the same versioned controls on the proposed state, preserving evidence and approved exceptions. |
 | S53 | Behavioral pre-change analysis | 51 | Planned | P10/P12: attach device/application maturity, incidents, exceptions and observation coverage; familiarity cannot authorize access alone. |
-| S54 | Exact change-plan generation | 48 | Planned | P12: specify target contexts, revisions, rule/object IDs, insertion points, commits/installs, expiry and compensation steps. |
+| S54 | Exact change-plan generation | 48 | Partial E9: exact-base offline candidate only | P12: specify target contexts, revisions, rule/object IDs, insertion points, commits/installs, expiry and compensation steps. |
 | S55 | Vendor remediation adapters | 52 | Partial E5: reference CLI only | P4–P5/P12–P13: qualify capability-scoped create/modify/disable/delete/object/schedule operations per vendor/version and approval class. |
 | S56 | Policy backup | 53 | Planned | P7/P12: protected pre-change policy snapshots with integrity, retention and tested recovery dependencies. |
 | S57 | Rollback | 53 | Planned | P4/P12: compensate only owned changes, preserve concurrent administrator edits and verify effective restored connectivity. |

@@ -29,6 +29,13 @@ PAGE = b'''<!doctype html><html lang="en"><meta charset="utf-8">
 <button type="submit">Evaluate model and search rules</button></form>
 <h3>Snapshot comparison</h3><label>Earlier snapshot ID <input id="before" size="40"></label>
 <button id="diff">Compare earlier with selected</button>
+<button id="impact">Compare modeled impact</button>
+<h3>Offline model-change preview</h3>
+<p>No changes are applied or imported. An equivalent header verdict does not establish native firewall safety.</p>
+<label>Operation <select id="operation"><option value="disable_rule">Disable model rule</option><option value="remove_rule">Remove model rule</option><option value="move_rule_before">Move model rule before another</option></select></label>
+<label>Target rule ID <input id="rule"></label>
+<label>Before rule ID (move only) <input id="anchor"></label>
+<button id="preview">Preview without applying</button>
 <pre id="result" aria-live="polite">Import the supplied reference fixture with the CLI first. All actions here are read-only.</pre>
 <script>
 const el=id=>document.getElementById(id);
@@ -39,6 +46,8 @@ el('audit').onclick=()=>display('/policy/audit?'+new URLSearchParams({snapshot:e
 el('search').onsubmit=e=>{e.preventDefault();const p=new URLSearchParams({snapshot:el('snapshot').value,source:el('source').value,destination:el('destination').value,protocol:el('protocol').value});if(el('dport').value)p.set('destination_port',el('dport').value);if(el('sport').value)p.set('source_port',el('sport').value);display('/policy/search?'+p);};
 el('protocol').onchange=()=>{const ports=['tcp','udp'].includes(el('protocol').value);el('dport').disabled=!ports;el('sport').disabled=!ports;if(!ports){el('dport').value='';el('sport').value='';}};
 el('diff').onclick=()=>display('/policy/diff?'+new URLSearchParams({before:el('before').value,after:el('snapshot').value}));
+el('impact').onclick=()=>display('/policy/impact?'+new URLSearchParams({before:el('before').value,after:el('snapshot').value}));
+el('preview').onclick=()=>{const p=new URLSearchParams({snapshot:el('snapshot').value,operation:el('operation').value,rule:el('rule').value});if(el('operation').value==='move_rule_before')p.set('before_rule',el('anchor').value);display('/policy/preview?'+p);};
 load('/policy/snapshots').then(data=>{el('status').textContent=data.total+' snapshot(s); '+(data.truncated?'list truncated; use CLI IDs':'all listed')+'. No firewall writes.';for(const item of data.snapshots){const o=document.createElement('option');o.value=item.id;o.textContent=item.site+'/'+item.device+'/'+item.context+' - '+item.revision+' - '+item.id.slice(0,12);el('snapshot').append(o);}}).catch(e=>el('status').textContent=e.message);
 </script></html>'''
 
@@ -85,6 +94,19 @@ def read_policy_api(store, path, parameters):
         values = _arguments(parameters, ("snapshot",), ("snapshot",))
         from policy_audit import audit_policy
         return dict(audit_policy(store.get_snapshot(values["snapshot"])), snapshot_id=values["snapshot"])
+    if path == "/policy/impact":
+        values = _arguments(parameters, ("before", "after", "limit"), ("before", "after"))
+        from policy_change import impact
+        return impact(store.get_snapshot(values["before"]), store.get_snapshot(values["after"]), int(values.get("limit", "100")))
+    if path == "/policy/preview":
+        values = _arguments(parameters, ("snapshot", "operation", "rule", "before_rule", "limit"), ("snapshot", "operation", "rule"))
+        from policy_change import proposal
+        operation = {"operation": values["operation"], "rule": values["rule"]}
+        if "before_rule" in values:
+            operation["before_rule"] = values["before_rule"]
+        request = {"version": "policy-proposal-v1", "base_snapshot": values["snapshot"],
+                   "reason": "Interactive offline model preview; operator review still required", "operations": [operation]}
+        return proposal(store.get_snapshot(values["snapshot"]), request, int(values.get("limit", "100")))
     return None
 
 

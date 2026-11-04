@@ -5,6 +5,8 @@ description: "Inspect duplicate, jointly shadowed and partially overlapping mode
 
 This is the first P8 implementation for partial S20/S21/S22/S23/S26/S27/S28/S29/S30. It extends [the read-only workbench](/deployment/policy-workbench) with CLI/API/UI analysis. Inputs remain operator descriptions in apf-policy-v1. Native firewall parsing, schedules, zones, applications/users, security profiles, NAT, routes, actual traffic paths and rule-usage collection remain outside this audit. No cleanup or firewall write occurs.
 
+The next [offline impact and proposal tools](/deployment/offline-policy-changes) can now test a particular disable/remove/reorder against exact snapshots and expose access/logging/attribution changes with witnesses. Audit findings do not authorize those changes; receipts remain OFFLINE_REVIEW_REQUIRED and native equivalence is unassessed.
+
 ## Supported proof domain
 
 The analyzer represents source/destination address sets and source/destination port intervals as disjoint rectangular header regions, separately for IPv4/IPv6 and TCP/UDP/ICMP/ICMPv6. ANY is restricted to those protocol cases for this assessment; other IP protocols are not covered. A result is always scoped to this model subset. It must not be used as proof that deleting a native firewall rule preserves all behavior.

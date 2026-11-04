@@ -1,6 +1,8 @@
 # Feature Groups v3 — Covering the Blind Spots
 
-Implementation update, 2026-11-04. The home-collection entry point implements a separately versioned site-v3.0 schema with a qualified subset of G11–G17 measurements. See [the implemented coverage and collection guide](docs-site/deployment/home-collection.mdx). The append-only v2 proposal below remains a historical design. Use the runtime schema.json for exact columns and parser limits.
+Implementation update, 2026-11-04. The home-collection entry point implements a separately versioned site-v3.0 schema with a bounded, fixture-tested subset of G11–G17 measurements; live site qualification is still required. See [the implemented coverage and collection guide](docs-site/deployment/home-collection.mdx). The append-only v2 proposal below remains a historical design. Its proposed flags/columns, engine assignments and "catches" wording are not installed behavior or detection guarantees. Use the runtime schema.json for exact columns and parser limits.
+
+The current [G1–G24 rationale catalog](docs-site/architecture/feature-rationale.mdx) supersedes scientific/implementation claims in this historical proposal. It includes G18–G24, supporting evidence, benign controls, exact legacy proxy limitations, parser/encryption scope, calibrated model/online-learning gates and a source-mapped guard. Current Nmap defaults are randomized, the legacy sorted-port score is density rather than arrival order, timing regularity is not universally malicious, and application authorization/exploitation need richer evidence than packet statistics. No append-only compatibility flag or new model input is implied by the retained design below.
 
 Design for new feature groups that close the system's detection blind spots (reconnaissance,
 web-application abuse, slow attacks, command-and-control, spoofing). They also build the

@@ -26,6 +26,10 @@ Stage an implementation change together with an affected MDX page and a new date
 
 Run `python scripts/check_docs_sync.py --staged` from the repository root. The guard reads the Git index, so unstaged documentation cannot satisfy it. `documentation-map.json` defines source-to-page rules using first-match order; keep specific patterns before broader ones. Unknown code requires developers/maintenance.mdx until a more specific rule is added. Deleted/missing mapped pages fail validation. Requirements files, firewall rules, model artifacts, CI and Git hooks are included. A changelog alone or an unrelated page is insufficient. Reviewers still verify accuracy, completeness and API changes.
 
+Also run `python scripts/check_feature_catalog.py --staged` locally and its default working-tree mode during development. The hook runs both guards; CI checks the committed feature map. Update architecture/feature-rationale.mdx and reference/feature-groups.json whenever current columns/group meaning or planned feature commitments change. The guard checks source-name/status/heading coverage, not detection quality or formula correctness.
+
+The offline-qualification workflow job also runs the offline test suite on Ubuntu 22.04/Python 3.10 with the collection requirements. Its result is independent of Mintlify publication and physical capture qualification; review the remote job after pushing.
+
 The GitHub workflow checks pushes and pull requests. Its docs-sync job checks changed source against the committed documentation. Its docs-build job installs the pinned CLI and runs Mintlify validation, link and accessibility checks. These checks validate the source; they do not publish a hosted site or keep a local process running.
 
 Require **docs-sync** and **docs-build** in the target branch ruleset, with pull requests required, to block merging failed checks. Repository-owner GitHub settings control that enforcement; the workflow alone cannot prevent a permitted direct push. Local hooks apply per clone and can be bypassed, so use the server-side required checks as well.

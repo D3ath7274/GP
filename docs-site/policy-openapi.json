@@ -3,7 +3,7 @@
   "info": {
     "title": "Adaptive IPS framework read-only policy workbench",
     "version": "apf-policy-v1",
-    "description": "Loopback-only trusted local/SSH viewer of operator descriptions. Unknown/repeated query parameters are rejected. No native vendor parser, route/NAT/session evaluation, import HTTP endpoint or firewall write operation. POST is unsupported (501)."
+    "description": "Loopback-only trusted local/SSH viewer of operator descriptions. Unknown/repeated query parameters are rejected. No native vendor parser, route/NAT/session evaluation, import HTTP endpoint or firewall write operation. POST is unsupported (501). Offline impact and hypothetical preview routes preserve read-only authority; no apply operation exists."
   },
   "servers": [
     {
@@ -15,15 +15,73 @@
       "get": {
         "summary": "Audit the bounded operator header-model subset",
         "description": "Read-only P8 subset: duplicate, union shadow/behavior coverage and partial overlap with witnesses; metadata and model-scoped object findings. IPv4/IPv6 TCP/UDP/ICMP/ICMPv6 only; ANY restricted to that domain. No native semantics, routes/NAT/usage, deletion proof or firewall writes. Up to 200 rules, 4096 regions per rule/residual, 250000 work units and 4096 findings. Caps abort instead of returning a partial proof. Unknown conditions remain indeterminate.",
-        "parameters": [{"name":"snapshot","in":"query","required":true,"schema":{"type":"string","pattern":"^[0-9a-f]{64}$"}}],
+        "parameters": [
+          {
+            "name": "snapshot",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Scoped analysis, possibly INDETERMINATE, with findings, witnesses, limits, automatic_cleanup false and enforcement NOT_ATTEMPTED.",
-            "content": {"application/json":{"schema":{"type":"object","required":["version","status","snapshot_id","findings","automatic_cleanup","enforcement"],"properties":{"version":{"type":"string","enum":["policy-audit-v1"]},"status":{"type":"string","enum":["INDETERMINATE","COMPLETE_FOR_SUPPORTED_SUBSET"]},"automatic_cleanup":{"type":"boolean","enum":[false]},"enforcement":{"type":"string","enum":["NOT_ATTEMPTED"]}},"additionalProperties":true}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "version",
+                    "status",
+                    "snapshot_id",
+                    "findings",
+                    "automatic_cleanup",
+                    "enforcement"
+                  ],
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "enum": [
+                        "policy-audit-v1"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "INDETERMINATE",
+                        "COMPLETE_FOR_SUPPORTED_SUBSET"
+                      ]
+                    },
+                    "automatic_cleanup": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "enforcement": {
+                      "type": "string",
+                      "enum": [
+                        "NOT_ATTEMPTED"
+                      ]
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            }
           },
-          "400": {"description":"Invalid/repeated/unknown parameters, invalid model/integrity or exceeded audit budget"},
-          "404": {"description":"Unknown snapshot"},
-          "503": {"description":"Policy store unavailable"}
+          "400": {
+            "description": "Invalid/repeated/unknown parameters, invalid model/integrity or exceeded audit budget"
+          },
+          "404": {
+            "description": "Unknown snapshot"
+          },
+          "503": {
+            "description": "Policy store unavailable"
+          }
         }
       }
     },
@@ -408,6 +466,144 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/policy/impact": {
+      "get": {
+        "summary": "Compare effective modeled access and logging",
+        "description": "Same-context normalized snapshots; supported IPv4/IPv6 TCP/UDP/ICMP/ICMPv6 domain only. Up to 200 rules per model, 4096 regions and 250000 symbolic work units. Access, explicit logging and rule attribution compared independently. Unknown/default logging and unsupported predicates remain explicit; native equivalence/reachability NOT_EVALUATED and enforcement NOT_ATTEMPTED. Counts describe symbolic regions, not traffic. Display cap does not skip analysis; witnesses_by_kind remains available.",
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed offline model assessment, which may be INDETERMINATE. No stored snapshot or firewall mutation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid/unknown/repeated parameters, unsupported operation, context mismatch, invalid model or exceeded budget"
+          },
+          "404": {
+            "description": "Unknown snapshot"
+          },
+          "503": {
+            "description": "Policy store unavailable"
+          }
+        }
+      }
+    },
+    "/policy/preview": {
+      "get": {
+        "summary": "Preview a hypothetical rule change without applying it",
+        "description": "GET performs one in-memory disable_rule, remove_rule or move_rule_before against the exact selected model. before_rule is required only for moves and rejected for other operations. Returns an offline review receipt/candidate with candidate_is_observed false and automatic_apply false. Nothing is imported, written to the store or applied to a firewall. Known equivalence is scoped to the supported header model. CLI propose can write a private receipt; HTTP does not.",
+        "parameters": [
+          {
+            "name": "snapshot",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "operation",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "disable_rule",
+                "remove_rule",
+                "move_rule_before"
+              ]
+            }
+          },
+          {
+            "name": "rule",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before_rule",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Completed offline model assessment, which may be INDETERMINATE. No stored snapshot or firewall mutation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid/unknown/repeated parameters, unsupported operation, context mismatch, invalid model or exceeded budget"
+          },
+          "404": {
+            "description": "Unknown snapshot"
+          },
+          "503": {
+            "description": "Policy store unavailable"
           }
         }
       }

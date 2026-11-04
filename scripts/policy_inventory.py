@@ -2,12 +2,13 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sqlite3
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Controller"))
-from firewall_policy import FORMAT, PolicyEvaluator, canonical_bytes, diff_policies, query, read_input, sha256
+from firewall_policy import FORMAT, MAX_INPUT_BYTES, PolicyEvaluator, canonical_bytes, diff_policies, parse_json, query, read_input, sha256
 from policy_store import PolicyStore
 
 
@@ -42,6 +43,20 @@ def main():
     audit = commands.add_parser("audit")
     audit.add_argument("--store", type=Path, required=True)
     audit.add_argument("--snapshot", required=True)
+    impact = commands.add_parser("impact")
+    impact.add_argument("--store", type=Path, required=True)
+    impact.add_argument("--before", required=True)
+    impact.add_argument("--after", required=True)
+    impact.add_argument("--limit", type=int, default=100)
+    propose = commands.add_parser("propose")
+    propose.add_argument("--store", type=Path, required=True)
+    propose.add_argument("--snapshot", required=True)
+    propose.add_argument("--request", type=Path, required=True)
+    propose.add_argument("--output", type=Path, help="New private receipt file; no overwrite or firewall write")
+    propose.add_argument("--limit", type=int, default=100)
+    verify = commands.add_parser("verify-proposal")
+    verify.add_argument("--store", type=Path, required=True)
+    verify.add_argument("--input", type=Path, required=True)
     serve = commands.add_parser("serve")
     serve.add_argument("--store", type=Path, required=True)
     serve.add_argument("--port", type=int, default=8082)
@@ -80,11 +95,34 @@ def main():
                 elif args.command == "audit":
                     from policy_audit import audit_policy
                     result = dict(audit_policy(store.get_snapshot(args.snapshot)), snapshot_id=args.snapshot)
+                elif args.command == "impact":
+                    from policy_change import impact
+                    result = impact(store.get_snapshot(args.before), store.get_snapshot(args.after), args.limit)
+                elif args.command == "propose":
+                    from policy_change import proposal
+                    with args.request.open("rb") as request_file:
+                        request = parse_json(request_file.read(MAX_INPUT_BYTES + 1))
+                    result = proposal(store.get_snapshot(args.snapshot), request, args.limit)
+                elif args.command == "verify-proposal":
+                    from policy_change import verify_proposal
+                    with args.input.open("rb") as receipt_file:
+                        receipt = parse_json(receipt_file.read(MAX_INPUT_BYTES + 1))
+                    result = verify_proposal(store.get_snapshot(receipt["base_snapshot"]), receipt)
                 else:
                     point = query(args.source, args.destination, args.protocol, args.destination_port, args.source_port)
                     result = dict(PolicyEvaluator(store.get_snapshot(args.snapshot)).search(point, args.limit, args.include_disabled),
                                   snapshot_id=args.snapshot)
-        print(json.dumps(result, indent=2, allow_nan=False))
+        rendered = json.dumps(result, indent=2, allow_nan=False)
+        if args.command == "propose":
+            if len((rendered + "\n").encode("utf-8")) > MAX_INPUT_BYTES:
+                raise ValueError("Proposal receipt exceeds the 8 MiB verification input cap")
+        if args.command == "propose" and args.output:
+            fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as output:
+                output.write(rendered + "\n")
+                output.flush()
+                os.fsync(output.fileno())
+        print(rendered)
         return 0
     except (OSError, ValueError, TypeError, KeyError, sqlite3.Error) as error:
         parser.exit(1, f"Policy operation failed: {error}\n")

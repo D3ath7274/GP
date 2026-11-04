@@ -36,6 +36,7 @@
           "security/shadow-policy",
           "integrations/snort",
           "architecture/detection",
+          "architecture/feature-rationale",
           "developers/maintenance",
           "deployment/passive-sensor",
           "deployment/nftables-lab",
@@ -46,6 +47,8 @@
           "deployment/pretest-qualification",
           "deployment/security-campaigns",
           "deployment/policy-audit",
+          "deployment/offline-policy-changes",
+          "developers/policy-change-code-tour",
           "developers/qualification-code-tour",
           "developers/policy-workbench-code-tour"
         ]
