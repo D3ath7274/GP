@@ -1,5 +1,9 @@
 # Validation
 
+## Ubuntu qualification diagnostics · 2026-11-04
+
+Remote run 41857432819 passed docs-sync, including the source-mapped feature catalog, but offline-qualification failed during unittest discovery/execution. Its failure cause was not available through the check's original generic exit annotation. The workflow now uses the same unittest discovery/runner and emits escaped per-failure tracebacks as check annotations while preserving failure exit status. This is diagnostic instrumentation; it does not mark the failed Ubuntu suite as passed or change collection behavior.
+
 ## Offline policy changes and source-mapped feature rationale · 2026-11-04
 
 The local full regression run passed all 108 tests in 25.769 seconds on Windows/Python 3.15.2. Eleven new policy-change tests include an independent finite-space matcher across 35 seeded six-rule before/after cases, concrete expansion/restriction witnesses, logging and attribution, IPv6/source ports, unknown/disabled/global predicates, context/budget errors, display truncation, stale requests and receipt tampering. CLI and HTTP operations preserved stored database bytes. A newly generated receipt verified against the final engine fingerprint; exclusive output creation refused replacement. The eleven policy-change tests passed again after including the output newline in the receipt-size cap. This is bounded operator-model evidence, not native firewall equivalence or a live change test.

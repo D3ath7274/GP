@@ -2,6 +2,10 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-04 · Diagnose Ubuntu qualification failures
+
+The first Ubuntu 22.04/Python 3.10 offline job failed at the unit suite while the remote documentation/source-catalog guard passed. Added escaped unittest failure tracebacks to GitHub check annotations, preserving the failing exit status and normal test output. This makes target-environment failures diagnosable when job-log access is unavailable. Synthetic fixture data only is eligible for these public annotations; no runtime, network configuration or detector behavior changes. Actual failure diagnosis and the subsequent job outcome remain pending at this diagnostic change.
+
 ## 2026-11-04 · Offline change impact and source-mapped feature rationale
 
 Added [counterfactual policy changes](/deployment/offline-policy-changes): bounded effective-header partition comparison, access/logging/attribution witnesses, conservative unknown envelopes, exact-base hypothetical disable/remove/reorder requests and hash/replay-verifiable offline receipts. CLI impact/propose/verify-proposal and GET /policy/impact /policy/preview share read-only store/no-firewall authority. Preview candidates are explicitly unobserved and require review; default/unknown logging, native profiles/routes/NAT/state and live enforcement remain unqualified. Concrete counterexamples disprove access equivalence even when other regions remain unknown. S34/S54 advance only to partial E9 foundations. The new [code tour](/developers/policy-change-code-tour) explains the algorithms and authority boundaries.
