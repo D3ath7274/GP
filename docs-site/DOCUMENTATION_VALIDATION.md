@@ -1,5 +1,9 @@
 # Validation
 
+## Python 3.10 empty-query compatibility · 2026-11-04
+
+Remote run 41858261375 passed docs-sync and docs-build, but identified one failing HTTP test: the workbench root returned 400 on Ubuntu 22.04/Python 3.10. Source review confirmed that Python 3.10's strict parse_qs raises on empty input. The handler now bypasses parsing only for absent/empty queries, preserving strict nonempty-query validation. The existing HTTP test additionally checks trailing-question-mark routes and malformed fields. All twenty workbench tests passed locally after the fix. Target verification must come from the subsequent Ubuntu job; this record does not reinterpret the failed run as a pass.
+
 ## Ubuntu qualification diagnostics · 2026-11-04
 
 Remote run 41857432819 passed docs-sync, including the source-mapped feature catalog, but offline-qualification failed during unittest discovery/execution. Its failure cause was not available through the check's original generic exit annotation. The workflow now uses the same unittest discovery/runner and emits escaped per-failure tracebacks as check annotations while preserving failure exit status. This is diagnostic instrumentation; it does not mark the failed Ubuntu suite as passed or change collection behavior.

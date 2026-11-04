@@ -3,6 +3,8 @@ title: "Policy workbench: code and rationale"
 description: "Read the P7 slice by source line, understand its invariants and distinguish essential checks from implementation choices."
 ---
 
+The handler treats an absent/empty query as an empty parameter map before strict parsing. Python 3.10's [query parser](https://github.com/python/cpython/blob/3.10/Lib/urllib/parse.py) rejects the empty input in strict mode, causing otherwise valid no-parameter routes to return HTTP 400. Nonempty input still uses strict parsing and the same field/duplicate/size limits. This compatibility fix changes no policy decision or write authority.
+
 This session builds a testable subset of P7 for S13–S17 and S44. The [runbook](/deployment/policy-workbench) gives commands; this page explains the source. Source line references below identify the implementation in this milestone. Comments, imports and neighboring assignments sometimes share an explanation because they establish one invariant. Update references when editing these files.
 
 No particular Python spelling, database product or UI layout is universally mandatory. The mandatory properties are preserving modeled semantics, exposing uncertainty, maintaining provenance, avoiding partial imports and preventing this read-only path from changing a firewall. SQLite, the small HTTP server and JSON are implementation choices that make those properties reviewable on a thin client.

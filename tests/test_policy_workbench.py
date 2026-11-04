@@ -259,7 +259,7 @@ class PolicyStoreTests(unittest.TestCase):
                 with urlopen(origin + "/") as response:
                     self.assertIn(b'Read-only policy workbench', response.read())
                     self.assertIn("nosniff", response.headers.get("X-Content-Type-Options"))
-                for route in ("/policy/status", "/policy/snapshots", "/policy/snapshots/" + identifier):
+                for route in ("/policy/status", "/policy/status?", "/policy/snapshots", "/policy/snapshots?", "/policy/snapshots/" + identifier):
                     with urlopen(origin + route) as response:
                         self.assertIsInstance(json.load(response), dict)
                 parameters = dict(snapshot=identifier, **point())
@@ -269,7 +269,9 @@ class PolicyStoreTests(unittest.TestCase):
                 for request, status in ((Request(origin + "/policy/snapshots", data=b'{}'), 501),
                                         (origin + "/policy/search?source=x&source=y", 400),
                                         (origin + "/policy/snapshots/" + "0" * 64, 404),
-                                        (origin + "/policy/status?unexpected=true", 400)):
+                                        (origin + "/policy/status?unexpected=true", 400),
+                                        (origin + "/policy/status?unexpected", 400),
+                                        (origin + "/policy/status?&&", 400)):
                     with self.assertRaises(HTTPError) as error:
                         urlopen(request)
                     self.assertEqual(error.exception.code, status)

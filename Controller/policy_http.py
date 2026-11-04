@@ -114,7 +114,7 @@ class PolicyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             target = urlsplit(self.path)
-            parameters = parse_qs(target.query, keep_blank_values=True, strict_parsing=True, max_num_fields=16)
+            parameters = parse_qs(target.query, keep_blank_values=True, strict_parsing=True, max_num_fields=16) if target.query else {}
             if target.path == "/":
                 _arguments(parameters, ())
                 self.respond(200, "text/html; charset=utf-8", PAGE)

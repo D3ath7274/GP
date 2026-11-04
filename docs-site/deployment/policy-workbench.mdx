@@ -3,6 +3,8 @@ title: "Test the read-only policy workbench"
 description: "Exercise the first P7 slice without a firewall, then prepare a qualified vendor export."
 ---
 
+Python 3.10 compatibility: an absent or empty URL query is treated as no parameters. Nonempty queries remain strictly parsed, with unknown/repeated/malformed fields rejected. Restart the viewer after pulling the fix if its landing page previously returned HTTP 400 on Ubuntu 22.04.
+
 The [first deterministic audit](/deployment/policy-audit) is now available through the audit CLI, GET /policy/audit and the viewer button. It adds bounded duplicate/shadow/redundant/partial-overlap findings with witnesses plus model-scoped object/metadata review. It retains this guide's operator-description and read-only limitations. Restart an existing viewer after pulling new Python code.
 
 [Offline change analysis](/deployment/offline-policy-changes) now adds effective before/after access/logging/attribution comparison, in-memory rule disable/remove/reorder previews and exact-base review receipts with deterministic replay verification. CLI impact/propose/verify-proposal and GET /policy/impact /policy/preview retain read-only store/no-firewall authority. Preview candidates are explicitly hypothetical and are not imported automatically. The source/method rationale is in [the new code tour](/developers/policy-change-code-tour). These tools can be tested while the actual H188A observation path remains unresolved.
