@@ -2,6 +2,10 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-06 · Rationale and alternatives for each feature field
+
+Expanded the [feature measurement reference](/architecture/feature-methods) with individual entries for 102 legacy and 71 site-v3 columns. Each entry documents current behavior, purpose, recommended calculation, an alternative with its trade-off, advantages and a verification check. Operators can now distinguish fields with the same name across schemas and inspect limitations such as key-pinned destination-port concentration, pooled reverse counts and capture-dependent parser support. G18–G24 have separate planned measurement candidates. The [group comparison](/architecture/feature-group-comparison) links to the detailed entries. This documentation work preserves the existing source schemas, measurement inventory and scoring behavior. Coverage and build checks are recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-05 · Comparative feature-group presentation
 
 Added a [comparative note and editable presentation](/architecture/feature-group-comparison) covering every G1–G24 group plus device, network, quality, label and policy context. Each group compares two simpler alternatives, explains where it adds evidence, and states benign lookalikes and current limits. Detailed speaker notes retain implementation references and primary sources. The 35-slide deck distinguishes design rationale from measured detection advantage and preserves G18–G24 as planned. Find it under Develop → Understand the design, with a downloadable PowerPoint file.

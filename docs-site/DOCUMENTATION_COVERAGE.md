@@ -55,4 +55,4 @@ The site groups pages into Start here, Collect data, Audit firewalls, Develop an
 | Feature-method research source | Site page |
 | --- | --- |
 | behavioral_evidence.py, score_feature_groups.py and test_behavioral_evidence.py | Feature measurement methods and research; Inspect feature-group evidence offline; Feature-group evidence: code and rationale |
-| feature-methods.json, G1/G6 site assignment and check_feature_catalog.validate_methods | Feature measurement methods and research; Why each behavioral feature group exists; Develop and verify changes |
+| feature-methods.json, legacy/site-v3 column semantics and check_feature_catalog.validate_methods | Feature measurement methods and research, with field-by-field rationale, alternatives, advantages, limits and verification; Why each behavioral feature group exists; Develop and verify changes |

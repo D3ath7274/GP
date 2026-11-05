@@ -1,15 +1,17 @@
 ---
 title: "Feature measurement methods and research"
-description: "Per-feature formulas, primary-source methods, current limits and the path from measurements to group evidence."
+description: "Current behavior, rationale, alternatives, advantages, limitations and checks for every feature field."
 ---
 
-Research review: **2026-11-05**. This is an APF engineering synthesis of primary standards, official analyzer documentation and research papers, not a ranking established by experiments on your home network. “Preferred” means the method worth testing under the stated assumptions. No method makes a finite feature set universally distinguish attacks from benign behavior.
+Primary-source research reviewed **2026-11-05**. Source-level feature comparisons expanded **2026-11-06**. This is an APF engineering synthesis of primary standards, official analyzer documentation and research papers, not a ranking established by experiments on your home network. “Preferred” means the method worth testing under the stated assumptions. No method makes a finite feature set universally distinguish attacks from benign behavior.
 
 ## What has been implemented in this milestone
 
 The [offline group-evidence tool](/deployment/feature-evidence) now fits frozen per-device/VLAN references, separately calibrates group maxima, reports the contributing measurements and retains insufficient-evidence outcomes. It does not change packet extraction, feature values/order, shipped RF/AE artifacts, online adaptation or firewall writes. Site inter-arrival mean/SD/CV are now cataloged under G1 and site size SD under G6, correcting their scientific grouping without changing either CSV schema.
 
-The JSON companion reference/feature-methods.json covers every **102 legacy plus 71 site** column occurrence, with group, units, recommended computation, current limitation and source IDs. Recommendations requiring new state/parsers remain future work. G18–G24 stay planned.
+The field-by-field reference covers **102 legacy columns and 71 site-v3 columns**. Find a field under its group to see what the code exports, why the field exists, the recommended method, an alternative with its trade-off, and a concrete validation check. Shared names are documented separately for each schema because observation scope, defaults and units can differ. The machine-readable `reference/feature-methods.json` retains the measurement inventory and source IDs.
+
+**Read the current behavior first.** Legacy observations come from `Controller/traffic_capture.py`. Site measurements and provenance come from `Controller/site_features.py` and `Controller/home_sensor.py`. The recommended method may require new parser support, state or a versioned schema. For rates and ratios, check exposure, sample support and capture direction before interpreting a zero. Audit and label fields support traceability and independent evaluation. The comparison describes the expected value of each technique under stated conditions, with validation needed to establish detection benefit.
 
 ## The method-selection rule
 
@@ -30,9 +32,11 @@ The +1 rank/tie convention follows [conformal outlier research](https://doi.org/
 
 For example, G1's current site mean, SD and CV may all change during one workload shift. That is one rhythm finding with supporting values. With low mean/SD support, a clock-resolution problem or a legitimate newly periodic sensor, the correct result can be insufficient evidence or an unusual-but-benign finding. Confirm attack mechanisms using G11/service outcomes, signatures or independent application evidence before claiming malicious behavior.
 
-## Per-group and per-feature recommendations
+## Per-feature rationale and alternatives
 
-Each table row names an actual current column. Formulas below are recommended measurement contracts, not a claim that every legacy proxy already implements the recommendation. Compare the stated current limits with source and the [existing rationale](/architecture/feature-rationale). Reference-source tables summarize shared requirements; thresholds and model choices still need matched benign controls and ablation.
+Each entry is keyed by schema and column name. The group introduction provides the shared observation limits and sources. Within each entry, the current behavior describes the shipped field, and the recommended method gives its preferred measurement contract. Compare the [group-level rationale](/architecture/feature-rationale) and [original proposed measurements](/architecture/feature-lineage) for the design history. G18–G24 list candidate measurements for future qualification.
+
+PPS means packets per second. SD is standard deviation, CV is the coefficient of variation, EWMA is an exponentially weighted moving average, and MAD is median absolute deviation. Each field uses the observation scope stated in its current behavior.
 
 ## G1: Timing and burst rhythm
 
@@ -42,18 +46,95 @@ Each table row names an actual current column. Formulas below are recommended me
 
 Primary basis: [Pébay, numerically stable one-pass moments](https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/), [NIST coefficient of variation](https://itl.nist.gov/div898/software/dataplot/refman2/auxillar/coefvari.htm), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/), [Kitsune, NDSS 2018](https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_03A-3_Mirsky_paper.pdf).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `inter_arrival_mean` | seconds | Mean of consecutive event-time gaps in a declared direction/key; retain interval count and timestamp resolution. |
-| legacy / `inter_arrival_std` | seconds | Sample SD of consecutive event-time gaps using stable online moments; at least two valid intervals. |
-| legacy / `inter_arrival_cv` | dimensionless | Sample SD / positive mean of gaps; report interval count, ties/reorders and timestamp resolution. |
-| legacy / `inter_arrival_min` | seconds | Minimum genuine adjacent event-time gap; distinguish quantized timestamps and duplicate observations. |
-| legacy / `inter_arrival_max` | seconds | Maximum adjacent gap, with idle/window censoring recorded rather than invented connection termination. |
-| legacy / `burst_count` | episodes | Count disjoint over-threshold subwindow episodes using a threshold frozen from reference data; qualify timescale. |
-| legacy / `burst_duration_avg` | seconds, new contract | Mean duration of defined episodes; legacy emits milliseconds and needs an explicit versioned conversion. |
-| site_v3 / `inter_arrival_mean` | seconds | Mean of consecutive event-time gaps in a declared direction/key; retain interval count and timestamp resolution. |
-| site_v3 / `inter_arrival_std` | seconds | Sample SD of consecutive event-time gaps using stable online moments; at least two valid intervals. |
-| site_v3 / `inter_arrival_cv` | dimensionless | Sample SD / positive mean of gaps; report interval count, ties/reorders and timestamp resolution. |
+### legacy / `inter_arrival_mean`
+
+- **Current behavior.** Averages adjacent gaps after sorting retained flow timestamps. Above 2,000 observations, the legacy calculation samples timestamps first.
+- **Rationale.** Expresses typical observed cadence between packets.
+- **Recommended method.** Mean of consecutive event-time gaps in a declared direction/key. Retain interval count and timestamp resolution. **Unit or type.** seconds.
+- **Alternative and trade-off.** A window PPS value expresses volume over an exposure period and can hide quiet time at either edge.
+- **Advantage.** Seconds are easy to interpret and an exact adjacent-gap mean needs only a running sum and count.
+- **Limitation and verification.** A few long pauses shift the mean. Compare steady and clustered traffic with equal counts, then check the sampling boundary against exact gaps.
+
+### legacy / `inter_arrival_std`
+
+- **Current behavior.** Computes sample SD on the same retained gaps and emits zero with fewer than two gaps.
+- **Rationale.** Captures how widely packet intervals vary around their mean.
+- **Recommended method.** Sample SD of consecutive event-time gaps using stable online moments. At least two valid intervals. **Unit or type.** seconds.
+- **Alternative and trade-off.** Min-to-max range uses two observations and can overstate one scheduling pause.
+- **Advantage.** Uses every eligible gap and admits a stable running calculation.
+- **Limitation and verification.** Outliers and subsampling can inflate dispersion. Test repeated gaps plus one long pause and distinguish sparse support from zero variation.
+
+### legacy / `inter_arrival_cv`
+
+- **Current behavior.** Divides legacy gap SD by a positive gap mean, with zero fallback.
+- **Rationale.** Compares relative jitter across flows with different typical spacings.
+- **Recommended method.** Sample SD / positive mean of gaps. Report interval count, ties/reorders and timestamp resolution. **Unit or type.** dimensionless.
+- **Alternative and trade-off.** Absolute SD gives meaningful seconds but makes the same proportional jitter look larger on slower traffic.
+- **Advantage.** Uniform time rescaling preserves CV.
+- **Limitation and verification.** Clock ties, sparse samples and near-zero means destabilize interpretation. Compare regular IoT telemetry with jittered probes at matched rates.
+
+### legacy / `inter_arrival_min`
+
+- **Current behavior.** Takes the shortest gap between retained sorted timestamps.
+- **Rationale.** Identifies the closest observed packet pair and helps investigate brief pressure.
+- **Recommended method.** Minimum genuine adjacent event-time gap. Distinguish quantized timestamps and duplicate observations. **Unit or type.** seconds.
+- **Alternative and trade-off.** Average PPS spreads a microburst over a longer interval. A low percentile is more stable when enough genuine gaps exist.
+- **Advantage.** An extreme requires only one running minimum and can expose rare clustering.
+- **Limitation and verification.** Timestamp ties, duplicate copies and timestamp sampling distort the minimum. Compare identical packet streams with controlled clock resolution and duplication.
+
+### legacy / `inter_arrival_max`
+
+- **Current behavior.** Takes the longest gap between retained timestamps within the flow window.
+- **Rationale.** Highlights an observed idle break between episodes.
+- **Recommended method.** Maximum adjacent gap, with idle/window censoring recorded rather than invented connection termination. **Unit or type.** seconds.
+- **Alternative and trade-off.** Mean gap dilutes a single long pause. An idle-timeout counter answers whether a predefined boundary was crossed.
+- **Advantage.** Preserves the magnitude of the largest observed pause for diagnosis.
+- **Limitation and verification.** Window edges censor silence and sampling can create artificial gaps. Test the same pause on both sides of a window boundary.
+
+### legacy / `burst_count`
+
+- **Current behavior.** Counts contiguous positive gaps whose reciprocal exceeds three times the flow PPS.
+- **Rationale.** Separates repeated short bursts from a single sustained period of traffic.
+- **Recommended method.** Count disjoint over-threshold subwindow episodes using a threshold frozen from reference data. Qualify timescale. **Unit or type.** episodes.
+- **Alternative and trade-off.** Peak PPS records one maximum and loses episode repetition.
+- **Advantage.** Gives an interpretable count of activity episodes in a compact value.
+- **Limitation and verification.** The threshold adapts to the current flow, so steady floods can have few bursts. Test pacing, timestamp ties and benign buffered sends against fixed subwindow thresholds.
+
+### legacy / `burst_duration_avg`
+
+- **Current behavior.** Averages detected episode lengths and exports milliseconds.
+- **Rationale.** Distinguishes brief spikes from longer busy periods at comparable burst counts.
+- **Recommended method.** Mean duration of defined episodes. Legacy emits milliseconds and needs an explicit versioned conversion. **Unit or type.** seconds, new contract.
+- **Alternative and trade-off.** Total burst time combines episode frequency and persistence. An episode-duration percentile needs more support.
+- **Advantage.** Gives a simple per-episode estimate and complements burst count.
+- **Limitation and verification.** A mean hides the longest event and flushes can split episodes. Check a known two-episode trace and preserve the legacy unit when reproducing results.
+
+### site_v3 / `inter_arrival_mean`
+
+- **Current behavior.** Averages eligible outgoing gaps within each IP and VLAN window using online moments. Reordered timestamps increment a health counter and skip that gap.
+- **Rationale.** Describes the usual spacing seen from a device across its outgoing traffic.
+- **Recommended method.** Mean of consecutive event-time gaps in a declared direction/key. Retain interval count and timestamp resolution. **Unit or type.** seconds.
+- **Alternative and trade-off.** Fixed-window PPS counts exposure and includes idle edges.
+- **Advantage.** Keeps constant-size state and can distinguish identical window rates with different active spans.
+- **Limitation and verification.** Mixed applications and timestamp reordering affect the estimate. Replay known event times and check gap count, reorder handling and missing single-packet values.
+
+### site_v3 / `inter_arrival_std`
+
+- **Current behavior.** Computes sample SD for eligible outgoing gaps. The field is empty with fewer than two gaps.
+- **Rationale.** Detects rhythm variation at the device boundary.
+- **Recommended method.** Sample SD of consecutive event-time gaps using stable online moments. At least two valid intervals. **Unit or type.** seconds.
+- **Alternative and trade-off.** Raw gap histograms preserve multimodality but require bins and more state.
+- **Advantage.** Captures dispersion in seconds with stable one-pass moments.
+- **Limitation and verification.** Mixes peer and application rhythms and is sensitive to long gaps. Compare one stream with a mix of two benign streams under the same rate.
+
+### site_v3 / `inter_arrival_cv`
+
+- **Current behavior.** Divides the outgoing gap SD by its mean when both are available and the mean is nonzero.
+- **Rationale.** Compares relative regularity across device activity levels.
+- **Recommended method.** Sample SD / positive mean of gaps. Report interval count, ties/reorders and timestamp resolution. **Unit or type.** dimensionless.
+- **Alternative and trade-off.** A fixed jitter cutoff in milliseconds applies different proportional tolerances to fast and slow devices.
+- **Advantage.** Helps separate rate from relative variation with three compact timing summaries.
+- **Limitation and verification.** Periodic benign traffic can score like scripted traffic. Check minimum support, clock resolution and peer context before interpreting a low value.
 
 ## G2: Directionality and asymmetry
 
@@ -63,15 +144,68 @@ Primary basis: [Pébay, numerically stable one-pass moments](https://www.sandia.
 
 Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `fwd_packet_count` | packets | Count originator packets in an identity/context-bound canonical bidirectional session or declared device window. |
-| legacy / `bwd_packet_count` | packets | Count matched responder packets for that same canonical session/context; report observation coverage. |
-| legacy / `fwd_bwd_packet_ratio` | dimensionless | Forward / reverse packet count with explicit denominator and undefined/no-reply state; smoothing must be declared. |
-| legacy / `fwd_bwd_bytes_ratio` | dimensionless | Forward / reverse bytes at the same layer; preserve zero-denominator state and optional declared log-ratio. |
-| legacy / `fwd_avg_packet_size` | captured bytes | Forward captured bytes / forward packets; null with no forward support. |
-| legacy / `bwd_avg_packet_size` | captured bytes | Reverse captured bytes / reverse packets; null with no reverse support. |
-| legacy / `reply_rate` | fraction or named packet ratio | Use matched request-response successes / eligible requests for true responsiveness; raw reverse/forward counts are a different metric. |
+### legacy / `fwd_packet_count`
+
+- **Current behavior.** Counts packets in the source-to-destination flow key.
+- **Rationale.** Measures the exposure behind ratios and the volume sent in that key.
+- **Recommended method.** Count originator packets in an identity/context-bound canonical bidirectional session or declared device window. **Unit or type.** packets.
+- **Alternative and trade-off.** Forward bytes can be dominated by a few large transfers and miss small packet pressure.
+- **Advantage.** Direct count is cheap and preserves support for flag and size summaries.
+- **Limitation and verification.** The key can combine sessions with different source ports. Check multi-session aggregation and repeat captures at one observation point.
+
+### legacy / `bwd_packet_count`
+
+- **Current behavior.** In v2, sums reverse IP-pair and protocol packets across destination ports. The v1 compatibility path emits zero.
+- **Rationale.** Supplies responder activity for interpreting one-way pressure.
+- **Recommended method.** Count matched responder packets for that same canonical session/context. Report observation coverage. **Unit or type.** packets.
+- **Alternative and trade-off.** A matched biflow counter offers accurate session attribution at the cost of bidirectional state.
+- **Advantage.** The pooled counter is inexpensive and can show broad pair activity.
+- **Limitation and verification.** Unrelated sessions can contribute replies and asymmetric visibility can suppress them. Test two simultaneous sessions with one unanswered.
+
+### legacy / `fwd_bwd_packet_ratio`
+
+- **Current behavior.** Divides forward key packets by pooled reverse packets plus one.
+- **Rationale.** Summarizes directional packet imbalance.
+- **Recommended method.** Forward / reverse packet count with explicit denominator and undefined/no-reply state. Smoothing must be declared. **Unit or type.** dimensionless.
+- **Alternative and trade-off.** A raw subtraction grows with volume and makes small and large flows hard to compare.
+- **Advantage.** Compact relative measure with a defined legacy value at zero reverse support.
+- **Limitation and verification.** Smoothing alters sparse values and combines different scopes. Test an upload, a download and loss of the reverse feed using matched session totals as a comparator.
+
+### legacy / `fwd_bwd_bytes_ratio`
+
+- **Current behavior.** Divides forward key bytes by pooled reverse bytes plus one.
+- **Rationale.** Reveals byte imbalance even when packet counts are similar.
+- **Recommended method.** Forward / reverse bytes at the same layer. Preserve zero-denominator state and optional declared log-ratio. **Unit or type.** dimensionless.
+- **Alternative and trade-off.** A packet ratio misses the difference between short ACKs and large data frames.
+- **Advantage.** Separates directional volume from directional packet frequency.
+- **Limitation and verification.** Backups and large transfers can look extreme, and a denominator of one byte exaggerates absent replies. Check the byte layer and both directions before scoring.
+
+### legacy / `fwd_avg_packet_size`
+
+- **Current behavior.** Divides forward captured bytes by forward packet count.
+- **Rationale.** Describes how a sender packages traffic under the forward key.
+- **Recommended method.** Forward captured bytes / forward packets. Null with no forward support. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Maximum size can be dominated by a single large frame.
+- **Advantage.** A cheap average helps distinguish many small sends from fewer large frames.
+- **Limitation and verification.** Different mixtures can share the same mean. Compare equal means with different distributions and keep packet-size SD as a companion.
+
+### legacy / `bwd_avg_packet_size`
+
+- **Current behavior.** Averages pooled reverse frame sizes with a zero fallback for absent reverse packets.
+- **Rationale.** Helps distinguish short reverse control traffic from larger reply traffic.
+- **Recommended method.** Reverse captured bytes / reverse packets. Null with no reverse support. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** A reverse byte total cannot separate response size from response frequency.
+- **Advantage.** Adds reply shape with just byte and packet totals.
+- **Limitation and verification.** Pooling can blend unrelated responses, and zero also occurs when the reverse path is unseen. Validate separately with reply-only and no-visibility cases.
+
+### legacy / `reply_rate`
+
+- **Current behavior.** Uses reverse packets divided by forward packets over the same IP pair and protocol in v2. V1 emits zero.
+- **Rationale.** Provides a quick clue about whether a peer is sending traffic back.
+- **Recommended method.** Use matched request-response successes / eligible requests for true responsiveness. Raw reverse/forward counts are a different metric. **Unit or type.** fraction or named packet ratio.
+- **Alternative and trade-off.** Matched protocol requests and outcomes give a bounded response fraction and require parsers or connection tracking.
+- **Advantage.** Cheap pair-level context works for exploratory comparisons when both directions are visible.
+- **Limitation and verification.** Several replies per request and unrelated flows can make the ratio exceed one. Test a response with several packets and a simultaneous unrelated reply.
 
 ## G3: TCP lifecycle proxies
 
@@ -81,12 +215,41 @@ Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/r
 
 Primary basis: [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `syn_ack_ratio` | dimensionless | Separate initial SYN attempts from retransmissions; compare eligible handshakes with matching SYN-ACK/ACK progression. |
-| legacy / `completed_sessions` | sessions | Count sequence-consistent established sessions in a bounded persistent five-tuple state machine, not a window-level Boolean. |
-| legacy / `incomplete_ratio` | fraction | Uncompleted eligible attempts / eligible attempts after an explicit timeout; distinguish pending, censored and unobserved. |
-| legacy / `avg_session_duration` | seconds | Mean actual completed-session lifetime by declared start/end criteria; unfinished sessions are censored. |
+### legacy / `syn_ack_ratio`
+
+- **Current behavior.** Divides SYN-bearing packet count by ACK-bearing count plus one.
+- **Rationale.** Highlights SYN-heavy traffic relative to packets carrying ACK.
+- **Recommended method.** Separate initial SYN attempts from retransmissions. Compare eligible handshakes with matching SYN-ACK/ACK progression. **Unit or type.** dimensionless.
+- **Alternative and trade-off.** SYN counts alone conflate busy legitimate connection starts with activity lacking ACK progress.
+- **Advantage.** Simple flag counts work without retaining sequence state.
+- **Limitation and verification.** SYN-ACK packets can increment both counts and established data ACKs dilute the ratio. Check with matched handshakes, retransmissions and concurrent transfers.
+
+### legacy / `completed_sessions`
+
+- **Current behavior.** Emits a Boolean using a forward SYN and ACK plus pooled reverse SYN and ACK evidence.
+- **Rationale.** Marks a window with flag activity consistent with a handshake.
+- **Recommended method.** Count sequence-consistent established sessions in a bounded persistent five-tuple state machine, not a window-level Boolean. **Unit or type.** sessions.
+- **Alternative and trade-off.** A sequence-aware session state machine counts actual establishments and needs more memory, expiry rules and bidirectional coverage.
+- **Advantage.** Useful as cheap legacy context around SYN-heavy observations.
+- **Limitation and verification.** Different sessions and packets can satisfy the conditions jointly. Verify a true handshake and a counterexample with unrelated reverse flags.
+
+### legacy / `incomplete_ratio`
+
+- **Current behavior.** Compares a single possible attempt indicator to the completion Boolean, dividing by attempts plus one.
+- **Rationale.** Exposes a window where SYN activity lacks the legacy completion pattern.
+- **Recommended method.** Uncompleted eligible attempts / eligible attempts after an explicit timeout. Distinguish pending, censored and unobserved. **Unit or type.** fraction.
+- **Alternative and trade-off.** Counting total SYNs loses any completion evidence. Matched timed-out attempts support a real failure fraction.
+- **Advantage.** Bounded legacy proxy is easy to reproduce from flags.
+- **Limitation and verification.** One unmatched SYN and many unanswered SYNs can both emit 0.5. Evaluate partial capture and handshakes spanning flushes against a session oracle.
+
+### legacy / `avg_session_duration`
+
+- **Current behavior.** Emits the current key span when the completion proxy fires and zero otherwise.
+- **Rationale.** Supplies the observed span around handshake-like activity.
+- **Recommended method.** Mean actual completed-session lifetime by declared start/end criteria. Unfinished sessions are censored. **Unit or type.** seconds.
+- **Alternative and trade-off.** Time from SYN to FIN or RST measures tracked session lifetime and needs persistent lifecycle state.
+- **Advantage.** Available without retaining connections after the window.
+- **Limitation and verification.** A long session can span windows, and one key can mix sessions. Test a known session crossing several flushes and keep observed span separate from lifetime.
 
 ## G4: Distribution entropy
 
@@ -96,11 +259,32 @@ Primary basis: [RFC 9293 TCP state and sequence semantics](https://www.rfc-edito
 
 Primary basis: [Lakhina/Crovella/Diot feature-distribution research](https://cs-pub.bu.edu/faculty/crovella/anomalies.html), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `payload_size_entropy` | bits | Shannon entropy of the declared length categories; captured-frame size and payload length must have different names/contracts. |
-| legacy / `src_port_entropy` | bits | Shannon entropy of source-port frequencies at a source/context/horizon scope; report sample count and category richness. |
-| legacy / `icmp_type_entropy` | bits | Shannon entropy of observed ICMP family/type/code categories; separate IPv4/IPv6 and diagnostic traffic. |
+### legacy / `payload_size_entropy`
+
+- **Current behavior.** Computes Shannon entropy of observed captured-frame lengths.
+- **Rationale.** Separates a size distribution dominated by one length from an even mixture.
+- **Recommended method.** Shannon entropy of the declared length categories. Captured-frame size and payload length must have different names/contracts. **Unit or type.** bits.
+- **Alternative and trade-off.** Unique-length count misses the difference between one rare length and a balanced distribution.
+- **Advantage.** Captures frequency structure across any number of size categories.
+- **Limitation and verification.** The field name says payload even though it uses frame length. Small samples and offloads alter entropy. Compare equal-richness traces with skewed and even counts.
+
+### legacy / `src_port_entropy`
+
+- **Current behavior.** Computes Shannon entropy over nonzero source-port observations in the legacy key.
+- **Rationale.** Measures how traffic is distributed across observed sender ports.
+- **Recommended method.** Shannon entropy of source-port frequencies at a source/context/horizon scope. Report sample count and category richness. **Unit or type.** bits.
+- **Alternative and trade-off.** Distinct-port count records richness but ignores repeated use.
+- **Advantage.** Invariant under one-to-one renaming of ports, making concentration measurable without numeric distances.
+- **Limitation and verification.** NAT and legitimate concurrent clients can produce high entropy. Report packet support and compare repeated reuse with broad source-port churn.
+
+### legacy / `icmp_type_entropy`
+
+- **Current behavior.** Computes entropy of retained ICMP type counts for the source on ICMP rows. Other rows emit zero.
+- **Rationale.** Describes diversity of diagnostic and control message types.
+- **Recommended method.** Shannon entropy of observed ICMP family/type/code categories. Separate IPv4/IPv6 and diagnostic traffic. **Unit or type.** bits.
+- **Alternative and trade-off.** ICMP PPS cannot distinguish concentrated echo traffic from mixed observed types at the same rate.
+- **Advantage.** Compact source-level context for interpreting ICMP volume.
+- **Limitation and verification.** A legitimate ping run can also concentrate on one type. Compare echo-only and mixed diagnostic traffic with packet count and family held explicit.
 
 ## G5: ARP binding behavior
 
@@ -110,15 +294,68 @@ Primary basis: [Lakhina/Crovella/Diot feature-distribution research](https://cs-
 
 Primary basis: [RFC 5227 legitimate IPv4 probes and announcements](https://datatracker.ietf.org/doc/rfc5227/), [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `arp_reply_rate` | messages/second | Observed ARP replies / actual elapsed observation interval; retain count and packet loss context. |
-| legacy / `arp_request_rate` | messages/second | Observed ARP requests / actual elapsed interval; classify legitimate probes/announcements separately. |
-| legacy / `arp_reply_request_ratio` | dimensionless | Replies / requests with explicit zero state; exact request/reply correlation is preferable for unsolicited claims. |
-| legacy / `arp_gratuitous_count` | messages | Count defined ARP announcement forms without equating legitimate announcements with poisoning. |
-| legacy / `arp_unsolicited_count` | messages | Time-correlate replies with outstanding requests and verified binding evidence; record expired/missing request visibility. |
-| legacy / `mac_ip_binding_changes` | binding events | Count changes against time-valid MAC-to-IP sets/leases, allowing legitimate multi-address ownership. |
-| legacy / `ip_mac_binding_changes` | binding events | Count conflicting IP-to-MAC claims against verified leases/ports/time; separate DHCP reuse/failover. |
+### legacy / `arp_reply_rate`
+
+- **Current behavior.** Divides the window reply count for the source MAC by the current ARP key's active span.
+- **Rationale.** Highlights repeated address-binding advertisements.
+- **Recommended method.** Observed ARP replies / actual elapsed observation interval. Retain count and packet loss context. **Unit or type.** messages/second.
+- **Alternative and trade-off.** All-ARP PPS combines address requests and replies, obscuring which operation is driving activity.
+- **Advantage.** Direct opcode and MAC attribution is cheap at a Layer 2 sensor.
+- **Limitation and verification.** The numerator and denominator have different scopes, inflating short rows. Compare known requests and replies over a common measured MAC window.
+
+### legacy / `arp_request_rate`
+
+- **Current behavior.** Divides the window request count for the source MAC by the current ARP key's active span.
+- **Rationale.** Exposes address-resolution pressure from discovery or unresolved hosts.
+- **Recommended method.** Observed ARP requests / actual elapsed interval. Classify legitimate probes/announcements separately. **Unit or type.** messages/second.
+- **Alternative and trade-off.** Reply rate cannot show failed lookups. Distinct targets can distinguish exploration from retries but discard intensity.
+- **Advantage.** Counts retry pressure even when only one target is queried.
+- **Limitation and verification.** Boot, cache expiry and failed links are benign causes. Test repeated requests to one host and a sweep at equal count with real window exposure.
+
+### legacy / `arp_reply_request_ratio`
+
+- **Current behavior.** Divides per-MAC reply count by its request count plus one.
+- **Rationale.** Describes whether an observed MAC mostly responds or mostly resolves addresses.
+- **Recommended method.** Replies / requests with explicit zero state. Exact request/reply correlation is preferable for unsolicited claims. **Unit or type.** dimensionless.
+- **Alternative and trade-off.** Raw reply count lacks request context. A request-reply join answers whether individual replies were solicited.
+- **Advantage.** A compact role imbalance summary uses cheap counters.
+- **Limitation and verification.** A busy gateway can legitimately reply often, and a MAC's outgoing requests are different transactions. Compare stable gateways and forged claims with trusted binding evidence.
+
+### legacy / `arp_gratuitous_count`
+
+- **Current behavior.** Counts ARP packets whose sender and target protocol addresses are equal.
+- **Rationale.** Highlights repeated self-announcement activity worth correlating with bindings.
+- **Recommended method.** Count defined ARP announcement forms without equating legitimate announcements with poisoning. **Unit or type.** messages.
+- **Alternative and trade-off.** All ARP reply counts mix routine resolution with announcements, and announcements can use request opcode.
+- **Advantage.** Simple field equality covers a useful subset without transaction state.
+- **Limitation and verification.** Failover and address initialization also announce mappings. Check opcode and binding changes in a legitimate failover fixture.
+
+### legacy / `arp_unsolicited_count`
+
+- **Current behavior.** Counts this MAC's replies with no matching claimed IP in window request targets or a conflict with the stored DAI binding.
+- **Rationale.** Gives more specific evidence of unusual replies than total ARP volume.
+- **Recommended method.** Time-correlate replies with outstanding requests and verified binding evidence. Record expired/missing request visibility. **Unit or type.** messages.
+- **Alternative and trade-off.** A rate threshold misses slow poisoning. A time-valid requester/target join with trusted lease evidence offers stronger attribution.
+- **Advantage.** Combines visible request context and binding conflicts using retained window state.
+- **Limitation and verification.** Requests can occur outside the window or on an unseen path. Compare authorized announcements, pre-window requests and a verified conflicting claim.
+
+### legacy / `mac_ip_binding_changes`
+
+- **Current behavior.** Counts distinct ARP sender IP claims for a MAC since history began, minus one with a zero floor.
+- **Rationale.** Highlights a sender presenting multiple address claims across windows.
+- **Recommended method.** Count changes against time-valid MAC-to-IP sets/leases, allowing legitimate multi-address ownership. **Unit or type.** binding events.
+- **Alternative and trade-off.** A single-window count loses slow changes. A time-valid lease set distinguishes authorized simultaneous addresses.
+- **Advantage.** Historical richness preserves evidence after a short event ends.
+- **Limitation and verification.** It counts distinct values rather than transitions. Aliases, routers and DHCP renewal can raise it. Check the lifetime scope against lease history.
+
+### legacy / `ip_mac_binding_changes`
+
+- **Current behavior.** Counts distinct ARP MAC claims for the row source IP in retained history, minus one with a zero floor.
+- **Rationale.** Exposes competing claimants for an address that should have one current owner.
+- **Recommended method.** Count conflicting IP-to-MAC claims against verified leases/ports/time. Separate DHCP reuse/failover. **Unit or type.** binding events.
+- **Alternative and trade-off.** MAC-to-IP richness cannot identify which IP has conflicting claimants. A verified lease/port join can distinguish reassignment.
+- **Advantage.** Maintains a simple signal across quiet spoofing attempts.
+- **Limitation and verification.** DHCP reuse and failover add legitimate claimants. Compare historical richness with simultaneous conflict under timed leases.
 
 ## G6: Packet-size distribution
 
@@ -128,13 +365,50 @@ Primary basis: [RFC 5227 legitimate IPv4 probes and announcements](https://datat
 
 Primary basis: [Pébay, numerically stable one-pass moments](https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `pkt_size_std` | captured bytes | Sample SD of explicitly defined captured sizes using online moments; keep n and compare protocol/role context. |
-| legacy / `pkt_size_variance` | captured bytes squared | Sample variance M2/(n-1); ablate against SD because the two encode the same scalar information. |
-| legacy / `small_pkt_ratio` | fraction | Count sizes below a declared byte boundary / observed packets; boundary and encapsulation are part of the schema. |
-| legacy / `large_pkt_ratio` | fraction | Count sizes above a declared boundary / observed packets; qualify MTU/offload effects and sample support. |
-| site_v3 / `packet_size_std` | captured bytes | Online sample SD of outgoing sizes, null below two observations. |
+### legacy / `pkt_size_std`
+
+- **Current behavior.** Computes sample SD of captured sizes in the flow, with zero below two samples.
+- **Rationale.** Distinguishes consistent frames from a mixture of small control frames and larger data frames.
+- **Recommended method.** Sample SD of explicitly defined captured sizes using online moments. Keep n and compare protocol/role context. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Min-max range discards all interior sizes. A quantile spread is less sensitive to rare extremes but needs an estimator or more samples.
+- **Advantage.** Uses all samples and retains byte units.
+- **Limitation and verification.** Encapsulation and offload affect sizes. Compare equal-mean streams, then test whether the result survives an observation-point change.
+
+### legacy / `pkt_size_variance`
+
+- **Current behavior.** Computes sample variance of the same sizes, with zero below two samples.
+- **Rationale.** Provides squared spread for reproducing the legacy schema and comparing variance-based calculations.
+- **Recommended method.** Sample variance M2/(n-1). Ablate against SD because the two encode the same scalar information. **Unit or type.** captured bytes squared.
+- **Alternative and trade-off.** SD is easier to read in bytes and preserves the same ordering.
+- **Advantage.** Supports direct variance decomposition and compatibility with stored columns.
+- **Limitation and verification.** Duplicates SD apart from rounding. Ablate one column before claiming extra detection value.
+
+### legacy / `small_pkt_ratio`
+
+- **Current behavior.** Counts frames below 64 captured bytes and divides by flow packets.
+- **Rationale.** Measures the prevalence of short frames under the legacy capture definition.
+- **Recommended method.** Count sizes below a declared byte boundary / observed packets. Boundary and encapsulation are part of the schema. **Unit or type.** fraction.
+- **Alternative and trade-off.** Mean size can hide a large share of short packets mixed with data. Flag-based checks are more specific for TCP.
+- **Advantage.** Interpretable share without a histogram or payload inspection.
+- **Limitation and verification.** Padding, encapsulation and snap length move frames across the boundary. Test 63, 64 and 65 bytes and compare benign short control traffic.
+
+### legacy / `large_pkt_ratio`
+
+- **Current behavior.** Counts frames above 1,000 captured bytes and divides by flow packets.
+- **Rationale.** Adds the proportion of large frames to explain payload-heavy transfers.
+- **Recommended method.** Count sizes above a declared boundary / observed packets. Qualify MTU/offload effects and sample support. **Unit or type.** fraction.
+- **Alternative and trade-off.** A maximum reports a single large frame even when the rest are small.
+- **Advantage.** Distinguishes a sustained large-frame workload from isolated outliers.
+- **Limitation and verification.** Bulk transfers and video are benign controls. Confirm 1,000-byte boundary behavior and compare captures with different MTU or offload.
+
+### site_v3 / `packet_size_std`
+
+- **Current behavior.** Computes outgoing captured-frame sample SD with online moments and leaves the value empty below two frames.
+- **Rationale.** Describes frame-size variation across a device window.
+- **Recommended method.** Online sample SD of outgoing sizes, null below two observations. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Size entropy adds categorical frequency structure but needs more per-window state.
+- **Advantage.** Stable constant-state summary that needs no payload retention.
+- **Limitation and verification.** Mixed applications, offloads and uncommon large frames affect SD. Test a constant-size window and a two-size window with hand-calculated sample SD.
 
 ## G7: Port-use structure
 
@@ -144,14 +418,61 @@ Primary basis: [Pébay, numerically stable one-pass moments](https://www.sandia.
 
 Primary basis: [MITRE ATT&CK network service discovery](https://attack.mitre.org/techniques/T1046/), [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `top_dst_port` | categorical identifier | Mode destination-port category; use service semantics/categorical encoding, not numeric distance. |
-| legacy / `top_dst_port_ratio` | fraction | Packets to the modal destination port / eligible transport packets at a declared source/horizon scope. |
-| legacy / `dst_port_std` | port-number units, heuristic | Prefer categorical concentration/entropy and service classes; integer port-number SD is only a legacy heuristic. |
-| legacy / `well_known_port_ratio` | fraction | Eligible contacts or packets to ports 0–1023 / corresponding eligible total; state which weighting is used. |
-| legacy / `ephemeral_port_ratio` | fraction | Eligible contacts or packets to ports 49152–65535 inclusive / eligible total; qualify OS-specific client behavior. |
-| legacy / `sequential_port_score` | fraction | Compute adjacency from actual arrival-ordered probes for an order metric; sorted-set density must remain separately named. |
+Port ranges and registration semantics are defined by IANA. [RFC 6335](https://www.rfc-editor.org/rfc/rfc6335.html).
+
+### legacy / `top_dst_port`
+
+- **Current behavior.** Reports the single nonzero destination port pinned by the flow key, or zero when absent.
+- **Rationale.** Identifies the service port represented by the row.
+- **Recommended method.** Mode destination-port category. Use service semantics/categorical encoding, not numeric distance. **Unit or type.** categorical identifier.
+- **Alternative and trade-off.** A source-wide modal port would describe dominance across contacts but needs source-wide frequency state.
+- **Advantage.** The current category is cheap and useful for explaining the key.
+- **Limitation and verification.** It duplicates destination-port information on supported rows. Treat port as a category and test whether removing it affects held-out service performance.
+
+### legacy / `top_dst_port_ratio`
+
+- **Current behavior.** Emits one when the key has a nonzero destination port and zero otherwise.
+- **Rationale.** Preserves a legacy field intended to describe destination-port concentration.
+- **Recommended method.** Packets to the modal destination port / eligible transport packets at a declared source/horizon scope. **Unit or type.** fraction.
+- **Alternative and trade-off.** A host-wide modal-port share can separate a sweep from a focused flood, while the key-pinned value cannot separate them.
+- **Advantage.** Existing values help reproduce historic schema-dependent evaluations.
+- **Limitation and verification.** Little independent concentration evidence remains in this implementation. Compare one-port and multi-port fixtures at source scope before choosing a replacement.
+
+### legacy / `dst_port_std`
+
+- **Current behavior.** Uses sample SD of distinct sorted destination port numbers, with v2 source-wide support and zero when fewer than two ports exist.
+- **Rationale.** Describes numeric spacing of explored ports in the legacy schema.
+- **Recommended method.** Prefer categorical concentration/entropy and service classes. Integer port-number SD is only a legacy heuristic. **Unit or type.** port-number units, heuristic.
+- **Alternative and trade-off.** Entropy or service classes preserve categorical concentration without relying on port numbering.
+- **Advantage.** Can help describe the range of a particular sequential scan pattern.
+- **Limitation and verification.** Equal-size sweeps over different numerical ranges can get different values. Test relabeled ports and compare against cardinality and concentration.
+
+### legacy / `well_known_port_ratio`
+
+- **Current behavior.** Reports the share of distinct nonzero ports below 1024 in the chosen scope.
+- **Rationale.** Adds context about exploration of system-port ranges.
+- **Recommended method.** Eligible contacts or packets to ports 0–1023 / corresponding eligible total. State which weighting is used. **Unit or type.** fraction.
+- **Alternative and trade-off.** A single port or raw numeric mean loses the fraction of explored services in that range.
+- **Advantage.** Cheap categorical summary that is insensitive to repeated packets per selected port.
+- **Limitation and verification.** A port number is only a service hint. Compare authorized administration, alternate service ports and sweeps, using packet weighting only as a separate metric.
+
+### legacy / `ephemeral_port_ratio`
+
+- **Current behavior.** Reports the share of distinct observed ports strictly above 49152.
+- **Rationale.** Describes how much exploration falls in the high dynamic range.
+- **Recommended method.** Eligible contacts or packets to ports 49152–65535 inclusive / eligible total. Qualify OS-specific client behavior. **Unit or type.** fraction.
+- **Alternative and trade-off.** Port dispersion cannot explain whether the spread is mostly high ports. OS-specific service classification requires site context.
+- **Advantage.** Compact and easy to audit against the selected port set.
+- **Limitation and verification.** The legacy cutoff excludes 49152 and real local allocation policies vary. Test both boundary ports and legitimate client-facing high ports.
+
+### legacy / `sequential_port_score`
+
+- **Current behavior.** Divides adjacent sorted unique port pairs within distance two by the total adjacent pairs.
+- **Rationale.** Quantifies whether observed destination ports are densely spaced.
+- **Recommended method.** Compute adjacency from actual arrival-ordered probes for an order metric. Sorted-set density must remain separately named. **Unit or type.** fraction.
+- **Alternative and trade-off.** Arrival-order adjacency addresses scan order and requires preserving probe times. Unique count cannot describe spacing.
+- **Advantage.** The set-based score is stable under a permutation of packet arrival order.
+- **Limitation and verification.** A randomized scan over a dense port set still scores highly. Compare ordered and shuffled probes over identical port sets.
 
 ## G8: Broadcast and multicast context
 
@@ -161,12 +482,41 @@ Primary basis: [MITRE ATT&CK network service discovery](https://attack.mitre.org
 
 Primary basis: [RFC 5227 legitimate IPv4 probes and announcements](https://datatracker.ietf.org/doc/rfc5227/), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `is_broadcast_dst` | indicator | Ethernet destination broadcast indicator, with VLAN/scope and IP broadcast interpretation explicitly distinguished. |
-| legacy / `broadcast_ratio` | fraction | Broadcast frames / all frames at the identical observation boundary and horizon. |
-| legacy / `multicast_ratio` | fraction | Multicast frames / all observed frames; distinguish multicast from Ethernet broadcast in the implementation. |
-| legacy / `arp_broadcast_ratio` | fraction | Broadcast ARP messages / observed ARP messages; retain support and legitimate address-resolution controls. |
+### legacy / `is_broadcast_dst`
+
+- **Current behavior.** Flags selected IPv4 destinations or the retained Ethernet broadcast MAC in v2. V1 has IP-based fallback only.
+- **Rationale.** Identifies traffic needing local discovery or broadcast context.
+- **Recommended method.** Ethernet destination broadcast indicator, with VLAN/scope and IP broadcast interpretation explicitly distinguished. **Unit or type.** indicator.
+- **Alternative and trade-off.** A site-wide ratio cannot identify which row represents a broadcast destination.
+- **Advantage.** Low-cost context from visible addressing.
+- **Limitation and verification.** The IP helper also treats 0.0.0.0 as broadcast, and a retained MAC can hide mixed observations. Check link-layer broadcast versus IPv4 limited and directed broadcast cases.
+
+### legacy / `broadcast_ratio`
+
+- **Current behavior.** Divides broadcast-classified packet count by all accepted network-window observations.
+- **Rationale.** Shows when shared segment activity drives apparent network volume.
+- **Recommended method.** Broadcast frames / all frames at the identical observation boundary and horizon. **Unit or type.** fraction.
+- **Alternative and trade-off.** Broadcast count alone rises with total load. A rate threshold treats discovery and unicast pressure the same.
+- **Advantage.** Provides comparable shares across windows with different packet counts.
+- **Limitation and verification.** High shares can come from legitimate discovery or harmful loops. Validate classification, capture duplication and denominator support with mixed traffic.
+
+### legacy / `multicast_ratio`
+
+- **Current behavior.** Divides packets classified by the IPv4 multicast range by total network observations.
+- **Rationale.** Describes group-delivery activity such as discovery and multicast distribution.
+- **Recommended method.** Multicast frames / all observed frames. Distinguish multicast from Ethernet broadcast in the implementation. **Unit or type.** fraction.
+- **Alternative and trade-off.** Folding broadcast and multicast into one counter obscures their different traffic roles.
+- **Advantage.** Cheap network-level context from destination addressing.
+- **Limitation and verification.** The classifier covers IPv4 and visibility depends on membership and placement. Test ordinary discovery and a quiet segment without assuming absent observations mean absent multicast.
+
+### legacy / `arp_broadcast_ratio`
+
+- **Current behavior.** Divides broadcast-classified ARP observations by all observed ARP.
+- **Rationale.** Explains whether address resolution is mostly shared or individually delivered.
+- **Recommended method.** Broadcast ARP messages / observed ARP messages. Retain support and legitimate address-resolution controls. **Unit or type.** fraction.
+- **Alternative and trade-off.** Broadcast share over all traffic can bury a change inside the ARP subset.
+- **Advantage.** A protocol-specific denominator makes unusual mix changes visible at low overall ARP volume.
+- **Limitation and verification.** One ARP frame can produce an extreme ratio. Require counts and compare address initialization with sustained repeated announcements.
 
 ## G9: Flow creation pressure
 
@@ -176,9 +526,14 @@ Primary basis: [RFC 5227 legitimate IPv4 probes and announcements](https://datat
 
 Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html), [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `flows_per_window` | new keys/window | Count new canonical connection/flow keys with LRU/time bounds; separate new arrivals from active entries and sessions. |
+### legacy / `flows_per_window`
+
+- **Current behavior.** Counts distinct source keys of source IP, destination IP, destination port and protocol in the window.
+- **Rationale.** Separates breadth of communication from packet volume for a sender.
+- **Recommended method.** Count new canonical connection/flow keys with LRU/time bounds. Separate new arrivals from active entries and sessions. **Unit or type.** new keys/window.
+- **Alternative and trade-off.** PPS misses key churn. Switch occupancy and new session metrics need switch or connection telemetry.
+- **Advantage.** A cheap proxy for discovery or flow-key pressure in the observed window.
+- **Limitation and verification.** Active keys can recur in later windows and several sessions share one key. Test repeated connections to one service versus equal packets to many services.
 
 ## G10: Audit metadata and provenance
 
@@ -188,29 +543,194 @@ Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/r
 
 Primary basis: [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `meta_window_id` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `meta_src_mac_oui` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `meta_device_name` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `meta_attack_tool` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `meta_attack_intensity` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `meta_mininet_event` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `meta_controller_load` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `meta_backlog_drops` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `schema_version` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `run_id` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `window_start_utc` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `window_end_utc` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `window_seconds` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `device_ip` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `vlan` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `ground_truth` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `metadata_enabled` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `content_enabled` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `history_restarted` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `cardinality_overflows_total` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| site_v3 / `window_complete` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+### legacy / `meta_window_id`
+
+- **Current behavior.** Exports the collector's window counter with each flow row.
+- **Rationale.** Groups rows that share counters, capture conditions and possible train/test leakage.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** A wall-clock timestamp alone can collide or jump. A run UUID plus window sequence better distinguishes restarts.
+- **Advantage.** Easy grouping for replay and validation without inferring window membership from row times.
+- **Limitation and verification.** It is process-local audit context and can encode experiment order. Check uniqueness within a run and split evaluation by independent campaign.
+
+### legacy / `meta_src_mac_oui`
+
+- **Current behavior.** Copies the first eight characters of the learned source MAC when available.
+- **Rationale.** Helps diagnose which observed link-layer identities contribute rows.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Full MAC retention adds sensitive detail. Verified inventory is stronger for assigning role or manufacturer.
+- **Advantage.** Compact audit hint for troubleshooting device grouping.
+- **Limitation and verification.** Randomized, locally administered and spoofed prefixes can mislead. Check masked MAC examples and keep prefix out of portable prediction inputs.
+
+### legacy / `meta_device_name`
+
+- **Current behavior.** Reads the source IP's discovered name from controller state, with an unknown fallback.
+- **Rationale.** Makes collection traces easier to reconcile with testbed device records.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** An IP alone is difficult to read and can be reassigned. Stable pseudonymous inventory IDs improve joins.
+- **Advantage.** Human-readable names simplify review of device coverage.
+- **Limitation and verification.** Names can identify specific devices and leak campaign roles. Validate stale and missing registrations and use redacted audit exports.
+
+### legacy / `meta_attack_tool`
+
+- **Current behavior.** Records the operator-supplied tool value associated with the current attack metadata.
+- **Rationale.** Lets an evaluator check whether a feature generalizes across traffic generators.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Inferring the tool from a detector prediction creates circular evaluation. Independent runner receipts improve timing and attribution.
+- **Advantage.** Useful for tool-held-out splits and experiment reproduction.
+- **Limitation and verification.** Metadata applies to rows beyond the actual attack traffic. Verify time and source using an independent scenario record and exclude the value from prediction.
+
+### legacy / `meta_attack_intensity`
+
+- **Current behavior.** Records the operator-supplied intensity or scenario value.
+- **Rationale.** Helps compare planned workloads at different configured attack pressures.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Packet counters measure observed load, while the configured value records the experimental setting. Both are needed to assess loss.
+- **Advantage.** Preserves run intent when the sensor undercounts actual traffic.
+- **Limitation and verification.** The tag may be free text or differ from delivered load. Compare it with generator and target measurements and reserve it for analysis.
+
+### legacy / `meta_mininet_event`
+
+- **Current behavior.** Carries the operator-set emulation event marker.
+- **Rationale.** Separates diagnostic activity and topology changes during interpretation of measurements.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Inferring a diagnostic event from broadcast rate alone confuses known operations with incidents.
+- **Advantage.** A simple provenance marker improves reproducibility of benign controls.
+- **Limitation and verification.** A stale marker can span unrelated activity and tie a model to the emulator. Compare event times with the run manifest and exclude the column from inputs.
+
+### legacy / `meta_controller_load`
+
+- **Current behavior.** Reports elapsed milliseconds from flush start when the row is built.
+- **Rationale.** Helps identify late or expensive flushes that distort observation and response timing.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Process CPU percentage answers resource use over a sampling period, while flush elapsed time describes a particular pipeline stage.
+- **Advantage.** Low overhead and easy to associate with the row.
+- **Limitation and verification.** Includes preceding processing and can vary by row position. Check it against monotonic stage timing and host CPU metrics before interpreting load.
+
+### legacy / `meta_backlog_drops`
+
+- **Current behavior.** Copies the collector backlog-drop counter taken and reset at the window snapshot.
+- **Rationale.** Flags a capture path where downstream features may omit observations.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Counting captured rows cannot reveal drops before those rows are formed. Independent NIC and capture statistics cover other loss points.
+- **Advantage.** Locates known collector loss without retaining packet contents.
+- **Limitation and verification.** The count is shared across rows and covers one loss point. Verify overload with independent send/receive counts and avoid summing duplicate row copies.
+
+### site_v3 / `schema_version`
+
+- **Current behavior.** Writes the collector schema identifier with each row.
+- **Rationale.** Ensures offline analysis uses the matching field definitions and units.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Inferring version from the CSV filename or column count can accept incompatible semantics. A full contract hash further identifies the exact specification.
+- **Advantage.** Enables explicit compatibility checks before interpreting values.
+- **Limitation and verification.** The identifier alone cannot detect modified code with the same version. Check the run manifest and contract hash alongside the header.
+
+### site_v3 / `run_id`
+
+- **Current behavior.** Repeats the run identifier used to pair feature files with policy evidence.
+- **Rationale.** Links data, run provenance and checkpoints under one observation campaign.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Calendar dates can contain multiple starts. A run ID keeps their rows distinct.
+- **Advantage.** Supports unambiguous joins and grouped analysis without parsing filenames alone.
+- **Limitation and verification.** One run can still contain several workloads or a resumed process. Check paired records and independently defined fit/calibration/test boundaries.
+
+### site_v3 / `window_start_utc`
+
+- **Current behavior.** Exports the UTC form of the event-time bucket start.
+- **Rationale.** Assigns measurements to an explicit time interval and supports joins with external evidence.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** File write time varies with buffering and processing latency.
+- **Advantage.** Makes time joins reproducible across timezones.
+- **Limitation and verification.** Sensor clock error and replay time remain relevant. Check boundary placement and clock offset against known packet times.
+
+### site_v3 / `window_end_utc`
+
+- **Current behavior.** Exports the UTC end of the recorded window, including a shortened final flush when applicable.
+- **Rationale.** Makes observation bounds explicit for joins, duration checks and partial-window review.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Adding five seconds to every start assumes every row spans a full window.
+- **Advantage.** Preserves actual collector boundaries for offline audits.
+- **Limitation and verification.** Equal-looking endpoints across sensors can still reflect clock skew. Compare first/last partial and full windows against the packet fixture.
+
+### site_v3 / `window_seconds`
+
+- **Current behavior.** Exports the positive recorded end-minus-start duration with a small floor.
+- **Rationale.** Supplies the exposure behind site rate fields.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Dividing by first-to-last packet time overweights short bursts and singletons for window-rate comparisons.
+- **Advantage.** Explicit denominator makes rates reproducible and partial exposure visible.
+- **Limitation and verification.** A full duration can contain capture gaps. Check declared seconds and packet-loss counters independently.
+
+### site_v3 / `device_ip`
+
+- **Current behavior.** Exports the scoped IP from the IP/VLAN observation key.
+- **Rationale.** Groups a device's observations within the collection boundary.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** A MAC alone is hop-local and can change or represent a router. Verified inventory and lease timing strengthen identity.
+- **Advantage.** Straightforward joins with scoped captures and local inventory.
+- **Limitation and verification.** NAT and address reuse can merge unrelated devices. Verify a reassignment case before using IP-based history or responding to a finding.
+
+### site_v3 / `vlan`
+
+- **Current behavior.** Exports the observed Ethernet VLAN stack, or the untagged marker.
+- **Rationale.** Separates repeated address spaces and policy context at the capture point.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** IP-only grouping merges equal addresses in different segments.
+- **Advantage.** Provides a compact scope qualifier for histories and evidence joins.
+- **Limitation and verification.** Mirroring or NIC processing may remove tags, and untagged traffic can belong to a configured access VLAN. Validate tagged, stacked and untagged fixtures against placement.
+
+### site_v3 / `ground_truth`
+
+- **Current behavior.** Exports UNKNOWN for collected site rows.
+- **Rationale.** Distinguishes raw observation from reviewed benign or attack evidence.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** A detector verdict or absence of an alert is circular as training or test truth. Independent scenario and target records can support adjudication.
+- **Advantage.** Keeps ordinary collection usable while preserving label uncertainty.
+- **Limitation and verification.** UNKNOWN reduces labeled sample availability. Verify independent reviewer and time/source provenance before assigning a class in a separate analysis.
+
+### site_v3 / `metadata_enabled`
+
+- **Current behavior.** Exports whether optional DNS and TLS metadata parsing was enabled.
+- **Rationale.** Explains why those measurement families can be empty or zero.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Inferring parser state from zero counts confuses disabled inspection with quiet traffic.
+- **Advantage.** Cheap audit field for separating configurations during analysis.
+- **Limitation and verification.** An enabled parser can still see encrypted, fragmented or unsupported messages. Check enabled/disabled runs and parser counters with known packets.
+
+### site_v3 / `content_enabled`
+
+- **Current behavior.** Exports whether optional HTTP lexical parsing was enabled.
+- **Rationale.** Identifies the collection policy behind HTTP feature availability.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Raw content retention would provide more reanalysis options with substantial privacy and storage costs.
+- **Advantage.** Configuration provenance supports privacy review without storing request contents in this field.
+- **Limitation and verification.** Enabled mode still has protocol and single-packet limits. Verify a supported request and an encrypted session under the same flag.
+
+### site_v3 / `history_restarted`
+
+- **Current behavior.** Flags rows within the first hour measured from the first event of the collector instance.
+- **Rationale.** Warns that long-horizon summaries may be in startup or recovery conditions.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Treating every row as fully warmed hides loss of reference exposure. Per-feature support and checkpoint receipts describe readiness more precisely.
+- **Advantage.** An inexpensive conservative startup marker.
+- **Limitation and verification.** It is an age heuristic even when some state was recovered. Test restart with and without a checkpoint and check retained support separately.
+
+### site_v3 / `cardinality_overflows_total`
+
+- **Current behavior.** Copies the cumulative bounded-set overflow counter at row construction.
+- **Rationale.** Identifies windows where distinct peers, names or other sets may be undercounted.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Unbounded sets increase memory use under fan-out. Sketches trade exact membership for quantified estimation error.
+- **Advantage.** Exposes saturation while keeping capture memory bounded.
+- **Limitation and verification.** The cumulative counter covers multiple sets and can change during row generation. Compare increments and per-group support with cap-stressing replay.
+
+### site_v3 / `window_complete`
+
+- **Current behavior.** Flags a normal five-second flush whose start is at or after the first observed event.
+- **Rationale.** Supports consistent exposure when fitting rate references.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Dropping the first and last CSV rows blindly can discard valid devices or keep partial windows.
+- **Advantage.** Keeps partial rows available for audit and makes eligibility explicit.
+- **Limitation and verification.** Complete boundaries do not quantify capture loss or one-sided visibility. Compare known startup/shutdown windows and verify packet coverage separately.
 
 ## G11: Reconnaissance evidence
 
@@ -220,17 +740,86 @@ Primary basis: [Arp et al., security ML evaluation pitfalls](https://www.usenix.
 
 Primary basis: [MITRE ATT&CK network service discovery](https://attack.mitre.org/techniques/T1046/), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html), [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| site_v3 / `g11_null_flag_count` | packets | Count eligible TCP flags exactly zero; correlate with exploration/responses and authorized scans. |
-| site_v3 / `g11_xmas_flag_count` | packets | Count TCP FIN+PSH+URG combinations under an explicit mask; malformed and partial capture are controls. |
-| site_v3 / `g11_fin_no_ack_count` | packets | Count FIN without ACK; distinguish session context and retransmissions before attributing reconnaissance. |
-| site_v3 / `g11_syn_count` | packets | Count SYN without ACK; a new-session attempt metric needs retransmission/tuple deduplication. |
-| site_v3 / `g11_rst_in_count` | packets | Count incoming resets; matched-probe outcomes require five-tuple/sequence correlation, currently absent. |
-| site_v3 / `g11_icmp_port_unreachable_in` | messages | Count IPv4 destination-port-unreachable observations; exact original-probe attribution and IPv6 handling need quoted-header parsing. |
-| site_v3 / `g11_dst_ip_count` | categories | Distinct outgoing peers per device/VLAN/window, with cap evidence and benign discovery controls. |
-| site_v3 / `g11_dst_port_count` | categories | Distinct outgoing destination ports at the same device/window scope, with cap evidence. |
-| site_v3 / `g11_service_edge_count` | categories | Distinct destination/protocol/port edges; distinguish host sweeps, vertical scans and ordinary application fan-out. |
+### site_v3 / `g11_null_flag_count`
+
+- **Current behavior.** Counts outgoing parsed TCP observations with flags equal to zero.
+- **Rationale.** Highlights uncommon flag shapes during reconnaissance review.
+- **Recommended method.** Count eligible TCP flags exactly zero. Correlate with exploration/responses and authorized scans. **Unit or type.** packets.
+- **Alternative and trade-off.** A SYN-only detector misses zero-flag probes. Sequence-aware state adds attribution and progression.
+- **Advantage.** A direct bit check is inexpensive and easy to verify.
+- **Limitation and verification.** Malformed captures and crafted benign test packets can match. Check the same flag vector with and without broad peer or service fan-out.
+
+### site_v3 / `g11_xmas_flag_count`
+
+- **Current behavior.** Counts outgoing TCP observations with FIN, PSH and URG all set. Additional flags can be present.
+- **Rationale.** Captures a recognizable flag combination used in probe families.
+- **Recommended method.** Count TCP FIN+PSH+URG combinations under an explicit mask. Malformed and partial capture are controls. **Unit or type.** packets.
+- **Alternative and trade-off.** Exact equality detects only the canonical mask. Masked counting covers variants and needs further context for specificity.
+- **Advantage.** Fast check that is independent of a scanner name.
+- **Limitation and verification.** Other flags and uncommon valid behavior can affect meaning. Test canonical and extra-bit cases with matched response context.
+
+### site_v3 / `g11_fin_no_ack_count`
+
+- **Current behavior.** Counts outgoing TCP packets with FIN set and ACK clear.
+- **Rationale.** Flags possible teardown-shaped probes without observed acknowledgment semantics in the packet.
+- **Recommended method.** Count FIN without ACK. Distinguish session context and retransmissions before attributing reconnaissance. **Unit or type.** packets.
+- **Alternative and trade-off.** A total FIN counter includes ordinary established teardown. Sequence tracking can distinguish orphan packets more precisely.
+- **Advantage.** A cheap subset useful alongside exploration breadth.
+- **Limitation and verification.** It neither establishes orphan state nor deduplicates retransmissions. Test teardown, crafted probes and capture beginning mid-session.
+
+### site_v3 / `g11_syn_count`
+
+- **Current behavior.** Counts outgoing SYN-without-ACK observations in the window.
+- **Rationale.** Measures attempted connection-start pressure.
+- **Recommended method.** Count SYN without ACK. A new-session attempt metric needs retransmission/tuple deduplication. **Unit or type.** packets.
+- **Alternative and trade-off.** All SYN counts include SYN-ACK responses. Unique session starts require tuple/sequence deduplication.
+- **Advantage.** Cheap and interpretable numerator for examining repeated initiation.
+- **Limitation and verification.** Retransmissions raise it and busy clients can be legitimate. Compare retransmitted attempts and many distinct attempts at the same count.
+
+### site_v3 / `g11_rst_in_count`
+
+- **Current behavior.** Counts incoming TCP observations carrying RST.
+- **Rationale.** Shows reset activity that can accompany closed-port probing or failing sessions.
+- **Recommended method.** Count incoming resets. Matched-probe outcomes require five-tuple/sequence correlation, currently absent. **Unit or type.** packets.
+- **Alternative and trade-off.** Outgoing probe counts omit responder behavior. Matched reset fractions provide stronger context when state is available.
+- **Advantage.** Adds an observable response class with minimal state.
+- **Limitation and verification.** Normal applications reset connections and pooled resets can be unrelated to probes. Verify an unrelated reset during an ongoing scan fixture.
+
+### site_v3 / `g11_icmp_port_unreachable_in`
+
+- **Current behavior.** Counts incoming decoded ICMP observations with type 3 and code 3, the IPv4 port-unreachable pattern.
+- **Rationale.** Adds rejection context relevant to UDP service exploration.
+- **Recommended method.** Count IPv4 destination-port-unreachable observations. Exact original-probe attribution and IPv6 handling need quoted-header parsing. **Unit or type.** messages.
+- **Alternative and trade-off.** Generic ICMP counts mix diagnostics with port errors. Quoted-header joins can attribute errors to original probes.
+- **Advantage.** Selective counter avoids payload storage.
+- **Limitation and verification.** Silent filtering and loss suppress these messages. Test closed and filtered services, and evaluate IPv6 attribution separately.
+
+### site_v3 / `g11_dst_ip_count`
+
+- **Current behavior.** Counts distinct outgoing peer IPs in a bounded set per device window.
+- **Rationale.** Measures horizontal exploration or normal application fan-out.
+- **Recommended method.** Distinct outgoing peers per device/VLAN/window, with cap evidence and benign discovery controls. **Unit or type.** categories.
+- **Alternative and trade-off.** Total packet volume cannot distinguish one repeated destination from many contacted peers.
+- **Advantage.** Richness is insensitive to repeats within the set and easy to explain.
+- **Limitation and verification.** Browsers and software deployment can have broad fan-out, and caps can undercount. Test equal-volume one-peer and many-peer windows with overflow evidence.
+
+### site_v3 / `g11_dst_port_count`
+
+- **Current behavior.** Counts distinct nonzero outgoing destination ports in the window.
+- **Rationale.** Measures breadth across service ports, including a possible vertical scan.
+- **Recommended method.** Distinct outgoing destination ports at the same device/window scope, with cap evidence. **Unit or type.** categories.
+- **Alternative and trade-off.** IP fan-out alone misses many ports on one host. A service-edge count retains the combination of peer and port.
+- **Advantage.** Compact, inexpensive breadth measure.
+- **Limitation and verification.** Proxy ports, service discovery and ordinary peer applications can raise it. Verify single-host breadth and compare against legitimate varied-port workloads.
+
+### site_v3 / `g11_service_edge_count`
+
+- **Current behavior.** Counts distinct outgoing combinations of peer IP, destination port and protocol, including the zero port marker.
+- **Rationale.** Captures exploration across services that separate IP and port totals can hide.
+- **Recommended method.** Distinct destination/protocol/port edges. Distinguish host sweeps, vertical scans and ordinary application fan-out. **Unit or type.** categories.
+- **Alternative and trade-off.** Summing peer and port cardinalities cannot recover how they pair. Full session tracking includes repeated attempts but needs more state.
+- **Advantage.** Preserves topology of observed contacts in a bounded set.
+- **Limitation and verification.** Different sequences can yield the same edge count. Compare a diagonal set of contacts with a full peer-by-port grid of equal marginals.
 
 ## G12: Header and evasion evidence
 
@@ -240,16 +829,77 @@ Primary basis: [MITRE ATT&CK network service discovery](https://attack.mitre.org
 
 Primary basis: [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| site_v3 / `g12_ttl_mean` | IP hop field units | Mean observed outgoing TTL/hop-limit; retain family/protocol/peer/context and actual header sample count. |
-| site_v3 / `g12_ttl_std` | IP hop field units | Sample SD of eligible outgoing TTL/hop-limit observations; not a distance from a known OS identity. |
-| site_v3 / `g12_ttl_residual` | IP hop field units | Current TTL mean minus prior baseline computed before update; declare EWMA decay and routing/OS-change controls. |
-| site_v3 / `g12_tcp_window_mean` | unscaled TCP window units | Mean raw advertised windows with TCP option context; negotiated scaling is required for effective receive-window bytes. |
-| site_v3 / `g12_tcp_window_std` | unscaled TCP window units | Sample SD of eligible raw advertised windows; retain counts/options and benign congestion/zero-window context. |
-| site_v3 / `g12_zero_window_count` | packets | Count eligible TCP advertisements equal to zero; normalize by TCP support only in a separately defined ratio. |
-| site_v3 / `g12_fragment_count` | packets | Count fragment observations per address family; overlap/evasion decisions need bounded reassembly/state. |
-| site_v3 / `g12_tiny_fragment_count` | packets, proxy | Define fragment payload/header size thresholds by family; current captured-frame-below-64 proxy is not semantic reassembly. |
+### site_v3 / `g12_ttl_mean`
+
+- **Current behavior.** Averages outgoing IPv4 TTL or IPv6 hop-limit values where decoded.
+- **Rationale.** Supplies a coarse header baseline for changes in routing or sender behavior.
+- **Recommended method.** Mean observed outgoing TTL/hop-limit. Retain family/protocol/peer/context and actual header sample count. **Unit or type.** IP hop field units.
+- **Alternative and trade-off.** A fixed OS fingerprint depends on a single presumed starting value and hop distance. Separate family/peer means can improve attribution.
+- **Advantage.** Online average is cheap and does not require storing headers.
+- **Limitation and verification.** Protocol mix and path changes shift the value. Test IPv4/IPv6 mixing and a legitimate routing change before attributing impersonation.
+
+### site_v3 / `g12_ttl_std`
+
+- **Current behavior.** Computes sample SD of eligible outgoing TTL or hop-limit observations.
+- **Rationale.** Shows whether header values became more heterogeneous in one window.
+- **Recommended method.** Sample SD of eligible outgoing TTL/hop-limit observations. Not a distance from a known OS identity. **Unit or type.** IP hop field units.
+- **Alternative and trade-off.** Mean TTL can stay steady despite a broader mixture. A histogram reveals modes but needs more state.
+- **Advantage.** Compact spread measure with null for fewer than two observations.
+- **Limitation and verification.** Several benign stacks or paths can produce dispersion. Compare equal means with different mixtures, and condition on family and peer where possible.
+
+### site_v3 / `g12_ttl_residual`
+
+- **Current behavior.** Subtracts the stored prior TTL mean from the current mean, then updates history with weights 0.9 and 0.1.
+- **Rationale.** Detects a change relative to the device's previous observations.
+- **Recommended method.** Current TTL mean minus prior baseline computed before update. Declare EWMA decay and routing/OS-change controls. **Unit or type.** IP hop field units.
+- **Alternative and trade-off.** A fixed absolute TTL cutoff ignores established differences between roles. A frozen reviewed reference better resists gradual contamination.
+- **Advantage.** Score-before-update exposes immediate shifts at constant memory per device.
+- **Limitation and verification.** Per-window adaptation and workload mix change the reference. Check missing initial history and a sequence of gradual shifts.
+
+### site_v3 / `g12_tcp_window_mean`
+
+- **Current behavior.** Averages raw 16-bit outgoing advertised TCP window fields.
+- **Rationale.** Describes receive-window behavior visible in headers.
+- **Recommended method.** Mean raw advertised windows with TCP option context. Negotiated scaling is required for effective receive-window bytes. **Unit or type.** unscaled TCP window units.
+- **Alternative and trade-off.** Byte throughput is affected by demand and path, and does not directly describe advertised capacity. Effective window bytes require negotiated scaling.
+- **Advantage.** Readable cheap summary from parsed TCP headers.
+- **Limitation and verification.** Raw field sizes cannot be compared as effective capacity across scaling factors. Test two sessions with the same raw field and different negotiated options.
+
+### site_v3 / `g12_tcp_window_std`
+
+- **Current behavior.** Computes sample SD of raw outgoing advertised TCP windows.
+- **Rationale.** Indicates how variable flow-control advertisements are across observed packets.
+- **Recommended method.** Sample SD of eligible raw advertised windows. Retain counts/options and benign congestion/zero-window context. **Unit or type.** unscaled TCP window units.
+- **Alternative and trade-off.** A mean can hide alternating zero and large window values. Per-session variation gives better attribution at greater state cost.
+- **Advantage.** Online moments provide a compact dispersion measure.
+- **Limitation and verification.** Mixed connections and scaling can explain spread. Compare one changing session against a mix of steady sessions at equal raw mean.
+
+### site_v3 / `g12_zero_window_count`
+
+- **Current behavior.** Counts outgoing parsed TCP advertisements with a raw window equal to zero.
+- **Rationale.** Flags episodes of receive-side backpressure for follow-up.
+- **Recommended method.** Count eligible TCP advertisements equal to zero. Normalize by TCP support only in a separately defined ratio. **Unit or type.** packets.
+- **Alternative and trade-off.** Mean window size can hide rare zero advertisements. Session dwell time describes persistence and needs tracking.
+- **Advantage.** Zero is directly interpretable independent of a scaling factor.
+- **Limitation and verification.** Receiver stalls and slow legitimate clients also create zeros. Compare isolated repeats, sustained blocked progress and normal recovery.
+
+### site_v3 / `g12_fragment_count`
+
+- **Current behavior.** Counts outgoing IPv4 and IPv6 observations identified as fragments.
+- **Rationale.** Identifies traffic where header or application interpretation may be incomplete.
+- **Recommended method.** Count fragment observations per address family. Overlap/evasion decisions need bounded reassembly/state. **Unit or type.** packets.
+- **Alternative and trade-off.** A packet size threshold alone cannot identify fragmentation. Reassembly can detect overlaps and costs memory and timeout handling.
+- **Advantage.** Cheap explicit header-based counter at the observation point.
+- **Limitation and verification.** Fragments can arise from ordinary MTU conditions. Test valid fragmentation and incomplete sets, then check whether target reassembly agrees.
+
+### site_v3 / `g12_tiny_fragment_count`
+
+- **Current behavior.** Counts outgoing fragment observations with captured frame size below 64 bytes.
+- **Rationale.** Surfaces especially short fragment observations for parser and evasion review.
+- **Recommended method.** Define fragment payload/header size thresholds by family. Current captured-frame-below-64 proxy is not semantic reassembly. **Unit or type.** packets, proxy.
+- **Alternative and trade-off.** All-fragment count ignores short fragments. Fragment payload size and reconstructed boundaries provide stronger semantic evidence.
+- **Advantage.** Simple bounded proxy for triage.
+- **Limitation and verification.** Captured frame size depends on link-layer overhead and truncation. Test identical fragment payloads with different encapsulation and snap length.
 
 ## G13: Long-horizon contacts
 
@@ -259,14 +909,59 @@ Primary basis: [RFC 9293 TCP state and sequence semantics](https://www.rfc-edito
 
 Primary basis: [NIST EWMA control charts](https://itl.nist.gov/div898/handbook/pmc/section3/pmc314.htm), [NIST CUSUM control charts](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc323.htm), [Kitsune, NDSS 2018](https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_03A-3_Mirsky_paper.pdf).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| site_v3 / `g13_dst_ips_hour_bucketed` | categories | Union peer sets in retained minute buckets; exact rolling-hour boundaries need event-time expiry or reported bucket uncertainty. |
-| site_v3 / `g13_dst_ports_10m_bucketed` | categories | Union retained port sets over the declared bucket horizon; record caps and boundary approximation. |
-| site_v3 / `g13_out_bytes_hour_bucketed` | captured bytes | Sum outgoing byte counters over retained buckets with exposure/idle gaps and expiry explicit. |
-| site_v3 / `g13_window_contacts_hour_bucketed` | device windows | Count retained windows containing device observations; it is not individual sessions or per-peer contacts. |
-| site_v3 / `g13_pair_interval_cv_mean` | dimensionless | Mean supported per-peer CV of window-contact intervals; packet/session-contact periodicity requires a separate event definition. |
-| site_v3 / `g13_pair_interval_supported_pairs` | pairs | Report how many pair histories support the CV; a support qualifier rather than an independent malicious vote. |
+### site_v3 / `g13_dst_ips_hour_bucketed`
+
+- **Current behavior.** Unions observed peer sets across retained minute buckets covering the current minute and preceding 59 minutes.
+- **Rationale.** Makes low-rate peer exploration visible across short-window boundaries.
+- **Recommended method.** Union peer sets in retained minute buckets. Exact rolling-hour boundaries need event-time expiry or reported bucket uncertainty. **Unit or type.** categories.
+- **Alternative and trade-off.** A five-second peer count misses breadth spread over time. Exact per-event expiry uses more memory.
+- **Advantage.** Bounded history supports approximate longer-horizon richness.
+- **Limitation and verification.** Bucket edges, capping and restarts can reduce the count. Test boundary expiry and slow discovery alongside a benign software rollout.
+
+### site_v3 / `g13_dst_ports_10m_bucketed`
+
+- **Current behavior.** Unions destination-port sets across the current minute and preceding nine minutes.
+- **Rationale.** Highlights a slow vertical scan or changing service mix.
+- **Recommended method.** Union retained port sets over the declared bucket horizon. Record caps and boundary approximation. **Unit or type.** categories.
+- **Alternative and trade-off.** Short-window cardinality misses probes spaced across windows. Summing window cardinalities double-counts repeated ports.
+- **Advantage.** A union preserves distinctness while avoiding per-packet history.
+- **Limitation and verification.** Minute buckets approximate the horizon and sets can saturate. Compare repeated and unique ports around expiry boundaries.
+
+### site_v3 / `g13_out_bytes_hour_bucketed`
+
+- **Current behavior.** Sums outgoing frame bytes across the retained hour-like minute buckets.
+- **Rationale.** Accumulates sustained egress that individual windows might miss.
+- **Recommended method.** Sum outgoing byte counters over retained buckets with exposure/idle gaps and expiry explicit. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Peak throughput favors short bursts. Exact rolling totals improve boundary precision and need finer retained state.
+- **Advantage.** Simple cumulative context for device role comparisons.
+- **Limitation and verification.** Backups and scheduled sync can dominate it, and missed capture lowers the total. Test equal-byte uploads spread over time and a known loss interval.
+
+### site_v3 / `g13_window_contacts_hour_bucketed`
+
+- **Current behavior.** Counts retained nonempty observed device windows, including windows with incoming activity only.
+- **Rationale.** Distinguishes recurring device activity from one busy period.
+- **Recommended method.** Count retained windows containing device observations. It is not individual sessions or per-peer contacts. **Unit or type.** device windows.
+- **Alternative and trade-off.** Total packets can be large in one window. Session count answers a different question and requires state.
+- **Advantage.** Compact measure of observed duty cycle when paired with coverage.
+- **Limitation and verification.** It can be low because capture was unavailable. Compare continuous small telemetry with one large transfer and check missing exposure.
+
+### site_v3 / `g13_pair_interval_cv_mean`
+
+- **Current behavior.** Averages supported per-peer CV values using timestamped windows containing outgoing peer contacts. Each contributing peer needs at least three gaps.
+- **Rationale.** Highlights regular contacts that can recur over long periods.
+- **Recommended method.** Mean supported per-peer CV of window-contact intervals. Packet/session-contact periodicity requires a separate event definition. **Unit or type.** dimensionless.
+- **Alternative and trade-off.** Device-wide timing can mix peers. Packet-level periodicity or spectral analysis offers finer resolution with higher state and sampling needs.
+- **Advantage.** Per-peer summaries reduce mixing before averaging.
+- **Limitation and verification.** The mean hides one highly regular peer and windows quantize timing. Test periodic health checks, jittered contacts and mixed peer rhythms.
+
+### site_v3 / `g13_pair_interval_supported_pairs`
+
+- **Current behavior.** Counts retained peers with enough interval history and positive mean to contribute a CV.
+- **Rationale.** Provides the sample support behind the mean peer CV.
+- **Recommended method.** Report how many pair histories support the CV. A support qualifier rather than an independent malicious vote. **Unit or type.** pairs.
+- **Alternative and trade-off.** Treating a CV mean without its contributing count assigns equal confidence to one peer and many peers.
+- **Advantage.** Separates eligibility from behavior using an auditable count.
+- **Limitation and verification.** Eviction and quiet peers reduce support, and a large count is not threat evidence. Check cold start, expiry and peer-history saturation.
 
 ## G14: Service initiation behavior
 
@@ -276,12 +971,41 @@ Primary basis: [NIST EWMA control charts](https://itl.nist.gov/div898/handbook/p
 
 Primary basis: [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html), [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html), [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| site_v3 / `g14_new_syn_rate` | packets/second, proxy | SYN-without-ACK observations / window exposure; new-session rate requires deduplication and state. |
-| site_v3 / `g14_auth_syn_count` | packets, proxy | SYN attempts toward configured authentication-related ports; outcomes require authentication logs/session joins. |
-| site_v3 / `g14_out_in_bytes_ratio` | dimensionless | Outgoing / incoming captured bytes with explicit denominator; null if no incoming bytes. |
-| site_v3 / `g14_out_payload_bytes` | payload bytes | Sum parsed outgoing transport payload lengths after excluding padding; not confirmed application upload or goodput. |
+### site_v3 / `g14_new_syn_rate`
+
+- **Current behavior.** Divides the outgoing SYN-without-ACK count by site window exposure.
+- **Rationale.** Describes frequency of observed connection-initiation packets.
+- **Recommended method.** SYN-without-ACK observations / window exposure. New-session rate requires deduplication and state. **Unit or type.** packets/second, proxy.
+- **Alternative and trade-off.** A raw SYN count changes with window duration. A deduplicated attempt rate offers stronger session meaning at greater state cost.
+- **Advantage.** Cheap comparable rate over known exposure.
+- **Limitation and verification.** Retransmissions contribute and this is derived from G11 SYN count. Compare unique attempts with retransmissions and avoid double-counting both as independent votes.
+
+### site_v3 / `g14_auth_syn_count`
+
+- **Current behavior.** Counts outgoing SYN-without-ACK observations to ports 21, 22, 23, 445 or 3389.
+- **Rationale.** Provides a service-oriented hint for repeated connection attempts.
+- **Recommended method.** SYN attempts toward configured authentication-related ports. Outcomes require authentication logs/session joins. **Unit or type.** packets, proxy.
+- **Alternative and trade-off.** Aggregate SYN counts hide which service categories are approached. Authentication logs provide outcomes beyond port inference.
+- **Advantage.** Simple targeted counter works with visible TCP headers.
+- **Limitation and verification.** Legitimate administration, nonstandard ports and retries limit interpretation. Compare a permitted deployment job and independently logged authentication failures.
+
+### site_v3 / `g14_out_in_bytes_ratio`
+
+- **Current behavior.** Divides outgoing frame bytes by incoming frame bytes, with an empty value when incoming bytes are zero.
+- **Rationale.** Highlights directional egress dominance in a device window.
+- **Recommended method.** Outgoing / incoming captured bytes with explicit denominator. Null if no incoming bytes. **Unit or type.** dimensionless.
+- **Alternative and trade-off.** Raw egress alone cannot show whether a workload is upload-heavy relative to its inbound activity. A log ratio stabilizes large values but needs explicit zero handling.
+- **Advantage.** Compact asymmetry measure with an explicit missing denominator.
+- **Limitation and verification.** Tiny denominators and asymmetric capture produce unstable values. Compare normal backups with matched coverage and hold one-direction-only rows out of ratio scoring.
+
+### site_v3 / `g14_out_payload_bytes`
+
+- **Current behavior.** Sums the visible parsed outgoing TCP and UDP payload lengths after length bounds exclude trailing padding.
+- **Rationale.** Describes data-bearing transport volume beyond frame/header overhead.
+- **Recommended method.** Sum parsed outgoing transport payload lengths after excluding padding. Not confirmed application upload or goodput. **Unit or type.** payload bytes.
+- **Alternative and trade-off.** Total frame bytes include headers. Application upload and unique goodput require higher-layer parsing or retransmission-aware accounting.
+- **Advantage.** Useful even when payload contents are encrypted and never retained.
+- **Limitation and verification.** Retransmissions and encrypted overhead contribute, and unsupported fragments can omit bytes. Test padded frames, retransmits and truncated captures.
 
 ## G15: DNS metadata
 
@@ -291,15 +1015,68 @@ Primary basis: [Zeek connection log](https://docs.zeek.org/en/master/reference/l
 
 Primary basis: [Zeek DNS transaction evidence](https://docs.zeek.org/en/master/reference/logs/dns.html), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| site_v3 / `g15_query_count` | messages | Count supported DNS query messages; transactions require tuple/ID/qname/time correlation and retransmission handling. |
-| site_v3 / `g15_response_count` | messages | Count supported DNS responses; do not equate responses with distinct successful transactions. |
-| site_v3 / `g15_nxdomain_response_ratio` | fraction | NXDOMAIN responses / supported observed DNS responses, retaining denominator and response matching limitations. |
-| site_v3 / `g15_qname_length_mean` | qname bytes | Mean canonical wire/name length per supported query; define labels/trailing dot/IDNA handling. |
-| site_v3 / `g15_qname_entropy_mean` | bits per name distribution | Mean character-distribution entropy of supported qnames; condition on length/label position and legitimate CDN names. |
-| site_v3 / `g15_distinct_qname_hashes` | categories | Count distinct normalized qname hashes; not registrable domains or authenticated destination identities. |
-| site_v3 / `g15_txt_null_query_count` | messages | Count supported TXT/NULL query types; compare with DNS-SD/SPF/DKIM and enterprise discovery controls. |
+### site_v3 / `g15_query_count`
+
+- **Current behavior.** Counts outgoing DNS query messages parsed on UDP with port 53 and exactly one question.
+- **Rationale.** Provides direct evidence of visible name lookup activity.
+- **Recommended method.** Count supported DNS query messages. Transactions require tuple/ID/qname/time correlation and retransmission handling. **Unit or type.** messages.
+- **Alternative and trade-off.** Port-53 packet volume mixes queries, responses and malformed payloads. Transaction matching adds retry and outcome context.
+- **Advantage.** Compact application-specific count without exporting query names.
+- **Limitation and verification.** TCP and encrypted DNS fall outside this parser, and retries add counts. Test supported queries, retries and encrypted resolver traffic separately.
+
+### site_v3 / `g15_response_count`
+
+- **Current behavior.** Counts incoming parsed DNS response messages within the same single-question UDP scope.
+- **Rationale.** Provides the support behind DNS outcome statistics.
+- **Recommended method.** Count supported DNS responses. Do not equate responses with distinct successful transactions. **Unit or type.** messages.
+- **Alternative and trade-off.** Counting outgoing queries alone leaves answer visibility unknown. Matched transactions can quantify completed requests.
+- **Advantage.** Distinguishes many responses from sparse response support when interpreting ratios.
+- **Limitation and verification.** Responses can cross windows or repeat, and unsupported formats reduce coverage. Compare delayed responses with an independent resolver log.
+
+### site_v3 / `g15_nxdomain_response_ratio`
+
+- **Current behavior.** Divides incoming supported DNS responses with code 3 by all incoming supported responses. It is empty without responses.
+- **Rationale.** Shows what fraction of observed answers report a nonexistent name.
+- **Recommended method.** NXDOMAIN responses / supported observed DNS responses, retaining denominator and response matching limitations. **Unit or type.** fraction.
+- **Alternative and trade-off.** Dividing by query count would mix response outcomes with unanswered requests and window misalignment. A matched transaction failure rate needs more state.
+- **Advantage.** The response-conditioned fraction has a clear denominator.
+- **Limitation and verification.** Typos and expired domains can increase it, while missing responses make the value unavailable. Test successful, NXDOMAIN and no-response cases with exact counts.
+
+### site_v3 / `g15_qname_length_mean`
+
+- **Current behavior.** Averages the byte length of outgoing parsed question names after stripping terminal dots.
+- **Rationale.** Detects shifts toward unusually long names at a device or resolver.
+- **Recommended method.** Mean canonical wire/name length per supported query. Define labels/trailing dot/IDNA handling. **Unit or type.** qname bytes.
+- **Alternative and trade-off.** A fixed maximum-length rule misses sustained shifts below the cutoff. Percentiles can expose rare long labels if enough names are observed.
+- **Advantage.** Simple online statistic without retaining raw names in CSV.
+- **Limitation and verification.** Legitimate CDN and service-discovery names can be long, and an average hides rare labels. Compare matched legitimate services and split label structure from full-name length in evaluation.
+
+### site_v3 / `g15_qname_entropy_mean`
+
+- **Current behavior.** Averages Shannon byte entropy computed separately for each parsed outgoing question name.
+- **Rationale.** Describes character diversity that length alone misses.
+- **Recommended method.** Mean character-distribution entropy of supported qnames. Condition on length/label position and legitimate CDN names. **Unit or type.** bits per name distribution.
+- **Alternative and trade-off.** A list of known names misses changing names. A language model can capture sequence structure but needs training data and calibration.
+- **Advantage.** Simple distribution statistic can distinguish equal-length strings with different character mixes.
+- **Limitation and verification.** Short names limit possible entropy, and benign generated labels can look random. Compare equal-length CDN and synthetic generated names while recording sample support.
+
+### site_v3 / `g15_distinct_qname_hashes`
+
+- **Current behavior.** Counts bounded distinct truncated SHA-256 hashes of lowercased parsed names with trailing dots stripped.
+- **Rationale.** Captures full-name churn without writing names to this CSV field.
+- **Recommended method.** Count distinct normalized qname hashes. Not registrable domains or authenticated destination identities. **Unit or type.** categories.
+- **Alternative and trade-off.** Query count treats repeated lookups like many new names. Registrable-domain aggregation addresses domain churn but needs a maintained suffix boundary.
+- **Advantage.** Repeated names collapse, and case differences are normalized for cardinality.
+- **Limitation and verification.** Caps can undercount and subdomains of one service can dominate. Test case variants, repeated names and many subdomains against known cardinality.
+
+### site_v3 / `g15_txt_null_query_count`
+
+- **Current behavior.** Counts supported outgoing questions whose type is TXT or NULL.
+- **Rationale.** Adds type-specific context for investigating unusual DNS usage.
+- **Recommended method.** Count supported TXT/NULL query types. Compare with DNS-SD/SPF/DKIM and enterprise discovery controls. **Unit or type.** messages.
+- **Alternative and trade-off.** Total DNS query count obscures a change in question-type mix. Separate type shares add context but need support and a declared denominator.
+- **Advantage.** Direct protocol field check and low processing cost.
+- **Limitation and verification.** Legitimate TXT lookups are common in some roles and traffic on other types can carry encoded data. Include authorized TXT use and compare total supported query counts.
 
 ## G16: TLS and QUIC evidence
 
@@ -309,12 +1086,41 @@ Primary basis: [Zeek DNS transaction evidence](https://docs.zeek.org/en/master/r
 
 Primary basis: [RFC 8446 TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446.html), [RFC 9000 QUIC](https://www.rfc-editor.org/rfc/rfc9000.html), [FoxIO fingerprint definition and scope](https://github.com/FoxIO-LLC/ja4/blob/main/README.md).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| site_v3 / `g16_complete_clienthello_count` | parsed records | Count complete supported ClientHellos; retain separate counters for incomplete, unsupported and reassembly-limited observations. |
-| site_v3 / `g16_no_sni_count` | parsed records | Count missing SNI only among fully parsed supported ClientHellos; absence is not a malicious verdict. |
-| site_v3 / `g16_ech_count` | extension observations | Count observed ECH extension indications, including possible GREASE; not proof that decryption succeeded or a hidden malicious name exists. |
-| site_v3 / `g16_distinct_custom_fingerprints` | categories | Count current custom handshake hashes; standardized JA4 requires exact specification/interoperability qualification. |
+### site_v3 / `g16_complete_clienthello_count`
+
+- **Current behavior.** Counts outgoing ClientHellos accepted from a complete supported TLS record available in one decoded TCP payload.
+- **Rationale.** Provides evidence of visible handshake attempts and the denominator behind TLS feature interpretation.
+- **Recommended method.** Count complete supported ClientHellos. Retain separate counters for incomplete, unsupported and reassembly-limited observations. **Unit or type.** parsed records.
+- **Alternative and trade-off.** A port-443 connection count combines TLS, other traffic and encrypted transports. Reassembled parsing covers split records at greater cost.
+- **Advantage.** Confirms a parseable message without storing the handshake in the feature row.
+- **Limitation and verification.** Splits, retransmissions and QUIC affect coverage, and the count records attempts. Replay equivalent segmented and unsegmented hellos and review parser health.
+
+### site_v3 / `g16_no_sni_count`
+
+- **Current behavior.** Counts accepted outgoing ClientHellos without a parsed host-name entry.
+- **Rationale.** Describes absence of a visible server name within the parsed subset.
+- **Recommended method.** Count missing SNI only among fully parsed supported ClientHellos. Absence is not a malicious verdict. **Unit or type.** parsed records.
+- **Alternative and trade-off.** Treating every TCP flow without a name as missing SNI conflates unsupported capture with a valid hello lacking that field.
+- **Advantage.** Conditions the count on successful parser support.
+- **Limitation and verification.** Direct IP access and legitimate clients can omit names. Compare known hello variants and keep incomplete parser outcomes separate.
+
+### site_v3 / `g16_ech_count`
+
+- **Current behavior.** Counts accepted outgoing ClientHellos carrying extension ID 65037.
+- **Rationale.** Records when encrypted-client-hello-related extensions affect interpretation of visible name evidence.
+- **Recommended method.** Count observed ECH extension indications, including possible GREASE. Not proof that decryption succeeded or a hidden malicious name exists. **Unit or type.** extension observations.
+- **Alternative and trade-off.** Guessing hidden names from destination IPs is ambiguous on shared hosting. Endpoint evidence can establish actual negotiation with more privileged access.
+- **Advantage.** Small metadata indicator that helps explain visibility limits.
+- **Limitation and verification.** An extension can be a GREASE placeholder and cannot establish negotiation success. Test observed extension presence with independent endpoint receipts.
+
+### site_v3 / `g16_distinct_custom_fingerprints`
+
+- **Current behavior.** Counts bounded distinct hashes of the hello version bytes, cipher vector and ordered extension IDs.
+- **Rationale.** Captures diversity in visible client handshake configurations.
+- **Recommended method.** Count current custom handshake hashes. Standardized JA4 requires exact specification/interoperability qualification. **Unit or type.** categories.
+- **Alternative and trade-off.** Raw IP reputation can miss client stack changes. Standardized JA4 offers cross-tool comparability with a different contract.
+- **Advantage.** Compact custom summary allows reproducible local comparison of identical inputs.
+- **Limitation and verification.** Order changes, GREASE and browser updates can change the hash. Compare controlled variants and use exact JA4 fixtures if migrating to that fingerprint.
 
 ## G17: HTTP behavior and lexical evidence
 
@@ -324,14 +1130,59 @@ Primary basis: [RFC 8446 TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446.html), 
 
 Primary basis: [RFC 9110 HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html), [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| site_v3 / `g17_complete_http_requests` | parsed requests | Count complete supported HTTP/1 headers; request reconstruction across TCP segments and HTTP/2/3 are separate work. |
-| site_v3 / `g17_rare_method_count` | parsed requests | Count methods outside the explicit configured set; protocol-legal methods are not attacks by themselves. |
-| site_v3 / `g17_uri_length_mean` | request-target bytes | Mean length over supported request targets; preserve raw/normalized representation and privacy boundaries. |
-| site_v3 / `g17_uri_entropy_mean` | bits per target distribution | Mean categorical byte entropy of request targets, conditioned on length and route/parameter roles. |
-| site_v3 / `g17_uri_encoded_ratio_mean` | fraction | Mean declared percent-encoding density per supported target; distinguish valid escapes and bounded normalization. |
-| site_v3 / `g17_uri_special_ratio_mean` | fraction | Mean fraction of the explicitly defined character set per target; distinguish legitimate search/encoded content. |
+### site_v3 / `g17_complete_http_requests`
+
+- **Current behavior.** Counts supported outgoing HTTP/1 request headers with a complete terminator in the parser's bounded single TCP payload.
+- **Rationale.** Gives request-level exposure for interpreting the lexical features.
+- **Recommended method.** Count complete supported HTTP/1 headers. Request reconstruction across TCP segments and HTTP/2/3 are separate work. **Unit or type.** parsed requests.
+- **Alternative and trade-off.** Bytes on a web port cannot distinguish requests from unrelated or encrypted traffic. Stream reconstruction supports more requests and requires more state.
+- **Advantage.** Counts parseable request evidence without exporting request text.
+- **Limitation and verification.** Split headers, requests beyond the 8 KiB cap and other HTTP versions are outside this subset. Compare complete, segmented and encrypted fixtures.
+
+### site_v3 / `g17_rare_method_count`
+
+- **Current behavior.** Counts supported outgoing requests whose method differs from GET or POST.
+- **Rationale.** Highlights method use worth checking against route and role expectations.
+- **Recommended method.** Count methods outside the explicit configured set. Protocol-legal methods are not attacks by themselves. **Unit or type.** parsed requests.
+- **Alternative and trade-off.** Global byte or request counters lose method semantics. A route-aware allowlist is more precise when application policy is available.
+- **Advantage.** Cheap, auditable context from the parsed start line.
+- **Limitation and verification.** Common API operations and CORS preflights can qualify as rare. Compare normal API traffic against an independently known method policy.
+
+### site_v3 / `g17_uri_length_mean`
+
+- **Current behavior.** Averages raw request-target byte length over supported outgoing requests.
+- **Rationale.** Highlights systematic changes in path or query size.
+- **Recommended method.** Mean length over supported request targets. Preserve raw/normalized representation and privacy boundaries. **Unit or type.** request-target bytes.
+- **Alternative and trade-off.** A fixed maximum can catch oversized requests but misses changes below it. Route-specific length percentiles better describe tails.
+- **Advantage.** Compact online measure with no raw target field in the output.
+- **Limitation and verification.** Long search filters and signed URLs are benign controls, and a mean can hide rare outliers. Compare within routes using equal request support.
+
+### site_v3 / `g17_uri_entropy_mean`
+
+- **Current behavior.** Averages Shannon byte entropy computed separately for each supported raw request target.
+- **Rationale.** Distinguishes equal-length targets with different byte diversity.
+- **Recommended method.** Mean categorical byte entropy of request targets, conditioned on length and route/parameter roles. **Unit or type.** bits per target distribution.
+- **Alternative and trade-off.** Length alone misses changes in character mixture. Structured parameter inspection adds semantics and needs authorized decoding.
+- **Advantage.** Cheap statistic can help prioritize unusual target shapes for review.
+- **Limitation and verification.** Tokens and signed links can have high entropy, and ordering is discarded. Use matched-length benign controls and correlate with application evidence.
+
+### site_v3 / `g17_uri_encoded_ratio_mean`
+
+- **Current behavior.** Averages each target's count of percent-hex triplets divided by raw target byte length.
+- **Rationale.** Highlights changes in percent-escape density that may affect normalization.
+- **Recommended method.** Mean declared percent-encoding density per supported target. Distinguish valid escapes and bounded normalization. **Unit or type.** fraction.
+- **Alternative and trade-off.** Counting percent signs includes malformed escapes. Full canonicalization can expose decoded meaning but must agree with the application.
+- **Advantage.** Matches well-formed escape tokens without retaining decoded content.
+- **Limitation and verification.** This is triplets per byte, so a fully triplet-encoded target has a value near one third. Internationalized text is a benign control. Test valid and invalid escapes separately.
+
+### site_v3 / `g17_uri_special_ratio_mean`
+
+- **Current behavior.** Averages the fraction of each raw target occupied by quotes, angle brackets, percent signs, semicolons or parentheses.
+- **Rationale.** Captures change in punctuation density for review alongside encoding and route context.
+- **Recommended method.** Mean fraction of the explicitly defined character set per target. Distinguish legitimate search/encoded content. **Unit or type.** fraction.
+- **Alternative and trade-off.** A single literal signature misses other syntax variants. Grammar-aware parsing can identify an injection context when visibility permits.
+- **Advantage.** Constant-size summary gives a simple, interpretable lexical clue.
+- **Limitation and verification.** Valid query parameters and escaped text can raise it, and the fixed character list misses other mechanisms. Check benign punctuation-heavy requests and independently verified exploit outcomes.
 
 ## G18: Resource and state exhaustion
 
@@ -341,7 +1192,28 @@ Primary basis: [RFC 9110 HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.
 
 Primary basis: [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html), [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/).
 
-No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+**Planned measurement candidates**
+
+### State occupancy share
+
+- **Proposed measurement.** Active tracked entries divided by documented table capacity at the same time and scope.
+- **Alternative and trade-off.** PPS alone misses slow state accumulation.
+- **Advantage.** Connects observed pressure to a finite resource.
+- **Limitation and verification.** Vendor counters may be delayed or scoped differently. Compare known capacity and sustained benign load.
+
+### Timed-out attempt fraction
+
+- **Proposed measurement.** Deduplicated attempts reaching a qualified timeout divided by resolved attempts.
+- **Alternative and trade-off.** Counting SYNs misses whether connections complete.
+- **Advantage.** Separates slow accumulation of stalled attempts from productive demand.
+- **Limitation and verification.** Asymmetric capture censors attempts. Validate timeout and state with target telemetry.
+
+### Useful progress under pressure
+
+- **Proposed measurement.** Completed transactions per second alongside queue depth and resource utilization.
+- **Alternative and trade-off.** CPU percentage alone cannot establish service degradation.
+- **Advantage.** Shows whether growing load coincides with falling useful work.
+- **Limitation and verification.** Backend faults can produce the same pattern. Compare a benign surge and a controlled failure.
 
 ## G19: Identity conflict and reassignment
 
@@ -351,7 +1223,21 @@ No additional source columns are claimed for this category. Establish the requir
 
 Primary basis: [RFC 5227 legitimate IPv4 probes and announcements](https://datatracker.ietf.org/doc/rfc5227/), [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html), [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/).
 
-No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+**Planned measurement candidates**
+
+### Time-overlapping identity conflict
+
+- **Proposed measurement.** Count claims that overlap an independently verified lease or authenticated attachment for another identity.
+- **Alternative and trade-off.** First-seen bindings can preserve an incorrect initial claim.
+- **Advantage.** Targets conflicts during actual ownership intervals.
+- **Limitation and verification.** Lease timing, failover and missing port evidence require uncertain outcomes. Replay valid reassignment and overlap.
+
+### Identity continuity across reassignment
+
+- **Proposed measurement.** Measure the fraction of address changes linked to the same verified device within a declared time tolerance.
+- **Alternative and trade-off.** An IP-keyed profile silently mixes device histories after reassignment.
+- **Advantage.** Allows prior context to follow a verified device.
+- **Limitation and verification.** Randomized identifiers and incomplete inventory reduce join coverage. Confirm continuity against independent inventory.
 
 ## G20: Management and SD-WAN control plane
 
@@ -361,7 +1247,21 @@ No additional source columns are claimed for this category. Establish the requir
 
 Primary basis: [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/), [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html).
 
-No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+**Planned measurement candidates**
+
+### Adjacency and control-session churn
+
+- **Proposed measurement.** Count verified resets, state transitions and durations by peer and maintenance context.
+- **Alternative and trade-off.** User-plane packet rates may stay normal while a control session fails.
+- **Advantage.** Provides direct evidence of instability.
+- **Limitation and verification.** Planned maintenance and failover also produce churn. Compare authorized resets with a controlled unexpected interruption.
+
+### Revision-to-path change
+
+- **Proposed measurement.** Join authenticated configuration revision events to measured route or path transitions and outcomes.
+- **Alternative and trade-off.** Static snapshots omit order and actual forwarding effects.
+- **Advantage.** Correlates change, identity and impact for audit review.
+- **Limitation and verification.** Delayed logs and asynchronous rollout create ambiguous timing. Require exact revision and independent path evidence.
 
 ## G21: Credential abuse and lateral transitions
 
@@ -371,7 +1271,21 @@ No additional source columns are claimed for this category. Establish the requir
 
 Primary basis: [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/), [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/).
 
-No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+**Planned measurement candidates**
+
+### Authentication failure and subsequent success
+
+- **Proposed measurement.** Count reviewed failures followed by success for the same account/service within a declared interval.
+- **Alternative and trade-off.** Port counters only describe connection initiation.
+- **Advantage.** Adds outcome and identity evidence for investigating credential abuse.
+- **Limitation and verification.** Password resets and automation can match. Test successful retry and controlled unauthorized-use scenarios.
+
+### Novel identity-to-service transitions
+
+- **Proposed measurement.** Count transitions to peers or services outside reviewed identity history and allowed roles.
+- **Alternative and trade-off.** Separate host alerts discard who moved between systems and in what order.
+- **Advantage.** Preserves the sequence needed to investigate lateral movement.
+- **Limitation and verification.** Shared accounts and deployment jobs complicate attribution. Check identity joins and compare an approved rollout.
 
 ## G22: Application authorization abuse
 
@@ -381,7 +1295,21 @@ No additional source columns are claimed for this category. Establish the requir
 
 Primary basis: [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/), [RFC 9110 HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html).
 
-No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+**Planned measurement candidates**
+
+### Authorization mismatch rate
+
+- **Proposed measurement.** Compare audited user, tenant, resource and action to time-valid application policy and divide violations by eligible actions.
+- **Alternative and trade-off.** URI lexical scores miss ordinary-looking cross-tenant actions.
+- **Advantage.** Tests authorization semantics directly.
+- **Limitation and verification.** Requires authoritative policy and request/outcome joins. Include permitted delegation and controlled cross-tenant fixtures.
+
+### Workflow sequence violations
+
+- **Proposed measurement.** Measure actions observed outside the application's allowed state transitions.
+- **Alternative and trade-off.** A static method or path rule does not represent workflow state.
+- **Advantage.** Can expose abuse built from individually valid requests.
+- **Limitation and verification.** Workflows vary by version and role. Test valid alternate paths before applying any decision.
 
 ## G23: Command-and-control and exfiltration
 
@@ -391,7 +1319,21 @@ No additional source columns are claimed for this category. Establish the requir
 
 Primary basis: [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/), [Kitsune, NDSS 2018](https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_03A-3_Mirsky_paper.pdf), [Zeek DNS transaction evidence](https://docs.zeek.org/en/master/reference/logs/dns.html).
 
-No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+**Planned measurement candidates**
+
+### Peer-specific contact regularity
+
+- **Proposed measurement.** Track exact eligible contact events per peer and compare interval summaries with role-specific reference support.
+- **Alternative and trade-off.** Device-window CV mixes time quantization and different kinds of activity.
+- **Advantage.** Preserves rhythm of a recurring individual channel.
+- **Limitation and verification.** Telemetry is often regular and deliberate jitter can mask periodicity. Test both with equivalent exposure.
+
+### Contextual egress excess
+
+- **Proposed measurement.** Compare long-horizon egress with a reviewed device, destination/service and scheduled-job baseline.
+- **Alternative and trade-off.** A fixed byte cutoff misses slow change and flags normal backups.
+- **Advantage.** Retains the magnitude and context of atypical sustained egress.
+- **Limitation and verification.** Cloud sync and recovery jobs shift reference behavior. Include scheduled transfers and slow controlled scenarios.
 
 ## G24: Exploitation outcome evidence
 
@@ -401,7 +1343,21 @@ No additional source columns are claimed for this category. Establish the requir
 
 Primary basis: [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/), [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/).
 
-No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+**Planned measurement candidates**
+
+### Attempt-to-outcome join coverage
+
+- **Proposed measurement.** Measure the share of independently observed attempts with a time-valid request, policy decision and target receipt.
+- **Alternative and trade-off.** Alert counts alone omit target impact.
+- **Advantage.** Exposes which incidents have enough evidence for outcome claims.
+- **Limitation and verification.** Asynchronous logs and retries cause ambiguous joins. Use correlation identifiers and explicit unknown outcomes.
+
+### Verified containment fraction
+
+- **Proposed measurement.** Count independently confirmed blocked attempts over eligible reviewed attempts, with benign reachability checked in parallel.
+- **Alternative and trade-off.** A rule write or alert is only evidence that one stage ran.
+- **Advantage.** Tests actual prevention with target and comparison-client evidence.
+- **Limitation and verification.** Missing receipts can also indicate outages or failed traffic generation. Run a known successful pre-block control and an independent target probe.
 
 ## BASE: Base traffic measurements
 
@@ -411,36 +1367,257 @@ No additional source columns are claimed for this category. Establish the requir
 
 Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html), [Pébay, numerically stable one-pass moments](https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `timestamp` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `src_ip` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `dst_ip` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `src_port` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `dst_port` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `protocol` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `flow_duration` | seconds | Last minus first event time for an observed flow, separately retaining window exposure and censoring; no singleton rate inflation. |
-| legacy / `total_packets` | packets | Exact accepted observations with direction/duplication/sampling boundaries; report independently measured drops. |
-| legacy / `total_bytes` | captured bytes | Sum observed captured frame lengths at a stated layer; not application goodput or wire-rate including FCS/preamble. |
-| legacy / `avg_packet_size` | captured bytes | Sum captured sizes / count at the same direction/key, null with zero support. |
-| legacy / `min_packet_size` | captured bytes | Minimum supported observed captured size; retain sample count, byte layer and truncation/offload flags. |
-| legacy / `max_packet_size` | captured bytes | Maximum supported observed captured size; retain sample count, byte layer and MTU/offload/truncation context. |
-| legacy / `packets_per_second` | packets/second | Count / recorded exposure interval for a window rate; flow active-span rate requires a separate name and singleton state. |
-| legacy / `bytes_per_second` | captured bytes/second | Captured bytes / recorded exposure; do not conflate bytes with bits or active span with full window. |
-| legacy / `syn_count` | packets | Count observed packets carrying SYN, with TCP eligibility and retransmission context; flags are not sessions. |
-| legacy / `ack_count` | packets | Count observed packets carrying ACK, with TCP eligibility and retransmission context; flags are not sessions. |
-| legacy / `fin_count` | packets | Count observed packets carrying FIN, with TCP eligibility and retransmission context; flags are not sessions. |
-| legacy / `rst_count` | packets | Count observed packets carrying RST, with TCP eligibility and retransmission context; flags are not sessions. |
-| legacy / `psh_count` | packets | Count observed packets carrying PSH, with TCP eligibility and retransmission context; flags are not sessions. |
-| legacy / `unique_src_ports` | categories | Distinct source ports in a declared source/context/horizon; retain cardinality support and capping/sketch uncertainty. |
-| legacy / `unique_dst_ports` | categories | Distinct destination ports at source/context/horizon scope rather than one fixed-port flow. |
-| site_v3 / `out_packets` | packets | Count locally attributed outgoing observations at the declared IP/VLAN boundary, including explicit omissions. |
-| site_v3 / `in_packets` | packets | Count locally attributed incoming observations at the identical boundary; qualify both directions. |
-| site_v3 / `out_bytes` | captured bytes | Sum outgoing captured frame bytes; distinguish endpoint identity from pre/post-NAT identities. |
-| site_v3 / `in_bytes` | captured bytes | Sum incoming captured frame bytes at the same scope and horizon. |
-| site_v3 / `out_pps` | packets/second | Outgoing observations / actual recorded window exposure; incomplete windows remain ineligible for this scorer. |
-| site_v3 / `out_bytes_per_second` | captured bytes/second | Outgoing captured bytes divided by actual recorded window exposure; retain incomplete-window and byte-layer context. |
-| site_v3 / `packet_size_mean` | captured bytes | Online mean outgoing frame size with explicit sample count, direction and byte layer. |
+### legacy / `timestamp`
+
+- **Current behavior.** Writes the first observed packet time as a local ISO timestamp without a timezone offset.
+- **Rationale.** Anchors legacy rows to the start of the observed key span for audit.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Export-time stamps include processing delay. Timezone-aware event time supports reliable cross-system joins.
+- **Advantage.** Preserves the observed start even when flushes are delayed.
+- **Limitation and verification.** Local time may be ambiguous across machines or clock shifts. Check timezone and clock provenance before aligning labels or splitting runs.
+
+### legacy / `src_ip`
+
+- **Current behavior.** Exports the observed source address of the directional legacy key.
+- **Rationale.** Identifies the source scope for counters, profiles and response review.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** A full authenticated device identity requires external evidence. An address provides inexpensive aggregation at the observation point.
+- **Advantage.** Easy to reconcile with packet traces and rule evidence.
+- **Limitation and verification.** NAT, spoofing and address reuse undermine attribution and raw IDs can leak lab roles. Compare reassignment and spoof cases before making device claims.
+
+### legacy / `dst_ip`
+
+- **Current behavior.** Exports the observed destination address from the legacy key.
+- **Rationale.** Identifies the peer for breadth, direction and policy context.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Traffic totals discard where packets go. Grouping by service role can generalize across changing addresses.
+- **Advantage.** Supports peer-level audits and reverse-pair joins.
+- **Limitation and verification.** Shared hosts and translated destinations blur application identity. Check both sides of a NAT mapping and keep raw peer IDs out of portable model inputs unless justified.
+
+### legacy / `src_port`
+
+- **Current behavior.** Emits the sole nonzero source port if the key has exactly one, otherwise zero.
+- **Rationale.** Indicates a consistent observed sender port within a row.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Taking the first port would hide mixtures. A full source-port set carries richer context at higher state cost.
+- **Advantage.** Compact scalar makes mixed-port keys easy to flag when paired with distinct count.
+- **Limitation and verification.** Zero conflates no observed port with multiple ports. Test single-port, multi-port and portless traffic separately.
+
+### legacy / `dst_port`
+
+- **Current behavior.** Emits the key's destination port with zero as the fallback.
+- **Rationale.** Retains the addressed transport service hint.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Raw numeric distance between ports has little protocol meaning. Categorized or verified service identity improves interpretation.
+- **Advantage.** Simple value supports a reproducible grouping key and known-service review.
+- **Limitation and verification.** A registered port cannot establish the application running there. Test different applications on the same port and handle portless traffic explicitly.
+
+### legacy / `protocol`
+
+- **Current behavior.** Exports the protocol label assigned to the directional key.
+- **Rationale.** Establishes which counters and state rules apply to the row.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Applying one protocol-agnostic distribution mixes TCP flags, ICMP and ARP traffic. Finer application identity needs parsing.
+- **Advantage.** Cheap eligibility context for features and per-protocol controls.
+- **Limitation and verification.** Outer or decoded protocol can hide tunneled or encrypted behavior. Verify protocol assignments and unknown categories under representative encapsulation.
+
+### legacy / `flow_duration`
+
+- **Current behavior.** Emits last minus first observed event time for the key, floored at one millisecond.
+- **Rationale.** Describes the observed activity span used by legacy rate calculations.
+- **Recommended method.** Last minus first event time for an observed flow, separately retaining window exposure and censoring. No singleton rate inflation. **Unit or type.** seconds.
+- **Alternative and trade-off.** Fixed-window exposure answers a different question. Session lifetime requires persistent lifecycle tracking.
+- **Advantage.** Retains subwindow activity timing for trace reproduction.
+- **Limitation and verification.** The floor makes single packets look like short active flows, and windows censor both ends. Check a singleton and a connection crossing flushes.
+
+### legacy / `total_packets`
+
+- **Current behavior.** Counts accepted packet observations retained in the legacy flow key.
+- **Rationale.** Supplies volume and the denominator behind many row statistics.
+- **Recommended method.** Exact accepted observations with direction/duplication/sampling boundaries. Report independently measured drops. **Unit or type.** packets.
+- **Alternative and trade-off.** Bytes alone can hide many tiny packets that stress packet processing. A sampled estimator reduces capture work and requires an inclusion model.
+- **Advantage.** Direct count is easy to reproduce from retained observations.
+- **Limitation and verification.** Duplicates, drops and unequal mirroring change the count. Validate against independently counted packets at the same boundary.
+
+### legacy / `total_bytes`
+
+- **Current behavior.** Sums captured lengths for accepted packets in the key.
+- **Rationale.** Measures observed frame volume relevant to link or processing load.
+- **Recommended method.** Sum observed captured frame lengths at a stated layer. Not application goodput or wire-rate including FCS/preamble. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Packet count alone gives equal weight to small and large frames. Goodput requires transport/application attribution.
+- **Advantage.** Adds size-weighted activity with an inexpensive sum.
+- **Limitation and verification.** FCS, padding, truncation and retransmissions change the relationship to wire load or useful data. Validate the capture layer and lengths against a known trace.
+
+### legacy / `avg_packet_size`
+
+- **Current behavior.** Derives mean captured size from byte rate divided by packet rate using the same active span.
+- **Rationale.** Summarizes typical observed size for each directional key.
+- **Recommended method.** Sum captured sizes / count at the same direction/key, null with zero support. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Minimum and maximum omit the center. A median is more resistant to extreme packets but needs extra retained state.
+- **Advantage.** Readable average is available from existing counts.
+- **Limitation and verification.** A mix of small and large frames can share a mean with uniform frames. Compare matched means and use size spread to disambiguate.
+
+### legacy / `min_packet_size`
+
+- **Current behavior.** Emits the minimum observed frame length in the key.
+- **Rationale.** Identifies the smallest captured frame for size and capture checks.
+- **Recommended method.** Minimum supported observed captured size. Retain sample count, byte layer and truncation/offload flags. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Mean size can hide a rare short frame. A lower percentile describes a recurring pattern when support is sufficient.
+- **Advantage.** One running minimum is cheap and useful for fixture validation.
+- **Limitation and verification.** Truncation and padding can dominate the value. Check a known short frame and compare complete and truncated observations.
+
+### legacy / `max_packet_size`
+
+- **Current behavior.** Emits the maximum observed frame length in the key.
+- **Rationale.** Identifies unexpectedly large capture units or evidence of differing encapsulation.
+- **Recommended method.** Maximum supported observed captured size. Retain sample count, byte layer and MTU/offload/truncation context. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** A large-packet fraction measures persistence but can hide one large outlier.
+- **Advantage.** An inexpensive extreme helps diagnose MTU and offload effects.
+- **Limitation and verification.** One aggregated frame can dominate, and maximum varies with sample count. Compare the same transfer at endpoints and the mirrored path with offload settings recorded.
+
+### legacy / `packets_per_second`
+
+- **Current behavior.** Divides retained packet count by the active key span with a one-millisecond floor.
+- **Rationale.** Describes apparent intensity during the observed key activity.
+- **Recommended method.** Count / recorded exposure interval for a window rate. Flow active-span rate requires a separate name and singleton state. **Unit or type.** packets/second.
+- **Alternative and trade-off.** A fixed-window rate includes idle time and is preferable for comparing sustained pressure.
+- **Advantage.** Can reveal a brief cluster diluted by a long collection window.
+- **Limitation and verification.** A singleton can report 1,000 PPS under the floor. Test singleton, brief burst and steady flows with both denominators clearly labeled.
+
+### legacy / `bytes_per_second`
+
+- **Current behavior.** Divides the retained sum of captured lengths by the floored active key span.
+- **Rationale.** Describes apparent byte intensity while the key was active.
+- **Recommended method.** Captured bytes / recorded exposure. Do not conflate bytes with bits or active span with full window. **Unit or type.** captured bytes/second.
+- **Alternative and trade-off.** Packet rate ignores frame size. Window-exposure throughput better represents sustained observed utilization.
+- **Advantage.** Reuses existing counts and span to explain burst volume.
+- **Limitation and verification.** Very short spans inflate the estimate and the units are bytes, even when a variable is named bps. Check a single frame and confirm the expected eightfold unit conversion for bits.
+
+### legacy / `syn_count`
+
+- **Current behavior.** Counts retained packets with SYN set, including SYN-ACK.
+- **Rationale.** Records connection-start and response flag activity as context for TCP pressure.
+- **Recommended method.** Count observed packets carrying SYN, with TCP eligibility and retransmission context. Flags are not sessions. **Unit or type.** packets.
+- **Alternative and trade-off.** Generic packet count loses setup semantics. Deduplicated SYN-without-ACK attempts provide a more specific measure of initiations.
+- **Advantage.** Cheap bit count is available from headers without sequence tracking.
+- **Limitation and verification.** Retransmissions and responses contribute. Validate flags against an independently reconstructed handshake trace.
+
+### legacy / `ack_count`
+
+- **Current behavior.** Counts retained packets carrying ACK, including data and SYN-ACK.
+- **Rationale.** Supplies acknowledgment context for interpreting a SYN-heavy key.
+- **Recommended method.** Count observed packets carrying ACK, with TCP eligibility and retransmission context. Flags are not sessions. **Unit or type.** packets.
+- **Alternative and trade-off.** All TCP volume cannot show whether ACK evidence is present. Sequence-aware progress is stronger when session state is available.
+- **Advantage.** Low-cost complement to SYN counts.
+- **Limitation and verification.** ACK flags alone do not reveal newly acknowledged bytes or handshake success. Test duplicate ACKs and a mixed SYN/data key.
+
+### legacy / `fin_count`
+
+- **Current behavior.** Counts retained packets with FIN set.
+- **Rationale.** Shows orderly close attempts or crafted FIN activity.
+- **Recommended method.** Count observed packets carrying FIN, with TCP eligibility and retransmission context. Flags are not sessions. **Unit or type.** packets.
+- **Alternative and trade-off.** Counting RST alone misses graceful termination. A state machine confirms a matched close.
+- **Advantage.** Simple visible teardown hint with little state.
+- **Limitation and verification.** Retries and out-of-context FINs inflate counts relative to closures. Compare successful half-close, repeated FIN and FIN probe fixtures.
+
+### legacy / `rst_count`
+
+- **Current behavior.** Counts retained packets carrying RST.
+- **Rationale.** Adds evidence of aborts and rejection-like activity.
+- **Recommended method.** Count observed packets carrying RST, with TCP eligibility and retransmission context. Flags are not sessions. **Unit or type.** packets.
+- **Alternative and trade-off.** FIN counts emphasize orderly close and miss abrupt termination. Matching resets to attempted services provides more precise outcomes.
+- **Advantage.** Simple counter captures a distinct responder or sender signal.
+- **Limitation and verification.** Resets occur during ordinary failures, cleanup and probes. Check direction and session context before using the count to label reconnaissance.
+
+### legacy / `psh_count`
+
+- **Current behavior.** Counts retained TCP packets with PSH set.
+- **Rationale.** Describes one aspect of packetization or stack behavior during transfers.
+- **Recommended method.** Count observed packets carrying PSH, with TCP eligibility and retransmission context. Flags are not sessions. **Unit or type.** packets.
+- **Alternative and trade-off.** Payload length and response timing answer data volume and progress more directly.
+- **Advantage.** Available from existing flag parsing and useful in comparison with a fixed stack baseline.
+- **Limitation and verification.** Stack and offload choices alter the flag, and the count does not reveal application message boundaries. Compare equal workloads across stacks and ablate it before relying on it.
+
+### legacy / `unique_src_ports`
+
+- **Current behavior.** Counts distinct nonzero source ports in the current key.
+- **Rationale.** Measures sender-port breadth within an otherwise fixed destination key.
+- **Recommended method.** Distinct source ports in a declared source/context/horizon. Retain cardinality support and capping/sketch uncertainty. **Unit or type.** categories.
+- **Alternative and trade-off.** Total packets cannot distinguish repeated use from port churn. Full connection tracking separates reused ports and attempts.
+- **Advantage.** Cheap companion to source-port entropy and the single-port field.
+- **Limitation and verification.** NAT, legitimate concurrency and source-port reuse alter cardinality. Test repeated and distinct sender ports at equal packet count.
+
+### legacy / `unique_dst_ports`
+
+- **Current behavior.** Counts the chosen distinct nonzero destination-port set, source-wide in v2 and key-local in v1.
+- **Rationale.** Describes explored service breadth when the source-wide set is available.
+- **Recommended method.** Distinct destination ports at source/context/horizon scope rather than one fixed-port flow. **Unit or type.** categories.
+- **Alternative and trade-off.** A per-flow port is pinned by the key, so it discards cross-flow breadth. Edge counting retains destination and protocol combinations.
+- **Advantage.** Straightforward count useful for scans spread across keys.
+- **Limitation and verification.** Schema mode affects meaning, and v1 is often zero or one. Validate same-source multi-port traffic in both modes before merging data.
+
+### site_v3 / `out_packets`
+
+- **Current behavior.** Counts accepted packets attributed to the outgoing side of the scoped device window.
+- **Rationale.** Supplies exposure for rate, size and timing interpretation.
+- **Recommended method.** Count locally attributed outgoing observations at the declared IP/VLAN boundary, including explicit omissions. **Unit or type.** packets.
+- **Alternative and trade-off.** Outgoing bytes can miss high packet volume from short frames. Session counts require additional state.
+- **Advantage.** Cheap exact count of observed accepted packets at a declared point.
+- **Limitation and verification.** Duplicate copies and missing visibility affect it. Compare the collector with an independent direction-aware capture and known omissions.
+
+### site_v3 / `in_packets`
+
+- **Current behavior.** Counts accepted incoming observations for the scoped device.
+- **Rationale.** Adds inbound workload context to outgoing pressure and response observations.
+- **Recommended method.** Count locally attributed incoming observations at the identical boundary. Qualify both directions. **Unit or type.** packets.
+- **Alternative and trade-off.** Outgoing counters alone cannot show whether the observation includes replies. Matched response tracking gives protocol outcome.
+- **Advantage.** Explicit direction allows bidirectional coverage checks.
+- **Limitation and verification.** A zero count can indicate idle replies or missing capture. Test with known bidirectional traffic and a deliberately one-sided observation point.
+
+### site_v3 / `out_bytes`
+
+- **Current behavior.** Sums captured frame sizes for outgoing scoped observations.
+- **Rationale.** Measures outgoing observed volume behind rate and asymmetry features.
+- **Recommended method.** Sum outgoing captured frame bytes. Distinguish endpoint identity from pre/post-NAT identities. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Payload-byte count excludes headers and unsupported transports, answering a narrower data-volume question.
+- **Advantage.** Works with encrypted traffic and unparsed payloads.
+- **Limitation and verification.** Observed frame volume includes retransmissions and may omit offloaded or dropped frames. Check against the same boundary and compare benign bulk egress.
+
+### site_v3 / `in_bytes`
+
+- **Current behavior.** Sums captured frame sizes for incoming scoped observations.
+- **Rationale.** Describes received volume and supplies the denominator of the directional byte ratio.
+- **Recommended method.** Sum incoming captured frame bytes at the same scope and horizon. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** Incoming packet count cannot distinguish short acknowledgments from large downloads. Application goodput requires more parsing and state.
+- **Advantage.** Supports direct byte-level direction comparison over the same window.
+- **Limitation and verification.** Capture direction gaps make the ratio misleading. Check an upload, a download and missing inbound capture.
+
+### site_v3 / `out_pps`
+
+- **Current behavior.** Divides outgoing accepted packet observations by recorded window seconds.
+- **Rationale.** Measures observed outgoing packet pressure over comparable exposure.
+- **Recommended method.** Outgoing observations / actual recorded window exposure. Incomplete windows remain ineligible for this scorer. **Unit or type.** packets/second.
+- **Alternative and trade-off.** Active-span PPS amplifies sparse windows. A peak-subwindow rate can describe short bursts but depends on a bin width.
+- **Advantage.** Transparent rate for full-window baseline fitting.
+- **Limitation and verification.** Loss suppresses the estimate and bursts are averaged. Check equal totals at different exposure lengths and review partial-window eligibility.
+
+### site_v3 / `out_bytes_per_second`
+
+- **Current behavior.** Divides outgoing captured bytes by recorded window seconds.
+- **Rationale.** Measures sustained observed egress volume for role and link-load comparisons.
+- **Recommended method.** Outgoing captured bytes divided by actual recorded window exposure. Retain incomplete-window and byte-layer context. **Unit or type.** captured bytes/second.
+- **Alternative and trade-off.** PPS gives no direct measure of byte pressure. Interface counters offer broader load but can lose per-device attribution.
+- **Advantage.** Simple and reproducible from the recorded bytes and exposure.
+- **Limitation and verification.** Video, updates and backups can create legitimate peaks. Compare with interface evidence and keep frame bytes, wire bits and useful payload distinct.
+
+### site_v3 / `packet_size_mean`
+
+- **Current behavior.** Computes the online mean of outgoing captured frame sizes, empty when no outgoing frame is available.
+- **Rationale.** Explains whether outgoing activity tends toward small or large capture units.
+- **Recommended method.** Online mean outgoing frame size with explicit sample count, direction and byte layer. **Unit or type.** captured bytes.
+- **Alternative and trade-off.** A full size histogram describes multiple modes but needs more state.
+- **Advantage.** Stable one-pass estimate with explicit missing output.
+- **Limitation and verification.** Several traffic mixes share one mean and offloads change size distribution. Validate with exact fixture sizes and inspect SD alongside the mean.
 
 ## DEVICE: Device-relative history
 
@@ -450,28 +1627,185 @@ Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/r
 
 Primary basis: [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html), [NIST outlier diagnostics](https://itl.nist.gov/div898/handbook/eda/section3/eda35h.htm), [NIST EWMA control charts](https://itl.nist.gov/div898/handbook/pmc/section3/pmc314.htm), [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `device_total_flows` | observations | Support count for a defined device identity; use to gate confidence, not as attack identity. |
-| legacy / `device_avg_pkt_rate` | packets/second | Prior-only reviewed baseline rate; if using EWMA declare elapsed-time decay and context. |
-| legacy / `device_pkt_rate_deviation` | standardized residual | Score current rate against a frozen prior device/context baseline; compare robust median/MAD and empirical tails. |
-| legacy / `device_avg_byte_rate` | bytes/second | Prior-only reviewed baseline byte rate at the same byte layer/exposure. |
-| legacy / `device_byte_rate_deviation` | standardized residual | Prior-baseline residual with zero-scale and missingness handling; never return normal merely because variance is zero. |
-| legacy / `device_unique_dst_ips` | categories | Distinct peers within the documented horizon and identity scope, with caps reported. |
-| legacy / `device_unique_dst_ports` | categories | Distinct peer-service contacts within documented horizon; preserve cap and eligibility evidence. |
-| legacy / `device_new_dst_ratio` | fraction | Size(current peers minus retained prior peers) / size(current peers), computed before history update; null for empty support. |
-| legacy / `device_protocol_dist_tcp` | fraction | Eligible prior TCP observations / all declared protocol observations; preserve OTHER and observation weighting. |
-| legacy / `device_protocol_dist_udp` | fraction | Eligible prior UDP observations / all declared protocol observations; preserve OTHER and observation weighting. |
-| legacy / `device_protocol_dist_icmp` | fraction | Eligible prior ICMP observations / all declared protocol observations; preserve OTHER and observation weighting. |
-| legacy / `device_avg_payload_size` | declared bytes | Use true transport payload lengths for a payload metric; current legacy inputs are average packet sizes and require a migration. |
-| legacy / `device_payload_size_deviation` | standardized residual | Compare the same byte-layer metric against its prior baseline with robust/empirical alternatives. |
-| legacy / `is_registered_iot` | inventory indicator | Time-valid independent inventory metadata; qualify leakage/role errors and never treat registration as evidence of benignness. |
-| legacy / `is_gateway` | inventory indicator | Time-valid role/context signal; independently verify topology and avoid memorizing device identities. |
-| legacy / `device_age_seconds` | seconds | Elapsed event-time identity lifetime with restart/reassignment explicit; confidence context, not an attack predictor. |
-| legacy / `is_baseline_mature` | eligibility indicator | Evidence-backed support/workload-coverage gate; twenty flows/180 seconds is a legacy heuristic, not reliability proof. |
-| site_v3 / `device_new_dst_ratio` | fraction | Size(current peers minus retained prior peers) / size(current peers), computed before history update; null for empty support. |
-| site_v3 / `device_macs_observed` | categories | Distinct observed outgoing MAC claims for an IP/VLAN window; use authenticated lease/port context before identity action. |
-| site_v3 / `profile_windows_before` | windows | Prior-history support count, excluded from the new scorer as an age/support field. |
+### legacy / `device_total_flows`
+
+- **Current behavior.** Counts accepted profile volume updates for the source IP, driven by rows labeled normal in the legacy path.
+- **Rationale.** Shows how much historical data backs a device baseline.
+- **Recommended method.** Support count for a defined device identity. Use to gate confidence, not as attack identity. **Unit or type.** observations.
+- **Alternative and trade-off.** Wall-clock age alone can be high for a quiet device. Independent effective sample size can account for repeated correlated observations.
+- **Advantage.** Cheap support measure enables cold-start gating.
+- **Limitation and verification.** Multiple rows in one flush can be strongly related, and detector-based inclusion can be biased. Test a busy single window and a slowly observed device with equal counts.
+
+### legacy / `device_avg_pkt_rate`
+
+- **Current behavior.** Reports the per-source EMA of accepted flow packet rates with 0.1 weight for each new row.
+- **Rationale.** Describes the expected packet intensity used to interpret a busy device.
+- **Recommended method.** Prior-only reviewed baseline rate. If using EWMA declare elapsed-time decay and context. **Unit or type.** packets/second.
+- **Alternative and trade-off.** A global PPS threshold ignores device roles. A reviewed median offers greater resistance to spikes with extra state or offline fitting.
+- **Advantage.** Constant-memory EMA follows legitimate workload shifts.
+- **Limitation and verification.** Rows arrive at uneven intervals and false-benign attack rows can shift the baseline. Test gradual contamination and holdout normal bursts against a frozen reference.
+
+### legacy / `device_pkt_rate_deviation`
+
+- **Current behavior.** Standardizes current flow PPS with the profile's running mean and sample SD. Low support or zero SD yields zero.
+- **Rationale.** Quantifies packet intensity relative to that source's observed spread.
+- **Recommended method.** Score current rate against a frozen prior device/context baseline. Compare robust median/MAD and empirical tails. **Unit or type.** standardized residual.
+- **Alternative and trade-off.** Raw PPS thresholds ignore variation between devices. Median/MAD or empirical ranks better handle skewed reference data.
+- **Advantage.** Signed residual shows the direction and scale of change.
+- **Limitation and verification.** Zero fallback conflates unknown spread with no change. Test a constant baseline followed by a spike, plus benign timing changes and sparse support.
+
+### legacy / `device_avg_byte_rate`
+
+- **Current behavior.** Reports the EMA of accepted flow byte rates with 0.1 weight per updated row.
+- **Rationale.** Provides expected observed volume for the source's workload.
+- **Recommended method.** Prior-only reviewed baseline byte rate at the same byte layer/exposure. **Unit or type.** bytes/second.
+- **Alternative and trade-off.** Average packet rate ignores typical packet sizes. A per-service or time-conditioned byte baseline better models varied workloads.
+- **Advantage.** Cheap adaptive summary supports comparison across devices with different volumes.
+- **Limitation and verification.** Busy transfers can dominate and earlier rows in a flush can affect later ones. Compare with a prior-only reference and scheduled backups.
+
+### legacy / `device_byte_rate_deviation`
+
+- **Current behavior.** Standardizes the current observed flow byte rate against the profile mean and sample SD, with zero fallback for low support or zero variance.
+- **Rationale.** Highlights volume changes relative to the device's usual variability.
+- **Recommended method.** Prior-baseline residual with zero-scale and missingness handling. Never return normal merely because variance is zero. **Unit or type.** standardized residual.
+- **Alternative and trade-off.** Absolute byte rate treats a camera and a backup host alike. Robust tails are preferable when baseline rates are heavy-tailed.
+- **Advantage.** A compact residual makes the baseline comparison explicit.
+- **Limitation and verification.** The legacy active-span denominator can inflate sparse flows, and stable reference variance can be zero. Check both effects before comparing alerts.
+
+### legacy / `device_unique_dst_ips`
+
+- **Current behavior.** Reports distinct destinations accumulated so far in the recent per-source profile set, cleared after the flush.
+- **Rationale.** Describes observed breadth of the device's recent contacts.
+- **Recommended method.** Distinct peers within the documented horizon and identity scope, with caps reported. **Unit or type.** categories.
+- **Alternative and trade-off.** Per-flow destination is a single value. A time-bucketed source union retains breadth across multiple windows.
+- **Advantage.** Easy context for a possible sweep and works without payload parsing.
+- **Limitation and verification.** Legacy rows can depend on build order within the flush. Check reordered rows and compare with a complete window snapshot.
+
+### legacy / `device_unique_dst_ports`
+
+- **Current behavior.** Reports distinct ports accumulated so far in the recent device profile set.
+- **Rationale.** Gives device-relative context for broad or unusual service use.
+- **Recommended method.** Distinct peer-service contacts within documented horizon. Preserve cap and eligibility evidence. **Unit or type.** categories.
+- **Alternative and trade-off.** One key's port loses cross-flow activity. Peer/protocol/port edges preserve the service relationships at higher state cost.
+- **Advantage.** Cheap breadth measure that collapses repeated use.
+- **Limitation and verification.** Set membership can include a zero port marker and reflects processing order. Test portless rows and compare with source-wide valid-port counts.
+
+### legacy / `device_new_dst_ratio`
+
+- **Current behavior.** Uses the recent set minus the complement of that set in all seen destinations. A nonempty recent set therefore yields one.
+- **Rationale.** Preserves a field intended to measure how much current activity reaches unfamiliar peers.
+- **Recommended method.** Size(current peers minus retained prior peers) / size(current peers), computed before history update. Null for empty support. **Unit or type.** fraction.
+- **Alternative and trade-off.** A true current-versus-prior set difference computed before updating history yields real novelty. Reputation lists answer a different question.
+- **Advantage.** The existing value supports reproduction of legacy pipelines.
+- **Limitation and verification.** The current set algebra fails to distinguish old peers from new peers. Use an old/new peer fixture and qualify a versioned correction before using it as novelty.
+
+### legacy / `device_protocol_dist_tcp`
+
+- **Current behavior.** Reports TCP profile observations divided by total protocol observations, including OTHER.
+- **Rationale.** Gives context for roles that primarily maintain TCP sessions.
+- **Recommended method.** Eligible prior TCP observations / all declared protocol observations. Preserve OTHER and observation weighting. **Unit or type.** fraction.
+- **Alternative and trade-off.** One flow's protocol is only a point observation. Byte-weighted share emphasizes bulk transfers and answers a different question.
+- **Advantage.** Cheap historical mix summary that distinguishes frequent TCP observations from bulk-byte dominance.
+- **Limitation and verification.** Counts reflect rows and include metadata updates from flagged activity. Compare equal-byte mixed-protocol traces and check accumulation order.
+
+### legacy / `device_protocol_dist_udp`
+
+- **Current behavior.** Reports UDP profile observations divided by total protocol observations.
+- **Rationale.** Shows sustained changes in UDP use for roles such as streaming, DNS or telemetry.
+- **Recommended method.** Eligible prior UDP observations / all declared protocol observations. Preserve OTHER and observation weighting. **Unit or type.** fraction.
+- **Alternative and trade-off.** A raw UDP count scales with profile activity. A role-conditioned packet or byte share can provide complementary exposure.
+- **Advantage.** Normalization makes protocol mix readable across different support totals.
+- **Limitation and verification.** QUIC, gaming and video can legitimately change the mix. Verify denominator and compare a known legitimate UDP transition.
+
+### legacy / `device_protocol_dist_icmp`
+
+- **Current behavior.** Reports ICMP profile observations divided by total protocol observations.
+- **Rationale.** Helps interpret diagnostic usage relative to a device's other traffic.
+- **Recommended method.** Eligible prior ICMP observations / all declared protocol observations. Preserve OTHER and observation weighting. **Unit or type.** fraction.
+- **Alternative and trade-off.** An ICMP count alone cannot separate a busy mixed device from one dominated by diagnostics. Type-specific counts give more precise context.
+- **Advantage.** Cheap normalized historical signal for unusual protocol mix.
+- **Limitation and verification.** Profile weighting counts flow observations and hides type differences. Test approved diagnostics and a rate-matched flood with type evidence.
+
+### legacy / `device_avg_payload_size`
+
+- **Current behavior.** Reports an EMA of accepted flow mean captured sizes, despite the payload name.
+- **Rationale.** Gives the historical size level behind a device's size residual.
+- **Recommended method.** Use true transport payload lengths for a payload metric. Current legacy inputs are average packet sizes and require a migration. **Unit or type.** declared bytes.
+- **Alternative and trade-off.** True transport payload means measure a narrower byte layer and need protocol parsing and a versioned contract.
+- **Advantage.** Constant-state role context can describe usual packet packaging.
+- **Limitation and verification.** Each updated flow mean receives the same new weight regardless of its packet count. Compare uneven flow sizes and verify frame versus payload semantics.
+
+### legacy / `device_payload_size_deviation`
+
+- **Current behavior.** Standardizes the current flow's mean frame size against the profile mean and sample SD, with zero fallback.
+- **Rationale.** Highlights unusual packet packaging relative to the source's history.
+- **Recommended method.** Compare the same byte-layer metric against its prior baseline with robust/empirical alternatives. **Unit or type.** standardized residual.
+- **Alternative and trade-off.** A global small-packet boundary ignores device role. Size histograms retain shape beyond a single mean.
+- **Advantage.** Compact signed comparison can reveal a change even at stable packet rate.
+- **Limitation and verification.** The field describes captured sizes, and MTU or offload changes can mimic an anomaly. Test constant history, a real workload shift and a capture-mode change.
+
+### legacy / `is_registered_iot`
+
+- **Current behavior.** Reports the legacy profile's IoT classification, which can be set from controller IP or MAC registration and discovery.
+- **Rationale.** Supplies role context when comparing devices with different expected workloads.
+- **Recommended method.** Time-valid independent inventory metadata. Qualify leakage/role errors and never treat registration as evidence of benignness. **Unit or type.** inventory indicator.
+- **Alternative and trade-off.** Inferring role solely from traffic can confuse a compromised or newly deployed device. Verified time-valid inventory improves provenance.
+- **Advantage.** Simple indicator can support role-specific interpretation.
+- **Limitation and verification.** The flag can persist and leak lab identities or roles. Check stale registrations and reserve it for context unless held-out evaluation supports its use.
+
+### legacy / `is_gateway`
+
+- **Current behavior.** Reports the profile gateway indicator set using controller gateway classification or discovery.
+- **Rationale.** Helps explain high peer counts or asymmetric forwarding workloads.
+- **Recommended method.** Time-valid role/context signal. Independently verify topology and avoid memorizing device identities. **Unit or type.** inventory indicator.
+- **Alternative and trade-off.** One common device baseline treats a gateway like an ordinary endpoint. Authenticated topology and interface roles provide stronger context.
+- **Advantage.** Compact indication supports stratified evaluation of gateway traffic.
+- **Limitation and verification.** Heuristic or stale roles can attach to an incorrect device. Check a gateway replacement and refresh inventory before relying on it.
+
+### legacy / `device_age_seconds`
+
+- **Current behavior.** Reports wall-clock seconds since the legacy IP profile was first created.
+- **Rationale.** Describes how long the collector has known the address for cold-start interpretation.
+- **Recommended method.** Elapsed event-time identity lifetime with restart/reassignment explicit. Confidence context, not an attack predictor. **Unit or type.** seconds.
+- **Alternative and trade-off.** Flow support counts alone can become large in one burst. Event-time identity lifetime is preferable for replay and reassignment.
+- **Advantage.** Cheap complementary eligibility evidence.
+- **Limitation and verification.** Clock changes and IP reuse can distort it, and long age alone says little about coverage. Test a clock discontinuity or reassignment.
+
+### legacy / `is_baseline_mature`
+
+- **Current behavior.** Emits one when the profile reaches at least 20 flow updates and 180 seconds of age.
+- **Rationale.** Makes the historical heuristic gate visible for review.
+- **Recommended method.** Evidence-backed support/workload-coverage gate. Twenty flows/180 seconds is a legacy heuristic, not reliability proof. **Unit or type.** eligibility indicator.
+- **Alternative and trade-off.** Using only elapsed age or only sample count loses one aspect of readiness. Measured workload diversity and drift checks improve qualification.
+- **Advantage.** Reproducible rule for comparing legacy runs.
+- **Limitation and verification.** Meeting the thresholds does not establish statistical reliability, and correlated rows can satisfy the count quickly. Compare quiet, bursty and varied schedules around both cutoffs.
+
+### site_v3 / `device_new_dst_ratio`
+
+- **Current behavior.** Divides current outgoing peers absent from retained prior history by all current outgoing peers, then updates history.
+- **Rationale.** Detects a shift toward unfamiliar peers relative to the scoped device.
+- **Recommended method.** Size(current peers minus retained prior peers) / size(current peers), computed before history update. Null for empty support. **Unit or type.** fraction.
+- **Alternative and trade-off.** Global reputation misses new contacts to unlisted infrastructure. Domain or service identity can be more stable than addresses.
+- **Advantage.** Score-before-update gives real novelty over retained state and an empty value with no peers.
+- **Limitation and verification.** CDN churn, first contact and history eviction can increase novelty. Test old/new peers, first observation and known eviction.
+
+### site_v3 / `device_macs_observed`
+
+- **Current behavior.** Counts distinct outgoing source MAC claims seen for the same IP/VLAN window.
+- **Rationale.** Highlights ambiguous link-layer identity requiring attribution review.
+- **Recommended method.** Distinct observed outgoing MAC claims for an IP/VLAN window. Use authenticated lease/port context before identity action. **Unit or type.** categories.
+- **Alternative and trade-off.** A first-seen binding masks later claimants. DHCP and authenticated port evidence can resolve ownership.
+- **Advantage.** Bounded count exposes competing observations without embedding full MACs in the row.
+- **Limitation and verification.** Legitimate migration, redundancy or mirror placement may create multiple claims. Check approved reassignment and overlapping conflicting claims with leases.
+
+### site_v3 / `profile_windows_before`
+
+- **Current behavior.** Reports how many observed windows the scoped profile has accumulated before the current update.
+- **Rationale.** Provides a support measure for cold-start and history interpretation.
+- **Recommended method.** Prior-history support count, excluded from the new scorer as an age/support field. **Unit or type.** windows.
+- **Alternative and trade-off.** Uptime ignores whether the particular device was seen. Per-feature support counts better describe sparse parser and peer histories.
+- **Advantage.** Explicit prior-window count helps keep readiness separate from anomaly evidence.
+- **Limitation and verification.** Repeated windows can reflect one workload, and eviction changes support. Test restored, evicted and newly created histories separately.
 
 ## NETWORK: Network-wide context
 
@@ -481,18 +1815,95 @@ Primary basis: [RFC 8520 intended device communication](https://www.rfc-editor.o
 
 Primary basis: [Lakhina/Crovella/Diot feature-distribution research](https://cs-pub.bu.edu/faculty/crovella/anomalies.html), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/), [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `network_active_flows` | keys | Active keys at a named observation scope, distinct from newly created sessions and actual switch occupancy. |
-| legacy / `network_total_pps` | packets/second | Total accepted packet count / actual network-window exposure; preserve scope and drops. |
-| legacy / `network_total_bps` | bytes/second, legacy name | Total captured bytes / actual window exposure; legacy bps here is bytes, not bits. |
-| legacy / `network_unique_src_ips` | categories | Distinct source identities at the sensor scope/horizon with NAT and address reuse explicit. |
-| legacy / `network_unique_dst_ips` | categories | Distinct destination identities at the declared site/window scope, with visibility, sampling and capping evidence. |
-| legacy / `network_avg_flow_duration` | seconds | Mean observed active spans with singleton/censoring behavior explicit; separate from exposure duration. |
-| legacy / `network_entropy_src_ip` | bits | Entropy of source-frequency categories plus sample size/richness; compare eligible site/context baselines. |
-| legacy / `network_entropy_dst_port` | bits | Shannon entropy of destination-port frequency categories at the declared site/context/horizon scope, retaining sample support. |
-| legacy / `active_snort_alerts` | detector observations | Separate signature-derived evidence from behavior-only model inputs and independent ground truth. |
-| legacy / `distinct_alert_types` | detector categories | Count mapped alert categories with GID/SID/ruleset provenance; avoid circular behavioral evaluation. |
+### legacy / `network_active_flows`
+
+- **Current behavior.** Counts keys present in the network snapshot for the flush.
+- **Rationale.** Adds site-scale context about how many observed communication keys were active.
+- **Recommended method.** Active keys at a named observation scope, distinct from newly created sessions and actual switch occupancy. **Unit or type.** keys.
+- **Alternative and trade-off.** Total bytes can be dominated by one transfer. Switch table occupancy measures installed state and needs switch telemetry.
+- **Advantage.** Cheap indicator of breadth and concurrent key activity in the snapshot.
+- **Limitation and verification.** The value repeats across all rows and differs from instantaneous concurrent sessions. Compare many keys in a flush against independent switch statistics.
+
+### legacy / `network_total_pps`
+
+- **Current behavior.** Divides accepted network packet count by the configured window duration.
+- **Rationale.** Gives overall observed packet pressure against which to interpret a device spike.
+- **Recommended method.** Total accepted packet count / actual network-window exposure. Preserve scope and drops. **Unit or type.** packets/second.
+- **Alternative and trade-off.** Per-device PPS misses site-wide events. Actual measured elapsed time better handles delayed flushes.
+- **Advantage.** One context value describes common load across the window.
+- **Limitation and verification.** Configured duration may differ from realized exposure and drops reduce observed PPS. Check timer drift, capture loss and shared-row duplication.
+
+### legacy / `network_total_bps`
+
+- **Current behavior.** Divides network captured bytes by configured window seconds. The stored unit is bytes per second.
+- **Rationale.** Describes observed site-wide byte volume and helps identify shared congestion conditions.
+- **Recommended method.** Total captured bytes / actual window exposure. Legacy bps here is bytes, not bits. **Unit or type.** bytes/second, legacy name.
+- **Alternative and trade-off.** Total PPS omits size distribution. Independent interface throughput measures another boundary.
+- **Advantage.** Reproducible aggregate from byte count and configured time.
+- **Limitation and verification.** The name can be misread as bits per second. Verify units, duration and capture boundary against an independent counter.
+
+### legacy / `network_unique_src_ips`
+
+- **Current behavior.** Counts distinct accepted packet source addresses in the network window.
+- **Rationale.** Explains whether pressure is concentrated in one observed source or distributed across many addresses.
+- **Recommended method.** Distinct source identities at the sensor scope/horizon with NAT and address reuse explicit. **Unit or type.** categories.
+- **Alternative and trade-off.** PPS measures total intensity and loses source richness. Source entropy adds concentration weighting.
+- **Advantage.** Simple context that remains readable when packet volume varies.
+- **Limitation and verification.** NAT can collapse senders and spoofed addresses can inflate richness. Compare a shared gateway and many known sources.
+
+### legacy / `network_unique_dst_ips`
+
+- **Current behavior.** Counts distinct accepted destination addresses in the network window.
+- **Rationale.** Shows changes in site-wide reach such as discovery or broad rollout traffic.
+- **Recommended method.** Distinct destination identities at the declared site/window scope, with visibility, sampling and capping evidence. **Unit or type.** categories.
+- **Alternative and trade-off.** Per-source breadth misses shared shifts. Destination entropy emphasizes concentration and can complement richness.
+- **Advantage.** Direct count helps explain broad versus focused site activity.
+- **Limitation and verification.** Capture placement and shared services affect breadth. Compare a rollout and an independently verified sweep with equal observed volume.
+
+### legacy / `network_avg_flow_duration`
+
+- **Current behavior.** Averages first-to-last spans over observed keys, flooring each at one millisecond.
+- **Rationale.** Summarizes whether a window consists mostly of short or long observed key activity.
+- **Recommended method.** Mean observed active spans with singleton/censoring behavior explicit. Separate from exposure duration. **Unit or type.** seconds.
+- **Alternative and trade-off.** Total exposure is shared by the window and loses key-level spans. Survival analysis needs tracked sessions and censored outcomes.
+- **Advantage.** Cheap context for many short probes versus sustained transfers.
+- **Limitation and verification.** Window splitting and singleton floors distort lifetime interpretation. Test known long-lived and short-lived sessions against their key spans.
+
+### legacy / `network_entropy_src_ip`
+
+- **Current behavior.** Computes Shannon entropy from network packet counts grouped by source address.
+- **Rationale.** Distinguishes traffic dominated by one source from a more even source mix.
+- **Recommended method.** Entropy of source-frequency categories plus sample size/richness. Compare eligible site/context baselines. **Unit or type.** bits.
+- **Alternative and trade-off.** Source cardinality treats rare and dominant contributors equally. Top share captures dominance but loses the distribution beyond the largest source.
+- **Advantage.** Captures concentration at fixed richness.
+- **Limitation and verification.** NAT, spoofing and variable visibility change source frequencies. Test balanced and skewed traces with identical source counts.
+
+### legacy / `network_entropy_dst_port`
+
+- **Current behavior.** Computes Shannon entropy of network packet counts for nonzero destination ports.
+- **Rationale.** Describes whether observed service traffic is concentrated or spread across ports.
+- **Recommended method.** Shannon entropy of destination-port frequency categories at the declared site/context/horizon scope, retaining sample support. **Unit or type.** bits.
+- **Alternative and trade-off.** Numeric port SD depends on arbitrary port magnitudes. Cardinality ignores relative frequencies.
+- **Advantage.** Categorical distribution context is invariant to one-to-one relabeling.
+- **Limitation and verification.** A busy legitimate service lowers entropy and portless traffic is excluded. Report eligible count and compare focused traffic with an even service mix.
+
+### legacy / `active_snort_alerts`
+
+- **Current behavior.** Counts recent alerts retained by the flush, using a cutoff of twice the configured window duration.
+- **Rationale.** Supplies signature-engine context for analyzing simultaneous behavioral changes.
+- **Recommended method.** Separate signature-derived evidence from behavior-only model inputs and independent ground truth. **Unit or type.** detector observations.
+- **Alternative and trade-off.** Ignoring alerts loses corroboration. Independent attack truth and de-duplicated incidents answer separate evaluation questions.
+- **Advantage.** Cheap indicator of the amount of observed detector activity.
+- **Limitation and verification.** Repeated alerts and overlapping windows inflate incident impressions. Check time, ruleset and deduplication, and separate this field from behavior-only inputs.
+
+### legacy / `distinct_alert_types`
+
+- **Current behavior.** Counts distinct mapped type values across the same recent alert set.
+- **Rationale.** Distinguishes a repetitive alert stream from several observed categories.
+- **Recommended method.** Count mapped alert categories with GID/SID/ruleset provenance. Avoid circular behavioral evaluation. **Unit or type.** detector categories.
+- **Alternative and trade-off.** Total alert count can be high for one repeated signature. Rule-ID distributions retain more detector provenance.
+- **Advantage.** Compact summary for incident review alongside alert volume.
+- **Limitation and verification.** Mapping changes, fallback text and generic categories affect richness. Verify categories with original alerts and keep them separate from ground truth.
 
 ## LABELS: Independent truth and detector labels
 
@@ -502,11 +1913,32 @@ Primary basis: [Lakhina/Crovella/Diot feature-distribution research](https://cs-
 
 Primary basis: [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp), [Sommer/Paxson, operational NIDS limitations](https://gangw.cs.illinois.edu/class/cs562/papers/Closed_World-IDS-sp10.pdf).
 
-| Schema / column | Units | Recommended measurement |
-| --- | --- | --- |
-| legacy / `label` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `attack_type` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
-| legacy / `snort_sid` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+### legacy / `label`
+
+- **Current behavior.** Exports the legacy numeric detector or override result. Normal defaults, signature/DAI and behavioral assignments have different provenance.
+- **Rationale.** Preserves how a row was categorized during collection and later inference handling.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Treating every unlabeled row as verified benign biases evaluation. Independent target and campaign adjudication supplies stronger truth.
+- **Advantage.** Enables reproduction and audit of the original labeling workflow.
+- **Limitation and verification.** Detection mode, cooldown and detector misses affect it. Check assignment provenance and exclude the label from predictor inputs.
+
+### legacy / `attack_type`
+
+- **Current behavior.** Exports the mapped attack class or normal value selected by legacy labeling and applicable inference.
+- **Rationale.** Supports per-family review and identifies which taxonomy the collector used.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** A binary class hides which detection mechanism succeeded or failed. Independent multi-label adjudication can represent mixed scenarios.
+- **Advantage.** Makes class-specific failure analysis possible.
+- **Limitation and verification.** A mapped class is a detector or operator assignment and can be wrong. Compare against independent scenario receipts and exclude it from predictors.
+
+### legacy / `snort_sid`
+
+- **Current behavior.** Exports a matched signature ID or a provenance marker such as DAI, manual_override or none.
+- **Rationale.** Helps trace how a legacy row acquired its detector-derived label.
+- **Recommended method.** Retain as typed audit context with its original collection provenance. **Unit or type.** audit/categorical.
+- **Alternative and trade-off.** Attack type alone loses rule-level provenance. A versioned GID/SID/revision join identifies the exact signature more reliably.
+- **Advantage.** Useful for auditing which rules supplied evidence.
+- **Limitation and verification.** Sentinel values and rule revisions limit direct comparisons. Check original alert provenance and exclude this label-related field from behavior-only scoring.
 
 ## QUALITY: Observation quality and missingness
 

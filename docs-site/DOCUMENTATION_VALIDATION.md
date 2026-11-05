@@ -1,5 +1,11 @@
 # Validation
 
+## Field-by-field feature rationale · 2026-11-06
+
+Reviewed current field semantics in `Controller/traffic_capture.py`, `Controller/site_features.py` and `Controller/home_sensor.py`. The expanded reference compares techniques and gives a verification check for each schema field. An independent coverage check matched all 173 schema-qualified headings to the method inventory and their assigned groups, with all six parts present per entry. It also counted 15 proposed measurements across the seven planned groups. Packet and workload checks described in the entries are qualification procedures for future experiments.
+
+Mintlify build, validation, link and accessibility checks passed for the 50-page site with the existing accent contrast advisory. The local preview returned HTTP 200 and rendered all 173 schema-qualified headings. The thin client documentation reader rendered the same fields and planned measurements through plain Markdown headings and lists. Staged documentation sync, feature catalog, AI handbook and whitespace checks passed. This work changes explanatory documentation only.
+
 ## Comparative feature-group presentation · 2026-11-05
 
 Created a live editable presentation with 35 slides, including a dedicated comparison for all 24 numbered groups and the six supporting categories. All 35 slides were rendered and visually inspected individually at full resolution. Session inspection confirmed 35 populated speaker-note sections. Read-only checks of the exported PowerPoint package confirmed 35 slide/notes parts, 34 native editable tables, exact authored slide titles and note content, and no elements extending outside the 1280×720 canvas. These checks do not establish PowerPoint/Google Slides application behavior; native application editing was not tested. The deck cites primary references in speaker notes and separates additional information, planned improvements and experimentally demonstrated superiority.
