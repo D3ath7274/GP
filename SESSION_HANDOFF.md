@@ -1,5 +1,7 @@
 # Session Handoff — 2026-08-19
 
+For current continuation use PROJECT_AI_HANDBOOK.md and its fingerprint check. This older assessment contains historical claims (including fixed mirror amplification, no-skew guarantees, preferred AP mode and missing-file statements) that are not authoritative for the present checkout. Preserve it as history, not current deployment instructions.
+
 Historical handoff: the current project name is **Adaptive IPS framework**. Earlier names and direction below describe the assessment at that time. Current scope and implementation status are maintained in [the service matrix](docs-site/roadmap/final-service-scope.mdx), [delivery phases](docs-site/roadmap/delivery-phases.mdx) and AI_Project_Context.md.
 
 Context carry-over for continuing this work in a new session. Written after a remote

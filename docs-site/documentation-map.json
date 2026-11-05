@@ -3,6 +3,14 @@
   "fallback_pages": ["docs-site/developers/maintenance.mdx"],
   "rules": [
     {
+      "sources": ["scripts/start_docs.cjs", "scripts/start_docs.cmd"],
+      "pages": ["docs-site/deployment/documentation-access.mdx", "docs-site/developers/maintenance.mdx"]
+    },
+    {
+      "sources": ["scripts/build_ai_handoff.py"],
+      "pages": ["docs-site/developers/ai-handoff.mdx", "docs-site/developers/maintenance.mdx"]
+    },
+    {
       "sources": ["Controller/policy_change.py"],
       "pages": ["docs-site/deployment/offline-policy-changes.mdx", "docs-site/developers/policy-change-code-tour.mdx"]
     },

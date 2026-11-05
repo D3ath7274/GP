@@ -1,5 +1,15 @@
 # Validation
 
+## AI continuation handbook, study roadmap and docs launcher · 2026-11-05
+
+Reviewed all tracked source/configuration paths with targeted implementation reads and a non-executing Python AST/import index. The handbook covers 164 tracked files, separates current lanes from historical notes/plans, records locally observed but untracked/excluded material without copying data rows or agent settings, and includes source/contract/fixture/artifact fingerprints. Conditional classes such as RFPreprocessor are included. Authored standalone study/context pages match their MDX counterparts. Historical starter and model/config assumptions are identified rather than presented as successful current deployment behavior.
+
+The local Python suite passed 112 tests, including four new handoff tests. Five Node launcher tests passed, including missing/wrong/escaped package-bin cases, busy/brand/no-start checks, and a detached synthetic server with readiness/state/lock verification and owned-process cleanup. The actual .cmd route reused the healthy site on port 3333; the missing-entry user log was not falsely attributed to a proven installer fault. Current Mint entry/version checks passed. Background lifecycle was additionally exercised with an isolated fixture, not a second production preview. Original Ryu/model/kernel forwarding qualification was not broadened by these tooling tests.
+
+The builder checks every tracked purpose and normalized source/raw-binary fingerprints without importing application modules or loading model artifacts. LF normalization and Git-index reads were tested to avoid Windows/Linux false drift. Its coverage and generated symbol names cannot prove that prose correctly explains semantics, so relevant source/test review remains required. No detector, packet feature/schema, model artifact, REST contract, native firewall adapter or S01–S70 implementation status changed.
+
+The staged documentation, feature and handoff guards passed with 164 file roles, 45 Python modules and 87 fingerprinted code/configuration/fixture/model inputs. The conditional RFPreprocessor class is indexed. Both new live documentation pages returned HTTP 200. Mintlify build/validation, broken-link and accessibility checks passed for 44 MDX pages, retaining the existing primary-color AA-versus-AAA advisory. CommonJS implementation classification was added with a focused regression; native controller/firewall/hardware claims remain unchanged.
+
 ## No-mirror step-by-step pilot · 2026-11-04
 
 Added matching standalone Markdown/MDX walkthroughs and an editable Markdown results template. The procedure separates t530 software qualification, real PC endpoint capture, address-scoped replay, operator-run namespaced firewall evidence and a seven-day workload schedule. Current CLI arguments and schemas were cross-checked against home_sensor.py, audit_home_data.py, both qualifiers and nft_quarantine.py. The current mirror backend's outgoing-copy skip is explicitly why endpoint/router observations use independent bidirectional capture plus replay. No runtime, model, REST contract or installed ruleset artifact changed.

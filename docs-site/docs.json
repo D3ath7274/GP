@@ -38,6 +38,8 @@
           "architecture/detection",
           "architecture/feature-rationale",
           "developers/maintenance",
+          "developers/study-roadmap",
+          "developers/ai-handoff",
           "deployment/passive-sensor",
           "deployment/nftables-lab",
           "deployment/home-collection",

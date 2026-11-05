@@ -4,6 +4,30 @@ title: "Documentation access and updates"
 
 ## Windows documentation preview on port 3333
 
+The straightforward Windows background command is now:
+
+```powershell
+cd "D:\Graduation Project\data\Claude Code Magic\GP"
+.\scripts\start_docs.cmd
+```
+
+It runs Node directly rather than a PowerShell script file, so it does not require an execution-policy change or finding mint.cmd through PATH. Node is resolved from PATH or the standard Program Files installation. The helper checks local/common-global package locations, reads mint's package.json bin declaration, requires the tested 4.2.1195 package and an existing entry file, and waits for HTTP 200 containing the site name. Its default is a hidden detached background process on port 3333 with logs under .local/docs-preview. Close the terminal after ready/already_ready. Restarting Windows still requires another launch; no login task was installed.
+
+If Node reports MODULE_NOT_FOUND, it did not start the site. A package.json or shim alone does not establish a complete installation. In the standard Node installation, repair the tested package with:
+
+```powershell
+& "$env:ProgramFiles\nodejs\npm.cmd" install --global mint@4.2.1195
+.\scripts\start_docs.cmd
+```
+
+For a custom npm prefix, install locally without a repository-wide dependency upgrade: run the following from docs-site, then run start_docs.cmd from the repository root. Generated node_modules/package-lock material is local; inspect Git before committing anything.
+
+```powershell
+& "$env:ProgramFiles\nodejs\npm.cmd" install --no-save --package-lock=false mint@4.2.1195
+```
+
+Use --port 3334 or --timeout 180 explicitly if needed; occupied unrelated ports are refused rather than silently moved. --foreground is available for debugging. If a node-start-PORT.lock remains after an interrupted launcher, inspect its recorded PID and running command before removing only that stale lock; the helper does not kill processes automatically. A timeout can leave a preparing process, so inspect logs/port before retrying. CLI flags and Node process behavior follow [Mintlify's own CLI](https://www.npmjs.com/package/mint) and [Node child-process documentation](https://nodejs.org/api/child_process.html); the repository pins its tested CLI and CI's Node 22 environment rather than assuming newest-version compatibility.
+
 From the repository root in PowerShell, run:
 
 ```powershell

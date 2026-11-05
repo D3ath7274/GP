@@ -8,4 +8,5 @@ else
   python_command=python
 fi
 "$python_command" scripts/check_docs_sync.py --staged
-exec "$python_command" scripts/check_feature_catalog.py --staged
+"$python_command" scripts/check_feature_catalog.py --staged
+exec "$python_command" scripts/build_ai_handoff.py --staged

@@ -1,5 +1,7 @@
 # Study & Rebuild Plan — from operating this IPS to building it
 
+Historical exercise plan: start with DEVELOPER_STUDY_ROADMAP.md for the current complete curriculum and PROJECT_AI_HANDBOOK.md for current source relationships. Several references below no longer exist; the old fixed 2x-mirror and unconditional zero-day/train-serve claims are not current guarantees. Deliberate break-it exercises belong only in isolated copies/labs. The new roadmap covers site-v3 collection, policy analysis and production evidence as well as this legacy SDN track.
+
 A self-study track that turns *this* project into your curriculum. No new project needed — you go back
 through what you have, with your hands instead of your prompts. Pair it with `DEVELOPER_LEARNING_GUIDE.md`
 (skills→files) and `codebase_overview.md` (the two line-by-line traces).

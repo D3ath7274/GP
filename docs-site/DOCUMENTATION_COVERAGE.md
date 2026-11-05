@@ -32,3 +32,9 @@
 | NO_VISIBILITY_PILOT_RUNBOOK.md, PILOT_RESULTS_TEMPLATE.md, endpoint PCAP replay and namespaced operator-run firewall exercise | Start testing without a traffic mirror; Collect home traffic for two weeks; Test temporary firewall quarantine |
 
 Advanced lab and setup steps remain in the repository runbooks.
+
+| Additional source | Site page |
+| --- | --- |
+| DEVELOPER_STUDY_ROADMAP.md and historical study-plan pointer | Study and rebuild the framework |
+| CODEBASE_AI_HANDOFF.md, PROJECT_AI_HANDBOOK.md, file-purposes.json, codebase-snapshot.json and build_ai_handoff.py | AI continuation and codebase architecture; Develop and verify changes |
+| start_docs.cmd/start_docs.cjs, tests/test_docs_launcher.cjs and Node CI check | Documentation access and updates; Develop and verify changes |

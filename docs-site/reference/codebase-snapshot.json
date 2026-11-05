@@ -1,0 +1,4497 @@
+{
+  "version": "ai-codebase-snapshot-v1",
+  "reference_base_commit": "98b947d2c97458a9e80d8b7e6e771f4f91b32ccd",
+  "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
+  "context_sha256": "89989e6e826253a528740b3f0b550b5f56d571f70aacc1f1ca219514902ba61d",
+  "files": [
+    {
+      "path": ".githooks/pre-commit",
+      "purpose": "Versioned local hook runs staged documentation, feature-catalog and AI-handoff guards; clone configuration and server-side rules remain separate.",
+      "sha256": "ecc8f71ca1b826f170e79ee905ef951f255d320db7d4209239892217b2980fcf",
+      "canonical_bytes": 379
+    },
+    {
+      "path": ".github/workflows/documentation.yml",
+      "purpose": "Push/PR workflow qualifies offline Python, committed guards, Node launcher and Mintlify build/link/accessibility checks.",
+      "sha256": "3567c08bf85707122c41584a4ae148d4a93204ce74e63198cf2e1ae6720b14c6",
+      "canonical_bytes": 2772
+    },
+    {
+      "path": ".gitignore",
+      "purpose": "Excludes generated caches, local state, vendored setup material and Node dependencies from authored product commits."
+    },
+    {
+      "path": "AGENTS.md",
+      "purpose": "Repository maintenance rules require source-related documentation, rationale, release honesty and fresh source-checked AI context."
+    },
+    {
+      "path": "AI_Project_Context.md",
+      "purpose": "Historical dense index now points to current source-checked context; earlier assumptions remain history rather than guarantees."
+    },
+    {
+      "path": "CODEBASE_AI_HANDOFF.md",
+      "purpose": "Authored continuation core explains goals, runtime lanes, call paths, authority, known risks and scoped next-work procedure."
+    },
+    {
+      "path": "Controller/Controller_main_Claude.py",
+      "purpose": "Merged Ryu OF1.0 app owns datapaths, learning/DAI, Snort callbacks, hub block queue, UDP control and legacy REST handlers.",
+      "sha256": "0057d822e381cb7974521bea2c56b272bcb68d8bc7a5a8253702eb2993ec5c07",
+      "canonical_bytes": 93962,
+      "symbols": [
+        {
+          "name": "_route_wsgi_access_log_to_file",
+          "kind": "function",
+          "line": 74,
+          "end_line": 139
+        },
+        {
+          "name": "_route_wsgi_access_log_to_file._FileLog",
+          "kind": "class",
+          "line": 97,
+          "end_line": 111
+        },
+        {
+          "name": "_route_wsgi_access_log_to_file._FileLog.write",
+          "kind": "function",
+          "line": 99,
+          "end_line": 103
+        },
+        {
+          "name": "_route_wsgi_access_log_to_file._FileLog.info",
+          "kind": "function",
+          "line": 104,
+          "end_line": 105
+        },
+        {
+          "name": "_route_wsgi_access_log_to_file._FileLog.flush",
+          "kind": "function",
+          "line": 107,
+          "end_line": 111
+        },
+        {
+          "name": "_route_wsgi_access_log_to_file._server",
+          "kind": "function",
+          "line": 133,
+          "end_line": 134
+        },
+        {
+          "name": "SimpleSwitch",
+          "kind": "class",
+          "line": 142,
+          "end_line": 1559
+        },
+        {
+          "name": "SimpleSwitch.__init__",
+          "kind": "function",
+          "line": 148,
+          "end_line": 413
+        },
+        {
+          "name": "SimpleSwitch._handle_snort_alert",
+          "kind": "function",
+          "line": 418,
+          "end_line": 466
+        },
+        {
+          "name": "SimpleSwitch.close",
+          "kind": "function",
+          "line": 468,
+          "end_line": 481
+        },
+        {
+          "name": "SimpleSwitch._udp_command_listener",
+          "kind": "function",
+          "line": 486,
+          "end_line": 767
+        },
+        {
+          "name": "SimpleSwitch._ip_to_int",
+          "kind": "function",
+          "line": 778,
+          "end_line": 779
+        },
+        {
+          "name": "SimpleSwitch._resolve_mac",
+          "kind": "function",
+          "line": 781,
+          "end_line": 788
+        },
+        {
+          "name": "SimpleSwitch.rest_block_ip",
+          "kind": "function",
+          "line": 790,
+          "end_line": 831
+        },
+        {
+          "name": "SimpleSwitch.rest_unblock_ip",
+          "kind": "function",
+          "line": 833,
+          "end_line": 855
+        },
+        {
+          "name": "SimpleSwitch.get_blocked_list",
+          "kind": "function",
+          "line": 857,
+          "end_line": 861
+        },
+        {
+          "name": "SimpleSwitch.block_attacker",
+          "kind": "function",
+          "line": 866,
+          "end_line": 902
+        },
+        {
+          "name": "SimpleSwitch.unblock_attacker",
+          "kind": "function",
+          "line": 904,
+          "end_line": 912
+        },
+        {
+          "name": "SimpleSwitch._block_worker",
+          "kind": "function",
+          "line": 914,
+          "end_line": 933
+        },
+        {
+          "name": "SimpleSwitch._do_block_attacker",
+          "kind": "function",
+          "line": 935,
+          "end_line": 1036
+        },
+        {
+          "name": "SimpleSwitch._do_unblock_attacker",
+          "kind": "function",
+          "line": 1038,
+          "end_line": 1060
+        },
+        {
+          "name": "SimpleSwitch._load_ips_config",
+          "kind": "function",
+          "line": 1065,
+          "end_line": 1079
+        },
+        {
+          "name": "SimpleSwitch._is_protected_mac",
+          "kind": "function",
+          "line": 1081,
+          "end_line": 1084
+        },
+        {
+          "name": "SimpleSwitch._is_external_ip",
+          "kind": "function",
+          "line": 1086,
+          "end_line": 1098
+        },
+        {
+          "name": "SimpleSwitch._block_external_ip",
+          "kind": "function",
+          "line": 1100,
+          "end_line": 1124
+        },
+        {
+          "name": "SimpleSwitch._unblock_external_ip",
+          "kind": "function",
+          "line": 1126,
+          "end_line": 1135
+        },
+        {
+          "name": "SimpleSwitch.add_flow",
+          "kind": "function",
+          "line": 1137,
+          "end_line": 1151
+        },
+        {
+          "name": "SimpleSwitch.is_iot",
+          "kind": "function",
+          "line": 1153,
+          "end_line": 1168
+        },
+        {
+          "name": "SimpleSwitch.is_gateway",
+          "kind": "function",
+          "line": 1170,
+          "end_line": 1179
+        },
+        {
+          "name": "SimpleSwitch.register_gateway_dynamic",
+          "kind": "function",
+          "line": 1181,
+          "end_line": 1198
+        },
+        {
+          "name": "SimpleSwitch._packet_in_handler",
+          "kind": "function",
+          "line": 1201,
+          "end_line": 1540
+        },
+        {
+          "name": "SimpleSwitch._port_status_handler",
+          "kind": "function",
+          "line": 1543,
+          "end_line": 1559
+        },
+        {
+          "name": "IPSRestController",
+          "kind": "class",
+          "line": 1567,
+          "end_line": 1689
+        },
+        {
+          "name": "IPSRestController.__init__",
+          "kind": "function",
+          "line": 1569,
+          "end_line": 1571
+        },
+        {
+          "name": "IPSRestController.block_ip",
+          "kind": "function",
+          "line": 1574,
+          "end_line": 1590
+        },
+        {
+          "name": "IPSRestController.unblock_ip",
+          "kind": "function",
+          "line": 1593,
+          "end_line": 1594
+        },
+        {
+          "name": "IPSRestController.list_blocked",
+          "kind": "function",
+          "line": 1597,
+          "end_line": 1598
+        },
+        {
+          "name": "IPSRestController.list_switches",
+          "kind": "function",
+          "line": 1601,
+          "end_line": 1603
+        },
+        {
+          "name": "IPSRestController.status",
+          "kind": "function",
+          "line": 1606,
+          "end_line": 1614
+        },
+        {
+          "name": "IPSRestController.metrics",
+          "kind": "function",
+          "line": 1617,
+          "end_line": 1661
+        },
+        {
+          "name": "IPSRestController.alerts",
+          "kind": "function",
+          "line": 1664,
+          "end_line": 1672
+        },
+        {
+          "name": "IPSRestController.dashboard",
+          "kind": "function",
+          "line": 1675,
+          "end_line": 1685
+        },
+        {
+          "name": "IPSRestController._json",
+          "kind": "function",
+          "line": 1687,
+          "end_line": 1689
+        }
+      ],
+      "imports": [
+        "ae_inference",
+        "datetime",
+        "eventlet.wsgi",
+        "ipaddress",
+        "json",
+        "logging",
+        "ml_inference",
+        "os",
+        "psutil",
+        "queue",
+        "ryu.app.wsgi",
+        "ryu.base",
+        "ryu.controller",
+        "ryu.controller.handler",
+        "ryu.lib",
+        "ryu.lib.mac",
+        "ryu.lib.packet",
+        "ryu.ofproto",
+        "snort_monitor",
+        "socket",
+        "struct",
+        "subprocess",
+        "sys",
+        "threading",
+        "time",
+        "traffic_capture",
+        "traffic_mirror",
+        "webob"
+      ]
+    },
+    {
+      "path": "Controller/SNORT_IDS_README.md",
+      "purpose": "Legacy integrated-Snort instructions must be compared against current manager/configuration and actual installed build."
+    },
+    {
+      "path": "Controller/STANDALONE_SNORT_RYU_FILES.md",
+      "purpose": "Historical alternate-chain asset list includes references that are absent from the present tracked controller source."
+    },
+    {
+      "path": "Controller/ae_inference.py",
+      "purpose": "Legacy NumPy dense reconstruction scorer loads schema-specific trusted bundle weights/scaler/threshold and computes normalized error.",
+      "sha256": "df5f9d503143ffb8848bf14cf50ce6075d2d784fa10f789fc73eb65a983e3791",
+      "canonical_bytes": 7155,
+      "symbols": [
+        {
+          "name": "AEInferenceEngine",
+          "kind": "class",
+          "line": 52,
+          "end_line": 162
+        },
+        {
+          "name": "AEInferenceEngine.__init__",
+          "kind": "function",
+          "line": 55,
+          "end_line": 65
+        },
+        {
+          "name": "AEInferenceEngine._log",
+          "kind": "function",
+          "line": 67,
+          "end_line": 71
+        },
+        {
+          "name": "AEInferenceEngine._load",
+          "kind": "function",
+          "line": 73,
+          "end_line": 97
+        },
+        {
+          "name": "AEInferenceEngine._vectorize",
+          "kind": "function",
+          "line": 99,
+          "end_line": 120
+        },
+        {
+          "name": "AEInferenceEngine._forward",
+          "kind": "function",
+          "line": 122,
+          "end_line": 128
+        },
+        {
+          "name": "AEInferenceEngine.score",
+          "kind": "function",
+          "line": 130,
+          "end_line": 154
+        },
+        {
+          "name": "AEInferenceEngine.get_stats",
+          "kind": "function",
+          "line": 156,
+          "end_line": 162
+        }
+      ],
+      "imports": [
+        "joblib",
+        "numpy",
+        "os",
+        "pandas"
+      ]
+    },
+    {
+      "path": "Controller/collection_io.py",
+      "purpose": "Exclusive nonblocking OS lease prevents concurrent writer/reviewer/report access and releases with handle or process closure.",
+      "sha256": "d622c95f1d8eeaa08b488bb0c007063af7574b8d01761a1b8da8b4aa47573aa6",
+      "canonical_bytes": 1173,
+      "symbols": [
+        {
+          "name": "collection_lease",
+          "kind": "function",
+          "line": 9,
+          "end_line": 31
+        }
+      ],
+      "imports": [
+        "contextlib",
+        "fcntl",
+        "msvcrt",
+        "os",
+        "pathlib"
+      ]
+    },
+    {
+      "path": "Controller/collection_report.py",
+      "purpose": "Stopped-run auditor validates paired rows/evidence/provenance and summarizes integrity, quality and coverage without assigning benign truth.",
+      "sha256": "80e704fb103956488e5e5f5d449f509ad84a7223f2a6e30d7fe31d76f644b540",
+      "canonical_bytes": 13290,
+      "symbols": [
+        {
+          "name": "instant",
+          "kind": "function",
+          "line": 24,
+          "end_line": 28
+        },
+        {
+          "name": "report",
+          "kind": "function",
+          "line": 31,
+          "end_line": 34
+        },
+        {
+          "name": "_report",
+          "kind": "function",
+          "line": 37,
+          "end_line": 191
+        }
+      ],
+      "imports": [
+        "collection_io",
+        "collections",
+        "csv",
+        "datetime",
+        "ipaddress",
+        "itertools",
+        "json",
+        "math",
+        "pathlib",
+        "site_policy",
+        "sqlite3",
+        "tempfile"
+      ]
+    },
+    {
+      "path": "Controller/firewall_policy.py",
+      "purpose": "Strict operator-model JSON/schema, bounded address/port resolution, ordered header queries and same-context structural differences.",
+      "sha256": "fde9dd1de65618c4e3bede3ded49608e8642a60ce650e584eb12176200cf3372",
+      "canonical_bytes": 16999,
+      "symbols": [
+        {
+          "name": "canonical_bytes",
+          "kind": "function",
+          "line": 25,
+          "end_line": 28
+        },
+        {
+          "name": "sha256",
+          "kind": "function",
+          "line": 31,
+          "end_line": 32
+        },
+        {
+          "name": "_unique_pairs",
+          "kind": "function",
+          "line": 35,
+          "end_line": 41
+        },
+        {
+          "name": "parse_json",
+          "kind": "function",
+          "line": 44,
+          "end_line": 52
+        },
+        {
+          "name": "parse_json.invalid_number",
+          "kind": "function",
+          "line": 47,
+          "end_line": 48
+        },
+        {
+          "name": "read_input",
+          "kind": "function",
+          "line": 55,
+          "end_line": 58
+        },
+        {
+          "name": "_fields",
+          "kind": "function",
+          "line": 61,
+          "end_line": 63
+        },
+        {
+          "name": "_text",
+          "kind": "function",
+          "line": 66,
+          "end_line": 71
+        },
+        {
+          "name": "_id",
+          "kind": "function",
+          "line": 74,
+          "end_line": 77
+        },
+        {
+          "name": "_conditions",
+          "kind": "function",
+          "line": 80,
+          "end_line": 83
+        },
+        {
+          "name": "_addresses",
+          "kind": "function",
+          "line": 86,
+          "end_line": 100
+        },
+        {
+          "name": "port_intervals",
+          "kind": "function",
+          "line": 103,
+          "end_line": 126
+        },
+        {
+          "name": "_ports",
+          "kind": "function",
+          "line": 129,
+          "end_line": 133
+        },
+        {
+          "name": "ResolvedAddresses",
+          "kind": "class",
+          "line": 137,
+          "end_line": 139
+        },
+        {
+          "name": "AddressResolver",
+          "kind": "class",
+          "line": 142,
+          "end_line": 184
+        },
+        {
+          "name": "AddressResolver.__init__",
+          "kind": "function",
+          "line": 144,
+          "end_line": 147
+        },
+        {
+          "name": "AddressResolver._consume",
+          "kind": "function",
+          "line": 149,
+          "end_line": 152
+        },
+        {
+          "name": "AddressResolver.resolve",
+          "kind": "function",
+          "line": 154,
+          "end_line": 184
+        },
+        {
+          "name": "normalize",
+          "kind": "function",
+          "line": 187,
+          "end_line": 253
+        },
+        {
+          "name": "query",
+          "kind": "function",
+          "line": 256,
+          "end_line": 272
+        },
+        {
+          "name": "_address_match",
+          "kind": "function",
+          "line": 275,
+          "end_line": 278
+        },
+        {
+          "name": "_port_match",
+          "kind": "function",
+          "line": 281,
+          "end_line": 286
+        },
+        {
+          "name": "PolicyEvaluator",
+          "kind": "class",
+          "line": 289,
+          "end_line": 336
+        },
+        {
+          "name": "PolicyEvaluator.__init__",
+          "kind": "function",
+          "line": 290,
+          "end_line": 292
+        },
+        {
+          "name": "PolicyEvaluator.match",
+          "kind": "function",
+          "line": 294,
+          "end_line": 304
+        },
+        {
+          "name": "PolicyEvaluator.search",
+          "kind": "function",
+          "line": 306,
+          "end_line": 336
+        },
+        {
+          "name": "diff_policies",
+          "kind": "function",
+          "line": 339,
+          "end_line": 357
+        },
+        {
+          "name": "diff_policies.changed",
+          "kind": "function",
+          "line": 343,
+          "end_line": 350
+        }
+      ],
+      "imports": [
+        "dataclasses",
+        "datetime",
+        "hashlib",
+        "ipaddress",
+        "json",
+        "pathlib",
+        "re"
+      ]
+    },
+    {
+      "path": "Controller/home_sensor.py",
+      "purpose": "Site-v3 entry point orchestrates lease, interface/replay capture, device windows, paired evidence/checkpoints and read-only dashboard endpoints.",
+      "sha256": "e923cc0ee7e82b3150c9573319ea642659fe6be93caa2cb785883a9100e36d9c",
+      "canonical_bytes": 22405,
+      "symbols": [
+        {
+          "name": "utc",
+          "kind": "function",
+          "line": 43,
+          "end_line": 44
+        },
+        {
+          "name": "collection_contract",
+          "kind": "function",
+          "line": 47,
+          "end_line": 60
+        },
+        {
+          "name": "atomic_json",
+          "kind": "function",
+          "line": 63,
+          "end_line": 69
+        },
+        {
+          "name": "StorageLimitError",
+          "kind": "class",
+          "line": 72,
+          "end_line": 73
+        },
+        {
+          "name": "HomeCollection",
+          "kind": "class",
+          "line": 76,
+          "end_line": 295
+        },
+        {
+          "name": "HomeCollection.__init__",
+          "kind": "function",
+          "line": 77,
+          "end_line": 150
+        },
+        {
+          "name": "HomeCollection._check_storage",
+          "kind": "function",
+          "line": 152,
+          "end_line": 159
+        },
+        {
+          "name": "HomeCollection.record",
+          "kind": "function",
+          "line": 161,
+          "end_line": 199
+        },
+        {
+          "name": "HomeCollection.advance",
+          "kind": "function",
+          "line": 201,
+          "end_line": 206
+        },
+        {
+          "name": "HomeCollection._flush",
+          "kind": "function",
+          "line": 208,
+          "end_line": 238
+        },
+        {
+          "name": "HomeCollection.snapshot",
+          "kind": "function",
+          "line": 240,
+          "end_line": 251
+        },
+        {
+          "name": "HomeCollection.checkpoint",
+          "kind": "function",
+          "line": 253,
+          "end_line": 262
+        },
+        {
+          "name": "HomeCollection.read",
+          "kind": "function",
+          "line": 264,
+          "end_line": 295
+        },
+        {
+          "name": "collect",
+          "kind": "function",
+          "line": 298,
+          "end_line": 365
+        },
+        {
+          "name": "collect.ingest",
+          "kind": "function",
+          "line": 299,
+          "end_line": 305
+        },
+        {
+          "name": "collect.sample_kernel_statistics",
+          "kind": "function",
+          "line": 326,
+          "end_line": 331
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 368,
+          "end_line": 423
+        }
+      ],
+      "imports": [
+        "argparse",
+        "collection_io",
+        "collections",
+        "csv",
+        "datetime",
+        "functools",
+        "hashlib",
+        "http.server",
+        "ipaddress",
+        "json",
+        "logging",
+        "math",
+        "os",
+        "passive_ids",
+        "pathlib",
+        "platform",
+        "psutil",
+        "scapy",
+        "scapy.error",
+        "scapy.layers.l2",
+        "scapy.utils",
+        "shutil",
+        "signal",
+        "site_features",
+        "site_policy",
+        "socket",
+        "struct",
+        "sys",
+        "threading",
+        "time",
+        "uuid"
+      ]
+    },
+    {
+      "path": "Controller/ips_config.json",
+      "purpose": "Merged-controller testbed LAN/whitelist/protected-MAC defaults require deliberate real-network configuration rather than copying examples blindly.",
+      "sha256": "07db785413b8e97ccfcc6e81da7186346a7bf8b04d87d92d487275efe426e410",
+      "canonical_bytes": 478
+    },
+    {
+      "path": "Controller/ipsctl.py",
+      "purpose": "Text UDP control sender confirms only sending, not authenticated receipt, accepted configuration or actual containment.",
+      "sha256": "1ce61c8a5ec219281d89fdf809a0fbe2ec3dbb69c44f4693e734c5fa9932f29a",
+      "canonical_bytes": 1568,
+      "symbols": [
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 31,
+          "end_line": 41
+        }
+      ],
+      "imports": [
+        "os",
+        "socket",
+        "sys"
+      ]
+    },
+    {
+      "path": "Controller/local_docs.py",
+      "purpose": "Read-only sensor documentation renderer confines requests to docs-site and rejects traversal while presenting lightweight Markdown.",
+      "sha256": "56a41573a028287fbfdb072158911506fdc9a8d6fa442f1dc19a44c07d522e9e",
+      "canonical_bytes": 2864,
+      "symbols": [
+        {
+          "name": "document",
+          "kind": "function",
+          "line": 12,
+          "end_line": 54
+        }
+      ],
+      "imports": [
+        "html",
+        "markdown",
+        "pathlib",
+        "re",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "Controller/ml_inference.py",
+      "purpose": "Legacy RF loader and conditional RFPreprocessor preserve artifact columns, force single-job scoring and expose fallback/statistics behavior.",
+      "sha256": "c3d8c8768276da18af641ae87a7199d7eb403106cd8e2473622ba2d9636fd0c5",
+      "canonical_bytes": 13842,
+      "symbols": [
+        {
+          "name": "RFPreprocessor",
+          "kind": "class",
+          "line": 80,
+          "end_line": 104
+        },
+        {
+          "name": "RFPreprocessor.__init__",
+          "kind": "function",
+          "line": 81,
+          "end_line": 86
+        },
+        {
+          "name": "RFPreprocessor.fit",
+          "kind": "function",
+          "line": 88,
+          "end_line": 89
+        },
+        {
+          "name": "RFPreprocessor.transform",
+          "kind": "function",
+          "line": 91,
+          "end_line": 104
+        },
+        {
+          "name": "MLInferenceEngine",
+          "kind": "class",
+          "line": 111,
+          "end_line": 304
+        },
+        {
+          "name": "MLInferenceEngine.__init__",
+          "kind": "function",
+          "line": 114,
+          "end_line": 131
+        },
+        {
+          "name": "MLInferenceEngine._log",
+          "kind": "function",
+          "line": 133,
+          "end_line": 137
+        },
+        {
+          "name": "MLInferenceEngine._load",
+          "kind": "function",
+          "line": 139,
+          "end_line": 188
+        },
+        {
+          "name": "MLInferenceEngine._force_single_threaded",
+          "kind": "function",
+          "line": 190,
+          "end_line": 208
+        },
+        {
+          "name": "MLInferenceEngine._preprocess_bundle",
+          "kind": "function",
+          "line": 211,
+          "end_line": 220
+        },
+        {
+          "name": "MLInferenceEngine._infer",
+          "kind": "function",
+          "line": 222,
+          "end_line": 250
+        },
+        {
+          "name": "MLInferenceEngine._result",
+          "kind": "function",
+          "line": 252,
+          "end_line": 256
+        },
+        {
+          "name": "MLInferenceEngine.predict",
+          "kind": "function",
+          "line": 258,
+          "end_line": 274
+        },
+        {
+          "name": "MLInferenceEngine.predict_batch",
+          "kind": "function",
+          "line": 276,
+          "end_line": 293
+        },
+        {
+          "name": "MLInferenceEngine.get_stats",
+          "kind": "function",
+          "line": 295,
+          "end_line": 304
+        }
+      ],
+      "imports": [
+        "__main__",
+        "joblib",
+        "numpy",
+        "os",
+        "pandas",
+        "sklearn.base",
+        "time",
+        "warnings"
+      ]
+    },
+    {
+      "path": "Controller/ml_models/ae_bundle.joblib",
+      "purpose": "Opaque tracked legacy AE parameter bundle is not compatible with site-v3 rows merely because feature names overlap.",
+      "sha256": "71e2e0ae94150fea23c6becda9a7883ac66dedadeb9a8116bf4c84a8eb6dd5cb",
+      "canonical_bytes": 82439
+    },
+    {
+      "path": "Controller/ml_models/autoencoder_tighter_bottleneck_16units.h5",
+      "purpose": "Tracked trained dense weight input for AE bundling; it does not supply a complete qualified future weight-training process.",
+      "sha256": "9af471039b61541a1fe257ac4943c70935c6838161fa3d8070bb4566ef865fb7",
+      "canonical_bytes": 154384
+    },
+    {
+      "path": "Controller/ml_models/build_ae_bundle.py",
+      "purpose": "Offline H5 weight bundler recalibrates data-derived preprocessing/error quantiles; it does not train new AE weights.",
+      "sha256": "ff78d4fad324b426c0d0a0ed5e5d5e0025722a40fd247c16f6b4267bae4b65d4",
+      "canonical_bytes": 4596,
+      "symbols": [
+        {
+          "name": "load_weights",
+          "kind": "function",
+          "line": 45,
+          "end_line": 53
+        },
+        {
+          "name": "forward",
+          "kind": "function",
+          "line": 56,
+          "end_line": 61
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 64,
+          "end_line": 105
+        }
+      ],
+      "imports": [
+        "argparse",
+        "h5py",
+        "joblib",
+        "numpy",
+        "pandas",
+        "sklearn.model_selection",
+        "sklearn.preprocessing"
+      ]
+    },
+    {
+      "path": "Controller/ml_models/retrain_rf_v4.py",
+      "purpose": "Offline legacy RF retrainer inherits deployed schema/hyperparameters and refits preprocessing/classifier with optional training resampling.",
+      "sha256": "43bb0035d95477c31fdd09338d2ecc5bba62e6e2a7d36d775fc7f976dca7a6e9",
+      "canonical_bytes": 6529,
+      "symbols": [
+        {
+          "name": "build_encoded",
+          "kind": "function",
+          "line": 57,
+          "end_line": 66
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 69,
+          "end_line": 129
+        }
+      ],
+      "imports": [
+        "argparse",
+        "imblearn.over_sampling",
+        "joblib",
+        "ml_inference",
+        "numpy",
+        "os",
+        "pandas",
+        "sklearn",
+        "sklearn.base",
+        "sklearn.metrics",
+        "sklearn.model_selection",
+        "sklearn.pipeline",
+        "sklearn.preprocessing",
+        "sys"
+      ]
+    },
+    {
+      "path": "Controller/ml_models/rf_pipeline.joblib",
+      "purpose": "Opaque tracked legacy sklearn artifact fingerprinted without loading; compatible trusted inspection is needed for actual model metadata.",
+      "sha256": "c5f53061666aaa532559aaca4c753cd1c030993a7dcff0386442367ef6c14433",
+      "canonical_bytes": 6508042
+    },
+    {
+      "path": "Controller/nft_quarantine.py",
+      "purpose": "Operator-only scoped IPv4 timeout-set adapter validates dedicated nftables structure and reads back single-element add/remove results.",
+      "sha256": "0f4eb2f0fd1206c30c5390d1b32308e9e3b6f9919342d4a2f163833ea58984b1",
+      "canonical_bytes": 3939,
+      "symbols": [
+        {
+          "name": "nft",
+          "kind": "function",
+          "line": 14,
+          "end_line": 17
+        },
+        {
+          "name": "read_set",
+          "kind": "function",
+          "line": 20,
+          "end_line": 38
+        },
+        {
+          "name": "members",
+          "kind": "function",
+          "line": 41,
+          "end_line": 43
+        },
+        {
+          "name": "change",
+          "kind": "function",
+          "line": 46,
+          "end_line": 65
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 68,
+          "end_line": 87
+        }
+      ],
+      "imports": [
+        "argparse",
+        "ipaddress",
+        "json",
+        "subprocess"
+      ]
+    },
+    {
+      "path": "Controller/passive_ids.py",
+      "purpose": "Standalone legacy Ethernet/PCAP observer adapts packets into TrafficCapture/models and supplies the shared read-only dashboard handler.",
+      "sha256": "380661308a4093e8ca3a9ca21e908c4248d8166c39ff1863d0b2ed7f59d4681d",
+      "canonical_bytes": 8749,
+      "symbols": [
+        {
+          "name": "packet_info",
+          "kind": "function",
+          "line": 32,
+          "end_line": 61
+        },
+        {
+          "name": "PassiveSensor",
+          "kind": "class",
+          "line": 64,
+          "end_line": 108
+        },
+        {
+          "name": "PassiveSensor.__init__",
+          "kind": "function",
+          "line": 65,
+          "end_line": 75
+        },
+        {
+          "name": "PassiveSensor.on_detection_observed",
+          "kind": "function",
+          "line": 77,
+          "end_line": 83
+        },
+        {
+          "name": "PassiveSensor.read",
+          "kind": "function",
+          "line": 85,
+          "end_line": 108
+        },
+        {
+          "name": "DashboardHandler",
+          "kind": "class",
+          "line": 111,
+          "end_line": 141
+        },
+        {
+          "name": "DashboardHandler.__init__",
+          "kind": "function",
+          "line": 112,
+          "end_line": 114
+        },
+        {
+          "name": "DashboardHandler.do_GET",
+          "kind": "function",
+          "line": 116,
+          "end_line": 130
+        },
+        {
+          "name": "DashboardHandler.respond",
+          "kind": "function",
+          "line": 132,
+          "end_line": 138
+        },
+        {
+          "name": "DashboardHandler.log_message",
+          "kind": "function",
+          "line": 140,
+          "end_line": 141
+        },
+        {
+          "name": "capture_packets",
+          "kind": "function",
+          "line": 144,
+          "end_line": 177
+        },
+        {
+          "name": "capture_packets.record",
+          "kind": "function",
+          "line": 145,
+          "end_line": 148
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 180,
+          "end_line": 214
+        }
+      ],
+      "imports": [
+        "ae_inference",
+        "argparse",
+        "collections",
+        "datetime",
+        "functools",
+        "http.server",
+        "json",
+        "local_docs",
+        "logging",
+        "ml_inference",
+        "os",
+        "pathlib",
+        "scapy.layers.inet",
+        "scapy.layers.l2",
+        "scapy.utils",
+        "signal",
+        "socket",
+        "struct",
+        "threading",
+        "time",
+        "traffic_capture",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "Controller/policy_audit.py",
+      "purpose": "Bounded symbolic header-box algebra emits supported shadow/redundancy/overlap/object/metadata findings with witnesses and preserved uncertainty.",
+      "sha256": "15d30d63c3a6af148a08b121524bc91dfda2553a51126ac9f976816be713b2b1",
+      "canonical_bytes": 8914,
+      "symbols": [
+        {
+          "name": "AuditBudgetError",
+          "kind": "class",
+          "line": 10,
+          "end_line": 11
+        },
+        {
+          "name": "Budget",
+          "kind": "class",
+          "line": 14,
+          "end_line": 22
+        },
+        {
+          "name": "Budget.__init__",
+          "kind": "function",
+          "line": 15,
+          "end_line": 17
+        },
+        {
+          "name": "Budget.tick",
+          "kind": "function",
+          "line": 19,
+          "end_line": 22
+        },
+        {
+          "name": "Box",
+          "kind": "class",
+          "line": 26,
+          "end_line": 35
+        },
+        {
+          "name": "Box.witness",
+          "kind": "function",
+          "line": 31,
+          "end_line": 35
+        },
+        {
+          "name": "intersection",
+          "kind": "function",
+          "line": 38,
+          "end_line": 43
+        },
+        {
+          "name": "subtract",
+          "kind": "function",
+          "line": 46,
+          "end_line": 61
+        },
+        {
+          "name": "difference",
+          "kind": "function",
+          "line": 64,
+          "end_line": 72
+        },
+        {
+          "name": "regions",
+          "kind": "function",
+          "line": 75,
+          "end_line": 94
+        },
+        {
+          "name": "audit_policy",
+          "kind": "function",
+          "line": 97,
+          "end_line": 184
+        },
+        {
+          "name": "audit_policy.finding",
+          "kind": "function",
+          "line": 104,
+          "end_line": 107
+        }
+      ],
+      "imports": [
+        "dataclasses",
+        "firewall_policy",
+        "ipaddress",
+        "itertools"
+      ]
+    },
+    {
+      "path": "Controller/policy_change.py",
+      "purpose": "Effective-partition comparisons and exact-base hypothetical edits generate review-only candidates and replay-verifiable receipts without native writes.",
+      "sha256": "146a715620fd21590353647ec09e84f8b43488f4c1b08c3189c47fad844153ba",
+      "canonical_bytes": 12967,
+      "symbols": [
+        {
+          "name": "EffectiveRegion",
+          "kind": "class",
+          "line": 22,
+          "end_line": 27
+        },
+        {
+          "name": "universe",
+          "kind": "function",
+          "line": 30,
+          "end_line": 37
+        },
+        {
+          "name": "overlaps",
+          "kind": "function",
+          "line": 40,
+          "end_line": 49
+        },
+        {
+          "name": "possible_envelope",
+          "kind": "function",
+          "line": 52,
+          "end_line": 58
+        },
+        {
+          "name": "effective_regions",
+          "kind": "function",
+          "line": 61,
+          "end_line": 90
+        },
+        {
+          "name": "outcome",
+          "kind": "function",
+          "line": 93,
+          "end_line": 97
+        },
+        {
+          "name": "impact",
+          "kind": "function",
+          "line": 100,
+          "end_line": 163
+        },
+        {
+          "name": "proposal",
+          "kind": "function",
+          "line": 166,
+          "end_line": 224
+        },
+        {
+          "name": "verify_proposal",
+          "kind": "function",
+          "line": 227,
+          "end_line": 243
+        }
+      ],
+      "imports": [
+        "copy",
+        "dataclasses",
+        "firewall_policy",
+        "hashlib",
+        "pathlib",
+        "policy_audit",
+        "sys"
+      ]
+    },
+    {
+      "path": "Controller/policy_http.py",
+      "purpose": "Loopback read-only policy viewer/API exposes snapshots, queries, audits and hypothetical previews; enterprise authentication/native apply are absent.",
+      "sha256": "76b1dbb9fde3a3786900cfe0234cdd8e595a36ecd13aac9ec88b968156def7b8",
+      "canonical_bytes": 11312,
+      "symbols": [
+        {
+          "name": "_arguments",
+          "kind": "function",
+          "line": 55,
+          "end_line": 61
+        },
+        {
+          "name": "read_policy_api",
+          "kind": "function",
+          "line": 64,
+          "end_line": 110
+        },
+        {
+          "name": "PolicyHandler",
+          "kind": "class",
+          "line": 113,
+          "end_line": 153
+        },
+        {
+          "name": "PolicyHandler.do_GET",
+          "kind": "function",
+          "line": 114,
+          "end_line": 137
+        },
+        {
+          "name": "PolicyHandler.json_response",
+          "kind": "function",
+          "line": 139,
+          "end_line": 140
+        },
+        {
+          "name": "PolicyHandler.respond",
+          "kind": "function",
+          "line": 142,
+          "end_line": 150
+        },
+        {
+          "name": "PolicyHandler.log_message",
+          "kind": "function",
+          "line": 152,
+          "end_line": 153
+        },
+        {
+          "name": "make_server",
+          "kind": "function",
+          "line": 156,
+          "end_line": 161
+        }
+      ],
+      "imports": [
+        "firewall_policy",
+        "http.server",
+        "json",
+        "local_docs",
+        "policy_audit",
+        "policy_change",
+        "policy_store",
+        "sqlite3",
+        "urllib.parse"
+      ]
+    },
+    {
+      "path": "Controller/policy_store.py",
+      "purpose": "Transactional SQLite snapshot/raw/import history validates integrity and separates explicit imports from read-only query connections.",
+      "sha256": "4cfc2002754a4cfc4e7251503a010ed96eee1ae43e77338a74270616bf53e376",
+      "canonical_bytes": 7939,
+      "symbols": [
+        {
+          "name": "PolicyStore",
+          "kind": "class",
+          "line": 33,
+          "end_line": 143
+        },
+        {
+          "name": "PolicyStore.__init__",
+          "kind": "function",
+          "line": 34,
+          "end_line": 71
+        },
+        {
+          "name": "PolicyStore.__enter__",
+          "kind": "function",
+          "line": 73,
+          "end_line": 74
+        },
+        {
+          "name": "PolicyStore.__exit__",
+          "kind": "function",
+          "line": 76,
+          "end_line": 77
+        },
+        {
+          "name": "PolicyStore.import_snapshot",
+          "kind": "function",
+          "line": 79,
+          "end_line": 110
+        },
+        {
+          "name": "PolicyStore.list_snapshots",
+          "kind": "function",
+          "line": 112,
+          "end_line": 118
+        },
+        {
+          "name": "PolicyStore.get_snapshot",
+          "kind": "function",
+          "line": 120,
+          "end_line": 129
+        },
+        {
+          "name": "PolicyStore.provenance",
+          "kind": "function",
+          "line": 131,
+          "end_line": 143
+        }
+      ],
+      "imports": [
+        "datetime",
+        "firewall_policy",
+        "os",
+        "pathlib",
+        "re",
+        "sqlite3"
+      ]
+    },
+    {
+      "path": "Controller/requirements-home.txt",
+      "purpose": "Collection-only Scapy/Markdown dependency constraints are separate from the compatible legacy Ryu/model runtime environment.",
+      "sha256": "b8e496fdf292c6464feae0ca8a3e8da27a13c5f6c356f561b59fc91a10721aa1",
+      "canonical_bytes": 123
+    },
+    {
+      "path": "Controller/scripts/apf-home.service",
+      "purpose": "Dedicated-account systemd collection template defines raw-capture capability, private state, environment and controlled restart behavior.",
+      "sha256": "1c661d08764b3be84a41cbfd1ee5f57e268922ed7d66d573f82fb96d6a20a0ce",
+      "canonical_bytes": 767
+    },
+    {
+      "path": "Controller/scripts/apf-quarantine.nft",
+      "purpose": "Dedicated timeout set and source-based forward drop must be provisioned only in the intended test/firewall namespace.",
+      "sha256": "83d7e46e75b9b2529b4f7b56899855f38f9ef6fbe9023b55364f6f1948bb35b3",
+      "canonical_bytes": 229
+    },
+    {
+      "path": "Controller/scripts/disable_capture_offloads.sh",
+      "purpose": "Privileged helper changes offload settings on named interfaces to investigate capture artifacts; it is not passive inspection.",
+      "sha256": "807cbf2f5bb7677c871e84ce74de5b2fb3d0bc06299c3aecbfead102c2f7ffbf",
+      "canonical_bytes": 1486
+    },
+    {
+      "path": "Controller/scripts/install_snort3_ips_config.sh",
+      "purpose": "Privileged helper installs tracked Snort 3 configuration/rules to selected system paths and checks their configuration.",
+      "sha256": "ea906121998155b86f3e595869b8fa4a25043e8d2b2e837cff9fcea4c14e1314",
+      "canonical_bytes": 1286
+    },
+    {
+      "path": "Controller/scripts/setup_external_blocking.sh",
+      "purpose": "Standalone reader helper enables forwarding and host INPUT/FORWARD hooks, separate from the scoped nftables adapter.",
+      "sha256": "7f99f9a56cbe312d3760c084317c1948ec4e8e9cac4c581b402c9a7b4d883176",
+      "canonical_bytes": 690
+    },
+    {
+      "path": "Controller/scripts/setup_vxlan_br_snort.sh",
+      "purpose": "Explicit local/remote deployment inputs create bridge/VXLAN mirror plumbing; no generic router-mirroring capability is implied.",
+      "sha256": "2241e6504f1beb3f2ba1c967b243f25e11362d6e8dd0862d59961c92f567e9f8",
+      "canonical_bytes": 1586
+    },
+    {
+      "path": "Controller/scripts/start_snort3_json.sh",
+      "purpose": "Executes selected Snort interface/config/log options to produce JSON alerts for the intended reader arrangement.",
+      "sha256": "c685e4ade01bac103c4cad3d27146130a6b3191329727f70bde10a2811e564af",
+      "canonical_bytes": 499
+    },
+    {
+      "path": "Controller/scripts/start_snort_ryu_ips.sh",
+      "purpose": "Historical launcher targets absent ryu_ips_app.py and is not runnable as the merged-controller entry in this checkout.",
+      "sha256": "667183e381214c99e8aa4881574383a972a24a40c2b374537e2f4a5d7936b9aa",
+      "canonical_bytes": 347
+    },
+    {
+      "path": "Controller/scripts/verify_snort_ryu_ips.sh",
+      "purpose": "Alternate-chain health probes need the correct RYU_BASE override because the script retains a historical HTTP port default.",
+      "sha256": "c1c9feb06a4f1cbbb4a5d059d52578c58cf6af38e99c59d69c8a1453610692ec",
+      "canonical_bytes": 427
+    },
+    {
+      "path": "Controller/site_features.py",
+      "purpose": "Ethernet IPv4/IPv6 decoder, online moments, bounded window state and historical features implement the current site measurement subset.",
+      "sha256": "9c78be06e94a28871b9a52c1da10ce7ead3093493515a395a095eba9b3b287ba",
+      "canonical_bytes": 20059,
+      "symbols": [
+        {
+          "name": "entropy",
+          "kind": "function",
+          "line": 21,
+          "end_line": 24
+        },
+        {
+          "name": "Moments",
+          "kind": "class",
+          "line": 28,
+          "end_line": 41
+        },
+        {
+          "name": "Moments.add",
+          "kind": "function",
+          "line": 33,
+          "end_line": 37
+        },
+        {
+          "name": "Moments.summary",
+          "kind": "function",
+          "line": 39,
+          "end_line": 41
+        },
+        {
+          "name": "bounded_add",
+          "kind": "function",
+          "line": 44,
+          "end_line": 50
+        },
+        {
+          "name": "client_hello",
+          "kind": "function",
+          "line": 53,
+          "end_line": 113
+        },
+        {
+          "name": "client_hello.vector",
+          "kind": "function",
+          "line": 66,
+          "end_line": 76
+        },
+        {
+          "name": "decode",
+          "kind": "function",
+          "line": 116,
+          "end_line": 205
+        },
+        {
+          "name": "DeviceWindow",
+          "kind": "class",
+          "line": 209,
+          "end_line": 307
+        },
+        {
+          "name": "DeviceWindow.observe",
+          "kind": "function",
+          "line": 246,
+          "end_line": 307
+        },
+        {
+          "name": "FeatureHistory",
+          "kind": "class",
+          "line": 310,
+          "end_line": 411
+        },
+        {
+          "name": "FeatureHistory.__init__",
+          "kind": "function",
+          "line": 311,
+          "end_line": 315
+        },
+        {
+          "name": "FeatureHistory.features",
+          "kind": "function",
+          "line": 317,
+          "end_line": 411
+        }
+      ],
+      "imports": [
+        "collections",
+        "dataclasses",
+        "hashlib",
+        "math",
+        "re",
+        "scapy.layers.dns",
+        "scapy.layers.inet",
+        "scapy.layers.inet6",
+        "scapy.layers.l2",
+        "statistics",
+        "struct"
+      ]
+    },
+    {
+      "path": "Controller/site_policy.example.json",
+      "purpose": "Sanitized expiring inventory/observation/role example is a configuration template, not an approved household identity source.",
+      "sha256": "b45584fe794295be3d5dfb06e2ecd42a1944a921423e916dc9e36f61b029ac2d",
+      "canonical_bytes": 614
+    },
+    {
+      "path": "Controller/site_policy.py",
+      "purpose": "Strict inventory/role/profile validation produces shadow identity/quality findings and separates unverified candidates from approved profiles.",
+      "sha256": "17e5c7b8248a7a7d755e1aca6ba3a4d03047566c169a2264ba953252461e8e25",
+      "canonical_bytes": 15540,
+      "symbols": [
+        {
+          "name": "digest",
+          "kind": "function",
+          "line": 27,
+          "end_line": 29
+        },
+        {
+          "name": "load_json",
+          "kind": "function",
+          "line": 32,
+          "end_line": 36
+        },
+        {
+          "name": "timestamp",
+          "kind": "function",
+          "line": 39,
+          "end_line": 45
+        },
+        {
+          "name": "identifier",
+          "kind": "function",
+          "line": 48,
+          "end_line": 51
+        },
+        {
+          "name": "keys",
+          "kind": "function",
+          "line": 54,
+          "end_line": 56
+        },
+        {
+          "name": "validate_policy",
+          "kind": "function",
+          "line": 59,
+          "end_line": 125
+        },
+        {
+          "name": "in_interval",
+          "kind": "function",
+          "line": 128,
+          "end_line": 129
+        },
+        {
+          "name": "quality_for",
+          "kind": "function",
+          "line": 132,
+          "end_line": 151
+        },
+        {
+          "name": "update_summary",
+          "kind": "function",
+          "line": 154,
+          "end_line": 167
+        },
+        {
+          "name": "ShadowPolicy",
+          "kind": "class",
+          "line": 170,
+          "end_line": 293
+        },
+        {
+          "name": "ShadowPolicy.__init__",
+          "kind": "function",
+          "line": 171,
+          "end_line": 188
+        },
+        {
+          "name": "ShadowPolicy._validate_approved",
+          "kind": "function",
+          "line": 190,
+          "end_line": 213
+        },
+        {
+          "name": "ShadowPolicy.evaluate",
+          "kind": "function",
+          "line": 215,
+          "end_line": 275
+        },
+        {
+          "name": "ShadowPolicy._residuals",
+          "kind": "function",
+          "line": 277,
+          "end_line": 284
+        },
+        {
+          "name": "ShadowPolicy.snapshot",
+          "kind": "function",
+          "line": 286,
+          "end_line": 293
+        }
+      ],
+      "imports": [
+        "collections",
+        "copy",
+        "datetime",
+        "hashlib",
+        "ipaddress",
+        "json",
+        "math",
+        "pathlib",
+        "re"
+      ]
+    },
+    {
+      "path": "Controller/snort3/sdn_ips.lua",
+      "purpose": "Snort 3 inspectors/logging/rule include contains lab network/binding assumptions needing deployment-specific validation.",
+      "sha256": "a9973fdfb676f1c124e11cb0b86e9e2fddd8023d555cd71307c2e6ed02b690b4",
+      "canonical_bytes": 2868
+    },
+    {
+      "path": "Controller/snort3/sdn_ips_local.rules",
+      "purpose": "Local lab flood signatures and inspector/fallback notes require workload qualification; labels do not establish universal detection.",
+      "sha256": "b8eb562ddc9856ac4a44fb2963a4e64b9787a08a7e9c34409693171733690766",
+      "canonical_bytes": 3976
+    },
+    {
+      "path": "Controller/snort_alert_reader.py",
+      "purpose": "Alternate JSON reader has separate SID/network/protection defaults and forwards internal block requests or applies external host filtering.",
+      "sha256": "c3a96894b01ce2bf501f90fd9a0a86b8761242bed5abcb65aba2e7148242ad99",
+      "canonical_bytes": 8657,
+      "symbols": [
+        {
+          "name": "parse_sid",
+          "kind": "function",
+          "line": 55,
+          "end_line": 64
+        },
+        {
+          "name": "parse_addr_port",
+          "kind": "function",
+          "line": 67,
+          "end_line": 79
+        },
+        {
+          "name": "get_endpoint",
+          "kind": "function",
+          "line": 82,
+          "end_line": 89
+        },
+        {
+          "name": "alert_name",
+          "kind": "function",
+          "line": 92,
+          "end_line": 99
+        },
+        {
+          "name": "show_ids_alert",
+          "kind": "function",
+          "line": 102,
+          "end_line": 128
+        },
+        {
+          "name": "show_blocked_retry_alert",
+          "kind": "function",
+          "line": 131,
+          "end_line": 157
+        },
+        {
+          "name": "alert_key",
+          "kind": "function",
+          "line": 160,
+          "end_line": 164
+        },
+        {
+          "name": "should_display_alert",
+          "kind": "function",
+          "line": 167,
+          "end_line": 174
+        },
+        {
+          "name": "should_send_block",
+          "kind": "function",
+          "line": 177,
+          "end_line": 184
+        },
+        {
+          "name": "should_display_blocked_retry",
+          "kind": "function",
+          "line": 187,
+          "end_line": 194
+        },
+        {
+          "name": "is_internal_sdn_ip",
+          "kind": "function",
+          "line": 197,
+          "end_line": 201
+        },
+        {
+          "name": "is_protected_ip",
+          "kind": "function",
+          "line": 204,
+          "end_line": 205
+        },
+        {
+          "name": "send_block",
+          "kind": "function",
+          "line": 208,
+          "end_line": 215
+        },
+        {
+          "name": "block_external_ip",
+          "kind": "function",
+          "line": 218,
+          "end_line": 249
+        },
+        {
+          "name": "is_external_ip_blocked",
+          "kind": "function",
+          "line": 252,
+          "end_line": 266
+        },
+        {
+          "name": "process_line",
+          "kind": "function",
+          "line": 269,
+          "end_line": 302
+        },
+        {
+          "name": "tail_file",
+          "kind": "function",
+          "line": 305,
+          "end_line": 323
+        }
+      ],
+      "imports": [
+        "ipaddress",
+        "json",
+        "logging",
+        "os",
+        "requests",
+        "subprocess",
+        "sys",
+        "time"
+      ]
+    },
+    {
+      "path": "Controller/snort_monitor.py",
+      "purpose": "Integrated Snort lifecycle manager parses/deduplicates alerts and invokes the merged controller callback.",
+      "sha256": "fc18a7003a8113f983e4c85ef24840cb65ef798b8853aaabd141f625e29a2f04",
+      "canonical_bytes": 34944,
+      "symbols": [
+        {
+          "name": "classify_attack",
+          "kind": "function",
+          "line": 99,
+          "end_line": 121
+        },
+        {
+          "name": "_protocol_aware_reclassify",
+          "kind": "function",
+          "line": 124,
+          "end_line": 139
+        },
+        {
+          "name": "parse_alert_line",
+          "kind": "function",
+          "line": 178,
+          "end_line": 239
+        },
+        {
+          "name": "_json_endpoint",
+          "kind": "function",
+          "line": 253,
+          "end_line": 274
+        },
+        {
+          "name": "parse_alert_json_line",
+          "kind": "function",
+          "line": 277,
+          "end_line": 325
+        },
+        {
+          "name": "SnortManager",
+          "kind": "class",
+          "line": 332,
+          "end_line": 789
+        },
+        {
+          "name": "SnortManager.__init__",
+          "kind": "function",
+          "line": 352,
+          "end_line": 433
+        },
+        {
+          "name": "SnortManager._log_info",
+          "kind": "function",
+          "line": 437,
+          "end_line": 441
+        },
+        {
+          "name": "SnortManager._log_warning",
+          "kind": "function",
+          "line": 443,
+          "end_line": 447
+        },
+        {
+          "name": "SnortManager._log_error",
+          "kind": "function",
+          "line": 449,
+          "end_line": 453
+        },
+        {
+          "name": "SnortManager._detect_snort_version",
+          "kind": "function",
+          "line": 457,
+          "end_line": 470
+        },
+        {
+          "name": "SnortManager.start_snort",
+          "kind": "function",
+          "line": 472,
+          "end_line": 560
+        },
+        {
+          "name": "SnortManager.stop_snort",
+          "kind": "function",
+          "line": 562,
+          "end_line": 595
+        },
+        {
+          "name": "SnortManager.start_monitoring",
+          "kind": "function",
+          "line": 599,
+          "end_line": 625
+        },
+        {
+          "name": "SnortManager._tail_alert_file",
+          "kind": "function",
+          "line": 627,
+          "end_line": 668
+        },
+        {
+          "name": "SnortManager._process_alert_line",
+          "kind": "function",
+          "line": 670,
+          "end_line": 753
+        },
+        {
+          "name": "SnortManager.get_recent_alerts",
+          "kind": "function",
+          "line": 757,
+          "end_line": 760
+        },
+        {
+          "name": "SnortManager.get_alert_count",
+          "kind": "function",
+          "line": 762,
+          "end_line": 765
+        },
+        {
+          "name": "SnortManager.get_alerts_by_type",
+          "kind": "function",
+          "line": 767,
+          "end_line": 774
+        },
+        {
+          "name": "SnortManager.get_alerts_by_source",
+          "kind": "function",
+          "line": 776,
+          "end_line": 783
+        },
+        {
+          "name": "SnortManager.is_snort_running",
+          "kind": "function",
+          "line": 785,
+          "end_line": 789
+        },
+        {
+          "name": "on_alert_callback",
+          "kind": "function",
+          "line": 840,
+          "end_line": 841
+        }
+      ],
+      "imports": [
+        "collections",
+        "datetime",
+        "json",
+        "os",
+        "re",
+        "signal",
+        "subprocess",
+        "sys",
+        "threading",
+        "time"
+      ]
+    },
+    {
+      "path": "Controller/snort_ryu_bridge.py",
+      "purpose": "Alternate loopback relay deduplicates priority-selected alerts and posts requests to the configured Ryu block API.",
+      "sha256": "6ad93922b1d48d43e764d5907a1ed7e18a6ab2ddf258eeaa234dbaeb345696ca",
+      "canonical_bytes": 4320,
+      "symbols": [
+        {
+          "name": "should_block",
+          "kind": "function",
+          "line": 26,
+          "end_line": 41
+        },
+        {
+          "name": "push_block_to_ryu",
+          "kind": "function",
+          "line": 43,
+          "end_line": 55
+        },
+        {
+          "name": "BridgeHandler",
+          "kind": "class",
+          "line": 57,
+          "end_line": 93
+        },
+        {
+          "name": "BridgeHandler.log_message",
+          "kind": "function",
+          "line": 58,
+          "end_line": 58
+        },
+        {
+          "name": "BridgeHandler.do_POST",
+          "kind": "function",
+          "line": 60,
+          "end_line": 79
+        },
+        {
+          "name": "BridgeHandler.do_GET",
+          "kind": "function",
+          "line": 81,
+          "end_line": 85
+        },
+        {
+          "name": "BridgeHandler._respond",
+          "kind": "function",
+          "line": 87,
+          "end_line": 93
+        },
+        {
+          "name": "cleanup_cache",
+          "kind": "function",
+          "line": 95,
+          "end_line": 101
+        }
+      ],
+      "imports": [
+        "datetime",
+        "http.server",
+        "json",
+        "logging",
+        "os",
+        "requests",
+        "threading",
+        "time"
+      ]
+    },
+    {
+      "path": "Controller/snort_setup.sh",
+      "purpose": "Historical mixed-version installer is not the authorized Snort 3 setup route; inspect distribution-install side effects before reuse.",
+      "sha256": "5b2b491ba202a11555e2daf813e7701cb076755e4a1a22ceabeb40b9d841a14c",
+      "canonical_bytes": 8726
+    },
+    {
+      "path": "Controller/traffic_capture.py",
+      "purpose": "Legacy 102-column flow/device/network aggregation, rate labeling, flush-thread RF/AE scoring, CSV output and evidence capture.",
+      "sha256": "c2d4c8bc5d5455425df97ab2ef57cb64ef940293e68a1a1bcf763bf4bf82b7bf",
+      "canonical_bytes": 111449,
+      "symbols": [
+        {
+          "name": "_shannon_entropy",
+          "kind": "function",
+          "line": 161,
+          "end_line": 172
+        },
+        {
+          "name": "_safe_div",
+          "kind": "function",
+          "line": 175,
+          "end_line": 176
+        },
+        {
+          "name": "_is_broadcast",
+          "kind": "function",
+          "line": 179,
+          "end_line": 185
+        },
+        {
+          "name": "_is_multicast",
+          "kind": "function",
+          "line": 188,
+          "end_line": 194
+        },
+        {
+          "name": "DeviceProfile",
+          "kind": "class",
+          "line": 201,
+          "end_line": 350
+        },
+        {
+          "name": "DeviceProfile.__init__",
+          "kind": "function",
+          "line": 215,
+          "end_line": 245
+        },
+        {
+          "name": "DeviceProfile.update",
+          "kind": "function",
+          "line": 247,
+          "end_line": 275
+        },
+        {
+          "name": "DeviceProfile.update_metadata",
+          "kind": "function",
+          "line": 277,
+          "end_line": 289
+        },
+        {
+          "name": "DeviceProfile._z_score",
+          "kind": "function",
+          "line": 291,
+          "end_line": 299
+        },
+        {
+          "name": "DeviceProfile.is_mature",
+          "kind": "function",
+          "line": 302,
+          "end_line": 305
+        },
+        {
+          "name": "DeviceProfile.get_features",
+          "kind": "function",
+          "line": 307,
+          "end_line": 345
+        },
+        {
+          "name": "DeviceProfile.reset_recent",
+          "kind": "function",
+          "line": 347,
+          "end_line": 350
+        },
+        {
+          "name": "TrafficCapture",
+          "kind": "class",
+          "line": 357,
+          "end_line": 2187
+        },
+        {
+          "name": "TrafficCapture.__init__",
+          "kind": "function",
+          "line": 371,
+          "end_line": 511
+        },
+        {
+          "name": "TrafficCapture._log",
+          "kind": "function",
+          "line": 515,
+          "end_line": 519
+        },
+        {
+          "name": "TrafficCapture.set_detection_mode",
+          "kind": "function",
+          "line": 523,
+          "end_line": 546
+        },
+        {
+          "name": "TrafficCapture.set_label_override",
+          "kind": "function",
+          "line": 548,
+          "end_line": 564
+        },
+        {
+          "name": "TrafficCapture.set_attack_metadata",
+          "kind": "function",
+          "line": 566,
+          "end_line": 570
+        },
+        {
+          "name": "TrafficCapture.clear_attack_metadata",
+          "kind": "function",
+          "line": 572,
+          "end_line": 576
+        },
+        {
+          "name": "TrafficCapture.set_mininet_event",
+          "kind": "function",
+          "line": 578,
+          "end_line": 581
+        },
+        {
+          "name": "TrafficCapture.start",
+          "kind": "function",
+          "line": 583,
+          "end_line": 614
+        },
+        {
+          "name": "TrafficCapture.stop",
+          "kind": "function",
+          "line": 616,
+          "end_line": 624
+        },
+        {
+          "name": "TrafficCapture.rotate",
+          "kind": "function",
+          "line": 626,
+          "end_line": 645
+        },
+        {
+          "name": "TrafficCapture.record_packet",
+          "kind": "function",
+          "line": 647,
+          "end_line": 804
+        },
+        {
+          "name": "TrafficCapture.record_alert",
+          "kind": "function",
+          "line": 806,
+          "end_line": 818
+        },
+        {
+          "name": "TrafficCapture._flush_loop",
+          "kind": "function",
+          "line": 822,
+          "end_line": 829
+        },
+        {
+          "name": "TrafficCapture._flush_flows",
+          "kind": "function",
+          "line": 831,
+          "end_line": 1353
+        },
+        {
+          "name": "TrafficCapture._build_flow_row",
+          "kind": "function",
+          "line": 1356,
+          "end_line": 1779
+        },
+        {
+          "name": "TrafficCapture._compute_network_context",
+          "kind": "function",
+          "line": 1781,
+          "end_line": 1813
+        },
+        {
+          "name": "TrafficCapture.manual_unblock",
+          "kind": "function",
+          "line": 1815,
+          "end_line": 1845
+        },
+        {
+          "name": "TrafficCapture.clear_detection_state",
+          "kind": "function",
+          "line": 1847,
+          "end_line": 1897
+        },
+        {
+          "name": "TrafficCapture._write_pcap",
+          "kind": "function",
+          "line": 1901,
+          "end_line": 1913
+        },
+        {
+          "name": "TrafficCapture._capture_evidence",
+          "kind": "function",
+          "line": 1915,
+          "end_line": 1966
+        },
+        {
+          "name": "TrafficCapture._attack_protocol_matches",
+          "kind": "function",
+          "line": 1976,
+          "end_line": 1989
+        },
+        {
+          "name": "TrafficCapture._compute_label",
+          "kind": "function",
+          "line": 1991,
+          "end_line": 2163
+        },
+        {
+          "name": "TrafficCapture._write_csv",
+          "kind": "function",
+          "line": 2165,
+          "end_line": 2187
+        }
+      ],
+      "imports": [
+        "collections",
+        "csv",
+        "datetime",
+        "math",
+        "os",
+        "random",
+        "statistics",
+        "struct",
+        "threading",
+        "time"
+      ]
+    },
+    {
+      "path": "Controller/traffic_mirror.py",
+      "purpose": "Linux TAP writer accepts PacketIn copies through a bounded queue for Snort, with explicit injection/drop counters.",
+      "sha256": "57f8729016b8cac2fc7bd8cadbb74bee7fe2a80642af82d7ca9cf8165241374c",
+      "canonical_bytes": 4667,
+      "symbols": [
+        {
+          "name": "TrafficMirror",
+          "kind": "class",
+          "line": 28,
+          "end_line": 137
+        },
+        {
+          "name": "TrafficMirror.__init__",
+          "kind": "function",
+          "line": 35,
+          "end_line": 45
+        },
+        {
+          "name": "TrafficMirror._log",
+          "kind": "function",
+          "line": 47,
+          "end_line": 51
+        },
+        {
+          "name": "TrafficMirror.start",
+          "kind": "function",
+          "line": 53,
+          "end_line": 93
+        },
+        {
+          "name": "TrafficMirror._writer_loop",
+          "kind": "function",
+          "line": 95,
+          "end_line": 109
+        },
+        {
+          "name": "TrafficMirror.inject",
+          "kind": "function",
+          "line": 111,
+          "end_line": 121
+        },
+        {
+          "name": "TrafficMirror.stop",
+          "kind": "function",
+          "line": 123,
+          "end_line": 137
+        }
+      ],
+      "imports": [
+        "fcntl",
+        "os",
+        "queue",
+        "struct",
+        "subprocess",
+        "threading"
+      ]
+    },
+    {
+      "path": "DEVELOPER_STUDY_ROADMAP.md",
+      "purpose": "Current complete curriculum ties prerequisites to source, rebuild exercises, competency checks and scientific/operational evidence."
+    },
+    {
+      "path": "Dashboard/PROJECT_DOCUMENTATION.md",
+      "purpose": "Historical engineering narrative contains stale guide references and ambitions that are not present implementation guarantees."
+    },
+    {
+      "path": "Dashboard/README.md",
+      "purpose": "Dashboard operation notes require checking the serving backend lane before assuming actions or data semantics."
+    },
+    {
+      "path": "Dashboard/index.html",
+      "purpose": "Shared dependency-free browser client reads runtime-origin metrics/status/alerts/blocks and collection/shadow views; backend authority remains decisive.",
+      "sha256": "340a2ab0e021bb34875338fcb72988d77d06913f5d172c8f552af0b469a2fb96",
+      "canonical_bytes": 23117
+    },
+    {
+      "path": "IPS_Project_Assessment.pdf",
+      "purpose": "Historical binary assessment is not executable, parsed by this inventory or current proof of deployment readiness."
+    },
+    {
+      "path": "NGFW_feature_comparison.md",
+      "purpose": "Time-bound competitor/gap comparison requires fresh vendor-specific verification before making product parity claims."
+    },
+    {
+      "path": "NO_VISIBILITY_PILOT_RUNBOOK.md",
+      "purpose": "Standalone operator walkthrough covers t530 qualification, bounded endpoint replay, namespaced firewall checks and representative sessions."
+    },
+    {
+      "path": "PILOT_RESULTS_TEMPLATE.md",
+      "purpose": "Blank handoff form is copied outside Git for actual redacted outcomes and uncertainty; successful tests are never prefilled."
+    },
+    {
+      "path": "PROJECT_AI_HANDBOOK.md",
+      "purpose": "Generated single-file context includes authored architecture, every tracked file purpose and full Python symbol/import index."
+    },
+    {
+      "path": "README.md",
+      "purpose": "Project entry page summarizes runtime lanes, present limits, learning/AI context and qualified operator documentation."
+    },
+    {
+      "path": "SDN_IPS_Snort_Installation_Runbook.pdf",
+      "purpose": "Historical binary installation reference must be reconciled with current source and the intended Snort 3 build."
+    },
+    {
+      "path": "SESSION_HANDOFF.md",
+      "purpose": "Historical August assessment has a current-context warning; obsolete deployment/missing-file/no-skew claims are not source authority."
+    },
+    {
+      "path": "STUDY_AND_REBUILD_PLAN.md",
+      "purpose": "Historical legacy exercises are retained with superseding-current-roadmap notice and corrected outdated assumptions."
+    },
+    {
+      "path": "apf_implementation_roadmap.md",
+      "purpose": "Expanded earlier roadmap connects IPS qualification and firewall-policy goals; current service phases govern release status."
+    },
+    {
+      "path": "docs-site/AGENTS.md",
+      "purpose": "Documentation rules require source coverage, navigation/contracts and actual validation evidence with implementation changes."
+    },
+    {
+      "path": "docs-site/DOCUMENTATION_AUDIT.md",
+      "purpose": "Source-review findings record unresolved state/enforcement/visibility/model assumptions; a written audit is not a completed fix."
+    },
+    {
+      "path": "docs-site/DOCUMENTATION_COVERAGE.md",
+      "purpose": "Human source-to-page coverage matrix complements first-match machine mapping and locates operator/implementation explanations."
+    },
+    {
+      "path": "docs-site/DOCUMENTATION_VALIDATION.md",
+      "purpose": "Dated actual verification records distinguish syntax/replay/CI/source checks from unperformed live/hardware/production tests."
+    },
+    {
+      "path": "docs-site/NEED_ATTENTION.md",
+      "purpose": "Pending checks highlight real forwarding/unblock, capture, management exposure and publication qualification needs."
+    },
+    {
+      "path": "docs-site/README.md",
+      "purpose": "Docs startup/install/publishing/check instructions explain background lifecycle and required source/feature/handoff guards."
+    },
+    {
+      "path": "docs-site/api-reference/collection.mdx",
+      "purpose": "Authored documentation page: Home collection read API. Collection health, schema and shadow-policy observations on port 8081."
+    },
+    {
+      "path": "docs-site/api-reference/overview.mdx",
+      "purpose": "Authored documentation page: Management API. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/api-reference/policy-workbench.mdx",
+      "purpose": "Authored documentation page: Policy workbench read API. Loopback operator-model queries on port 8082, separate from live collection and Ryu."
+    },
+    {
+      "path": "docs-site/architecture/data-flow.mdx",
+      "purpose": "Authored documentation page: Packet capture and enforcement. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/architecture/detection.mdx",
+      "purpose": "Authored documentation page: Detection tiers and decisions. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/architecture/feature-rationale.mdx",
+      "purpose": "Authored documentation page: Why each behavioral feature group exists. Source-mapped rationale, benign lookalikes, limits and qualification plans for G1–G24 and supporting evidence."
+    },
+    {
+      "path": "docs-site/collection-openapi.json",
+      "purpose": "Site-v3 read-only schema/health/shadow contract provides observations without trained inference or firewall write authority.",
+      "sha256": "c1c9944cac0e5f0f3f09c8335f63e69f25fff00cbf04e0b5be4434743245829d",
+      "canonical_bytes": 6078
+    },
+    {
+      "path": "docs-site/deployment/documentation-access.mdx",
+      "purpose": "Authored documentation page: Documentation access and updates. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/deployment/home-collection.mdx",
+      "purpose": "Authored documentation page: Collect home traffic for two weeks. Run the site-v3 collector on Ubuntu with daily CSVs, observation history and capture health."
+    },
+    {
+      "path": "docs-site/deployment/home-pilot-step-by-step.mdx",
+      "purpose": "Authored documentation page: Home pilot: one Ethernet port, wired and Wi-Fi. A timed, command-by-command passive pilot with an external AP, ingress mirror and explicit management/visibility gates."
+    },
+    {
+      "path": "docs-site/deployment/nftables-lab.mdx",
+      "purpose": "Authored documentation page: Test temporary firewall quarantine. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/deployment/no-mirror-pilot.mdx",
+      "purpose": "Authored documentation page: Start testing without a traffic mirror. Qualify the t530, capture real PC workloads, test a namespaced firewall and return a structured results handoff."
+    },
+    {
+      "path": "docs-site/deployment/offline-policy-changes.mdx",
+      "purpose": "Authored documentation page: Develop and test while visibility is unresolved. Exercise counterfactual policy changes, concrete impact witnesses and reproducible review receipts without a live firewall."
+    },
+    {
+      "path": "docs-site/deployment/passive-sensor.mdx",
+      "purpose": "Authored documentation page: Test the passive sensor. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/deployment/placement.mdx",
+      "purpose": "Authored documentation page: Select deployment placement. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/deployment/policy-audit.mdx",
+      "purpose": "Authored documentation page: Audit the supported firewall-policy subset. Inspect duplicate, jointly shadowed and partially overlapping model rules with bounded deterministic evidence."
+    },
+    {
+      "path": "docs-site/deployment/policy-workbench.mdx",
+      "purpose": "Authored documentation page: Test the read-only policy workbench. Exercise the first P7 slice without a firewall, then prepare a qualified vendor export."
+    },
+    {
+      "path": "docs-site/deployment/pretest-qualification.mdx",
+      "purpose": "Authored documentation page: Qualify collection before a long pilot. Run preflight, independent packet expectations, restart/failure checks and closed daily quality reports."
+    },
+    {
+      "path": "docs-site/deployment/security-campaigns.mdx",
+      "purpose": "Authored documentation page: Run independent security campaigns. Separate benign baselines, ground truth, detector verdicts and verified firewall outcomes."
+    },
+    {
+      "path": "docs-site/developers/ai-handoff.mdx",
+      "purpose": "Authored documentation page: AI continuation and codebase architecture. Current runtime lanes, source-based data flows, authority boundaries, limitations and a freshness-checked continuation procedure."
+    },
+    {
+      "path": "docs-site/developers/maintenance.mdx",
+      "purpose": "Authored documentation page: Develop and verify changes. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/developers/policy-change-code-tour.mdx",
+      "purpose": "Authored documentation page: Policy changes and feature rationale: code tour. Understand symbolic impact, hypothetical proposals, reproducibility receipts and source-to-rationale guards."
+    },
+    {
+      "path": "docs-site/developers/policy-workbench-code-tour.mdx",
+      "purpose": "Authored documentation page: Policy workbench: code and rationale. Read the P7 slice by source line, understand its invariants and distinguish essential checks from implementation choices."
+    },
+    {
+      "path": "docs-site/developers/qualification-code-tour.mdx",
+      "purpose": "Authored documentation page: Qualification and audit: code and rationale. Trace readiness, feature evidence, restart recovery, reports, campaign scoring and symbolic policy analysis."
+    },
+    {
+      "path": "docs-site/developers/study-roadmap.mdx",
+      "purpose": "Authored documentation page: Study and rebuild the framework. A complete prerequisite roadmap, source-linked exercises and competency checks from packets and Python to qualified adaptive response."
+    },
+    {
+      "path": "docs-site/docs.json",
+      "purpose": "Mintlify branding/navigation selects authored pages and separate legacy-Ryu versus policy-workbench API groups.",
+      "sha256": "1b0ea5c3ecf9eae531bedd39e31fa4cdb8bd05e33126a2eba62282f9978c89ce",
+      "canonical_bytes": 2409
+    },
+    {
+      "path": "docs-site/documentation-map.json",
+      "purpose": "First-match source patterns define affected MDX pages eligible to satisfy the staged implementation documentation guard.",
+      "sha256": "03bdbab52bbb1d64bec83d59774d699692e68405217ffcf8e3d2b2283b70d172",
+      "canonical_bytes": 3960
+    },
+    {
+      "path": "docs-site/getting-started/install.mdx",
+      "purpose": "Authored documentation page: Install the controller. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/getting-started/quickstart.mdx",
+      "purpose": "Authored documentation page: Verify your first capture. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/index.mdx",
+      "purpose": "Authored documentation page: Adaptive IPS framework. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/integrations/snort.mdx",
+      "purpose": "Authored documentation page: Snort and alternate reader path. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/openapi.json",
+      "purpose": "Legacy merged-Ryu mutating management contract is separate from collection and read-only policy workbench APIs.",
+      "sha256": "975e0812d18586373c65869a699996096c11e7b519503107accd57793e534c22",
+      "canonical_bytes": 9192
+    },
+    {
+      "path": "docs-site/operations/collection.mdx",
+      "purpose": "Authored documentation page: Collect and validate site data. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/operations/dashboard.mdx",
+      "purpose": "Authored documentation page: Dashboard and unblock workflow. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/operations/incident-response.mdx",
+      "purpose": "Authored documentation page: Verify, contain and recover. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/operations/modes.mdx",
+      "purpose": "Authored documentation page: Detection modes and controls. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/policy-openapi.json",
+      "purpose": "Loopback read-only operator-model API contract documents snapshots/query/audit/impact/preview semantics and explicit limits.",
+      "sha256": "5d1a79c36c2e41b3df74f900919eef68bb753e51732d633cb9af4404b556dd70",
+      "canonical_bytes": 19487
+    },
+    {
+      "path": "docs-site/reference/change-log.mdx",
+      "purpose": "Authored documentation page: Implementation changelog. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/reference/codebase-snapshot.json",
+      "purpose": "Generated normalized source/raw-model fingerprints and Python metadata expose stale AI handoff data without importing runtime code."
+    },
+    {
+      "path": "docs-site/reference/control-protocol.mdx",
+      "purpose": "Authored documentation page: UDP control protocol. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/reference/feature-groups.json",
+      "purpose": "Authored current/planned G1-G24/supporting map assigns all legacy/site columns and rationale/model-use classifications.",
+      "sha256": "469c82a26c32a72901b797f2cedc61ed085a5cdc3bd729a2d0ddca7f91a3d259",
+      "canonical_bytes": 13287
+    },
+    {
+      "path": "docs-site/reference/file-purposes.json",
+      "purpose": "Authored exact tracked-path roles and local-only exclusions drive complete handbook coverage without ingesting private data.",
+      "sha256": "81bacc627eab534944d317ba2c4aea8b13bcb1d8939bdf9532c9fbecbb9eb56b",
+      "canonical_bytes": 31799
+    },
+    {
+      "path": "docs-site/roadmap/delivery-phases.mdx",
+      "purpose": "Authored documentation page: Delivery phases and service release gates. Extend the IPS roadmap with read-only policy analysis, governance, application services and verified automation."
+    },
+    {
+      "path": "docs-site/roadmap/final-service-scope.mdx",
+      "purpose": "Authored documentation page: Final service scope and competitor coverage. Trace all 70 specification capabilities to current code, planned phases and release evidence."
+    },
+    {
+      "path": "docs-site/security/configuration.mdx",
+      "purpose": "Authored documentation page: Configuration and management access. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/security/shadow-policy.mdx",
+      "purpose": "Authored documentation page: Shadow policy and reviewed baselines. Set device roles before collection, hold unsuitable windows and approve descriptive profiles offline."
+    },
+    {
+      "path": "docs-site/troubleshooting/verification.mdx",
+      "purpose": "Authored documentation page: Verify and troubleshoot. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs/SNORT_RYU_INTEGRATION.md",
+      "purpose": "Alternate Snort/Ryu integration narrative complements current source but retains environment/entry-point assumptions requiring review."
+    },
+    {
+      "path": "examples/policies/audit-reference.json",
+      "purpose": "Sanitized audit model exercises duplicates, union shadows, partial overlap, object findings and unresolved header predicates.",
+      "sha256": "fe7fcba7312463f76a1bba192f8044209142ac80dd4f37af9bbed64bf024017d",
+      "canonical_bytes": 3038
+    },
+    {
+      "path": "examples/policies/change-reference-v1.json",
+      "purpose": "Known supported base snapshot supplies duplicate/web/partial-source/default cases for exact-base hypothetical change demonstrations.",
+      "sha256": "b763bff37eb341de540f95d50dad2973eba94affbaf32dca7d130a04d11e9cda",
+      "canonical_bytes": 1779
+    },
+    {
+      "path": "examples/policies/change-reference-v2.json",
+      "purpose": "Same-context later snapshot broadens supported web access and produces concrete semantic expansion witnesses.",
+      "sha256": "11a24576c9123b22724c8f782a0286ca3537178a6b08b90cc988c41fd59d5d2d",
+      "canonical_bytes": 2647
+    },
+    {
+      "path": "examples/policies/disable-duplicate.request.json",
+      "purpose": "Exact-base hypothetical duplicate-disable request produces a review-only receipt without importing or applying the candidate.",
+      "sha256": "090b2f0815d7466178fc0cae6b10bdc0de78a1751aa3716ebe8edd2d249f11e4",
+      "canonical_bytes": 316
+    },
+    {
+      "path": "examples/policies/move-deny.request.json",
+      "purpose": "Exact-base hypothetical reorder request demonstrates supported access restriction from changed first-match precedence.",
+      "sha256": "197b3a94330043a2d3c75517c3a30eda29b410942f655f0d9861ff5f58b69719",
+      "canonical_bytes": 342
+    },
+    {
+      "path": "examples/policies/reference-v1.json",
+      "purpose": "First sanitized operator model includes address objects and an unsupported earlier predicate for conservative header search.",
+      "sha256": "5d7cf1b8c56809110d9b83b592c2753f4d67dbd46897064291fbbff1d4186a3c",
+      "canonical_bytes": 3027
+    },
+    {
+      "path": "examples/policies/reference-v2.json",
+      "purpose": "Second same-context operator snapshot changes selected rule fields/order to demonstrate structural revision comparison.",
+      "sha256": "c3bb4ce80b20a4345e11b678c76ac5343d7a81ec30c91dcd63c4566027caff6b",
+      "canonical_bytes": 3077
+    },
+    {
+      "path": "examples/testing/campaign-results.example.json",
+      "purpose": "Unqualified campaign template preserves independent truth/coverage/outcome fields and unavailable metrics instead of fabricated attack success.",
+      "sha256": "9bd10f88ae9300a42888cd3c58bccc5b2646dd04ba74027a250ed9a3e1cc0771",
+      "canonical_bytes": 862
+    },
+    {
+      "path": "examples/testing/visibility.example.json",
+      "purpose": "Deliberately unqualified sanitized visibility template requires actual dated path/direction evidence before meaningful operator attestation.",
+      "sha256": "6c60a6a6c347468e1c0a91c50c09ea5fcef504c7cd24c152ebafd53dcf52dd6d",
+      "canonical_bytes": 482
+    },
+    {
+      "path": "feature_groups_v3_plan.md",
+      "purpose": "Historical feature proposal is superseded for exact implementation claims by source-mapped current/planned rationale and code."
+    },
+    {
+      "path": "firewall_waf_integration_plan.md",
+      "purpose": "Planning reference proposes network-firewall/WAF integration without delivering universal vendor support or encrypted application visibility."
+    },
+    {
+      "path": "home_network_test_plan.md",
+      "purpose": "Earlier home experiment proposal is planning context; current visibility/no-mirror walkthrough governs executable steps."
+    },
+    {
+      "path": "pre_production_collection_runbook.md",
+      "purpose": "Earlier collection/review steps need current site-v3 schema, flags, eligibility and capture-scope qualification."
+    },
+    {
+      "path": "production_readiness_results.md",
+      "purpose": "Fill-in readiness scorecard preserves unmeasured results and independent evidence rather than inventing successful deployment."
+    },
+    {
+      "path": "production_readiness_test_plan.md",
+      "purpose": "Proposed realistic pilot objectives/phases define experiments rather than establish performed production qualification."
+    },
+    {
+      "path": "real_world_deployment_plan.md",
+      "purpose": "Earlier real-device placement/configuration plan remains conditional on physical observation and qualified network interfaces."
+    },
+    {
+      "path": "red_team_test_runbook.md",
+      "purpose": "Authorized lab scenario instructions require supported runtime paths, matched benign controls and independently observed outcomes."
+    },
+    {
+      "path": "scripts/audit_home_data.py",
+      "purpose": "Stopped-data audit CLI writes new private reports and exposes PASS/FAIL/REVIEW exit semantics from collection_report.",
+      "sha256": "8345dc4ae755f5e62c23db6296529b4d4679a9cc70a9674c6e408dd2927b306b",
+      "canonical_bytes": 1347,
+      "symbols": [
+        {
+          "name": "audit",
+          "kind": "function",
+          "line": 13,
+          "end_line": 14
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 17,
+          "end_line": 34
+        }
+      ],
+      "imports": [
+        "argparse",
+        "collection_report",
+        "json",
+        "os",
+        "pathlib",
+        "sys"
+      ]
+    },
+    {
+      "path": "scripts/build_ai_handoff.py",
+      "purpose": "Non-executing tracked-file/purpose/AST/fingerprint builder generates the complete handbook and checks staged or working-tree freshness.",
+      "sha256": "364a5f24dd46aff42449f367c7e4c0c8c5b8594d1ac4f782c565563944af92b0",
+      "canonical_bytes": 8521,
+      "symbols": [
+        {
+          "name": "tracked",
+          "kind": "function",
+          "line": 17,
+          "end_line": 19
+        },
+        {
+          "name": "read",
+          "kind": "function",
+          "line": 21,
+          "end_line": 24
+        },
+        {
+          "name": "symbols",
+          "kind": "function",
+          "line": 26,
+          "end_line": 47
+        },
+        {
+          "name": "symbols.Visitor",
+          "kind": "class",
+          "line": 29,
+          "end_line": 43
+        },
+        {
+          "name": "symbols.Visitor.__init__",
+          "kind": "function",
+          "line": 30,
+          "end_line": 31
+        },
+        {
+          "name": "symbols.Visitor.record",
+          "kind": "function",
+          "line": 32,
+          "end_line": 37
+        },
+        {
+          "name": "symbols.Visitor.visit_ClassDef",
+          "kind": "function",
+          "line": 38,
+          "end_line": 39
+        },
+        {
+          "name": "symbols.Visitor.visit_FunctionDef",
+          "kind": "function",
+          "line": 40,
+          "end_line": 41
+        },
+        {
+          "name": "symbols.Visitor.visit_AsyncFunctionDef",
+          "kind": "function",
+          "line": 42,
+          "end_line": 43
+        },
+        {
+          "name": "build",
+          "kind": "function",
+          "line": 49,
+          "end_line": 105
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 107,
+          "end_line": 137
+        }
+      ],
+      "imports": [
+        "argparse",
+        "ast",
+        "check_docs_sync",
+        "hashlib",
+        "json",
+        "pathlib",
+        "subprocess"
+      ]
+    },
+    {
+      "path": "scripts/check_docs_sync.py",
+      "purpose": "Staged/PR/push Git guard binds implementation changes to a mapped affected MDX page and dated changelog entry.",
+      "sha256": "15e826f6a90402db8673cdee1c163dfd5433f0de2729479388f53e9b219a1d5a",
+      "canonical_bytes": 5456,
+      "symbols": [
+        {
+          "name": "is_implementation",
+          "kind": "function",
+          "line": 22,
+          "end_line": 34
+        },
+        {
+          "name": "git_diff",
+          "kind": "function",
+          "line": 37,
+          "end_line": 38
+        },
+        {
+          "name": "snapshot_file",
+          "kind": "function",
+          "line": 41,
+          "end_line": 44
+        },
+        {
+          "name": "load_map",
+          "kind": "function",
+          "line": 47,
+          "end_line": 70
+        },
+        {
+          "name": "related_pages",
+          "kind": "function",
+          "line": 73,
+          "end_line": 78
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 81,
+          "end_line": 126
+        }
+      ],
+      "imports": [
+        "argparse",
+        "fnmatch",
+        "json",
+        "pathlib",
+        "re",
+        "subprocess",
+        "sys"
+      ]
+    },
+    {
+      "path": "scripts/check_feature_catalog.py",
+      "purpose": "AST/index guard checks column ownership/current-planned rationale coverage without importing models or proving mathematical correctness.",
+      "sha256": "5f77e2eaf0c0ec56bf7310a938f0a0e75262e0134bcc04f46b0e43e9e56c9c12",
+      "canonical_bytes": 5875,
+      "symbols": [
+        {
+          "name": "source_columns",
+          "kind": "function",
+          "line": 15,
+          "end_line": 37
+        },
+        {
+          "name": "validate",
+          "kind": "function",
+          "line": 40,
+          "end_line": 75
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 78,
+          "end_line": 90
+        },
+        {
+          "name": "main.read",
+          "kind": "function",
+          "line": 82,
+          "end_line": 85
+        }
+      ],
+      "imports": [
+        "argparse",
+        "ast",
+        "collections",
+        "json",
+        "pathlib",
+        "subprocess"
+      ]
+    },
+    {
+      "path": "scripts/evaluate_security_campaign.py",
+      "purpose": "Independent campaign scorer validates truth/coverage/times and separates misses, abstentions, alerts, read-back and verified containment.",
+      "sha256": "9df380d1084cd92ac6894645c5aad3413616f2dcb91974104458c75361b91acd",
+      "canonical_bytes": 8965,
+      "symbols": [
+        {
+          "name": "timestamp",
+          "kind": "function",
+          "line": 21,
+          "end_line": 25
+        },
+        {
+          "name": "score",
+          "kind": "function",
+          "line": 28,
+          "end_line": 114
+        },
+        {
+          "name": "score.ratio",
+          "kind": "function",
+          "line": 101,
+          "end_line": 101
+        },
+        {
+          "name": "score.summary",
+          "kind": "function",
+          "line": 102,
+          "end_line": 106
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 117,
+          "end_line": 135
+        }
+      ],
+      "imports": [
+        "argparse",
+        "collections",
+        "datetime",
+        "hashlib",
+        "json",
+        "math",
+        "os",
+        "pathlib",
+        "statistics",
+        "sys"
+      ]
+    },
+    {
+      "path": "scripts/home_preflight.py",
+      "purpose": "Noncreating environment/settings/permissions/clock/storage/dated-visibility preflight does not configure network mirroring or approve labels.",
+      "sha256": "0be2d5bf31c401addb39d4e4b477134c94981909a78cd4549ef0cf9f4b85e8ee",
+      "canonical_bytes": 10477,
+      "symbols": [
+        {
+          "name": "visibility",
+          "kind": "function",
+          "line": 21,
+          "end_line": 55
+        },
+        {
+          "name": "visibility.instant",
+          "kind": "function",
+          "line": 28,
+          "end_line": 32
+        },
+        {
+          "name": "preflight",
+          "kind": "function",
+          "line": 58,
+          "end_line": 151
+        },
+        {
+          "name": "preflight.add",
+          "kind": "function",
+          "line": 60,
+          "end_line": 61
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 154,
+          "end_line": 175
+        }
+      ],
+      "imports": [
+        "argparse",
+        "collection_io",
+        "datetime",
+        "hashlib",
+        "home_sensor",
+        "importlib",
+        "ipaddress",
+        "json",
+        "math",
+        "os",
+        "pathlib",
+        "scapy.utils",
+        "shutil",
+        "site_policy",
+        "socket",
+        "subprocess",
+        "sys"
+      ]
+    },
+    {
+      "path": "scripts/policy_inventory.py",
+      "purpose": "Operator-model import/query/audit/proposal-receipt CLI also launches the read-only loopback viewer without native firewall credentials.",
+      "sha256": "a7bf190a7f48ad926e9ee675d6f3cd15899cb1ad373c925eb35e2d4bad6c5887",
+      "canonical_bytes": 7183,
+      "symbols": [
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 15,
+          "end_line": 128
+        }
+      ],
+      "imports": [
+        "argparse",
+        "firewall_policy",
+        "json",
+        "os",
+        "pathlib",
+        "policy_audit",
+        "policy_change",
+        "policy_http",
+        "policy_store",
+        "sqlite3",
+        "sys"
+      ]
+    },
+    {
+      "path": "scripts/qualify_home_collection.py",
+      "purpose": "Sanitized packet fixtures drive all-field golden extraction comparisons, including nonzero supported protocol/header subsets.",
+      "sha256": "94e40fdde5489fd7bc3b3dd798bc894f03a298721d795443917f3a135b3d2ba9",
+      "canonical_bytes": 6250,
+      "symbols": [
+        {
+          "name": "hello",
+          "kind": "function",
+          "line": 24,
+          "end_line": 33
+        },
+        {
+          "name": "fixtures",
+          "kind": "function",
+          "line": 36,
+          "end_line": 63
+        },
+        {
+          "name": "fixtures.frame",
+          "kind": "function",
+          "line": 37,
+          "end_line": 42
+        },
+        {
+          "name": "fixtures.close",
+          "kind": "function",
+          "line": 59,
+          "end_line": 62
+        },
+        {
+          "name": "qualify",
+          "kind": "function",
+          "line": 66,
+          "end_line": 106
+        },
+        {
+          "name": "qualify.compare",
+          "kind": "function",
+          "line": 72,
+          "end_line": 79
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 109,
+          "end_line": 115
+        }
+      ],
+      "imports": [
+        "argparse",
+        "csv",
+        "hashlib",
+        "home_sensor",
+        "json",
+        "math",
+        "pathlib",
+        "scapy.layers.dns",
+        "scapy.layers.inet",
+        "scapy.layers.inet6",
+        "scapy.layers.l2",
+        "scapy.utils",
+        "struct",
+        "sys",
+        "threading",
+        "types"
+      ]
+    },
+    {
+      "path": "scripts/qualify_home_runtime.py",
+      "purpose": "Accelerated synthetic state/restart exercise reports bounded resources/artifacts without proving real live throughput or multi-day stability.",
+      "sha256": "1e5dbc52cf1d2b4bf040b49cfee52e63647f6f2d3a36c7df91ae395142fbe635",
+      "canonical_bytes": 3862,
+      "symbols": [
+        {
+          "name": "exercise",
+          "kind": "function",
+          "line": 19,
+          "end_line": 68
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 71,
+          "end_line": 79
+        }
+      ],
+      "imports": [
+        "argparse",
+        "collection_report",
+        "csv",
+        "home_sensor",
+        "json",
+        "pathlib",
+        "psutil",
+        "scapy.layers.inet",
+        "scapy.layers.l2",
+        "site_features",
+        "sys",
+        "time"
+      ]
+    },
+    {
+      "path": "scripts/review_site_baseline.py",
+      "purpose": "Explicit stopped-run approval validates identity/schema/policy/quality/provenance and writes a new frozen descriptive profile.",
+      "sha256": "ce51a0f20aa0d34f5fd8e59476f2f1c1b043ebbd21aab52f57838440d51c3ad3",
+      "canonical_bytes": 9647,
+      "symbols": [
+        {
+          "name": "stopped_collection",
+          "kind": "function",
+          "line": 21,
+          "end_line": 27
+        },
+        {
+          "name": "file_hash",
+          "kind": "function",
+          "line": 30,
+          "end_line": 35
+        },
+        {
+          "name": "approve",
+          "kind": "function",
+          "line": 38,
+          "end_line": 125
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 128,
+          "end_line": 158
+        }
+      ],
+      "imports": [
+        "argparse",
+        "collection_io",
+        "contextlib",
+        "csv",
+        "datetime",
+        "hashlib",
+        "itertools",
+        "json",
+        "os",
+        "pathlib",
+        "site_policy",
+        "sys"
+      ]
+    },
+    {
+      "path": "scripts/start_docs.cjs",
+      "purpose": "Node helper validates declared pinned Mint executable and port, launches hidden detached log-backed child and checks branded readiness.",
+      "sha256": "c2309ddb7bb7d495d8c883800332effc053790d97c350fc350b35e829d8665a0",
+      "canonical_bytes": 5971
+    },
+    {
+      "path": "scripts/start_docs.cmd",
+      "purpose": "Windows wrapper locates Node through PATH/default installation and runs the Node helper without changing PowerShell execution policy.",
+      "sha256": "2baf4f45d703b819003931ecb39ee0f09d3b4acabeb85804fc4cd875c2e03ee9",
+      "canonical_bytes": 371
+    },
+    {
+      "path": "scripts/start_docs.ps1",
+      "purpose": "Original PowerShell background/foreground helper requires permitted script-file execution and a resolvable global Mint shim.",
+      "sha256": "112bd71d873beee1cdbd806c577ed15c4aa90257922f87eb5306dc2002fdcd64",
+      "canonical_bytes": 3961
+    },
+    {
+      "path": "t530_bridge_setup.md",
+      "purpose": "Conditional transparent-bridge setup requires an actual inline topology and suitable interfaces, absent in the current one-NIC home arrangement."
+    },
+    {
+      "path": "t530_full_system_runbook.md",
+      "purpose": "Long legacy controller/Snort/topology procedure retains historical environment and missing-file assumptions; validate entry points first."
+    },
+    {
+      "path": "t530_mode_b_ap_setup.md",
+      "purpose": "Conditional hostapd/AP instructions require compatible Wi-Fi hardware, which has not been established on this t530."
+    },
+    {
+      "path": "tests/fixtures/site-v3-golden.json",
+      "purpose": "Hand-derived independent feature expectations identify the extraction oracle; do not regenerate them blindly from the extractor.",
+      "sha256": "f4deaa9401fd95e119c92f8b4fdbf434e9621a557722e875a8a7c100f3ab6fe3",
+      "canonical_bytes": 4084
+    },
+    {
+      "path": "tests/test_ai_handoff.py",
+      "purpose": "Tests exact file-purpose coverage, conditional/nested AST extraction, private read boundaries, LF/raw hashing and staged readers.",
+      "sha256": "f599d370857edbad45120a879f075a42ccb6ffb60a16093e8e4ac01286d16fb2",
+      "canonical_bytes": 3557,
+      "symbols": [
+        {
+          "name": "HandoffTests",
+          "kind": "class",
+          "line": 14,
+          "end_line": 63
+        },
+        {
+          "name": "HandoffTests.catalog",
+          "kind": "function",
+          "line": 15,
+          "end_line": 19
+        },
+        {
+          "name": "HandoffTests.test_conditional_class_nested_symbols_and_imports",
+          "kind": "function",
+          "line": 21,
+          "end_line": 25
+        },
+        {
+          "name": "HandoffTests.test_exact_path_purpose_coverage_and_no_private_reads",
+          "kind": "function",
+          "line": 27,
+          "end_line": 37
+        },
+        {
+          "name": "HandoffTests.test_lf_normalization_and_raw_artifact_fingerprints",
+          "kind": "function",
+          "line": 39,
+          "end_line": 51
+        },
+        {
+          "name": "HandoffTests.test_staged_reader_does_not_substitute_unstaged_source",
+          "kind": "function",
+          "line": 53,
+          "end_line": 63
+        }
+      ],
+      "imports": [
+        "build_ai_handoff",
+        "copy",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest",
+        "unittest.mock"
+      ]
+    },
+    {
+      "path": "tests/test_collection_readiness.py",
+      "purpose": "Golden/restart/preflight/lease/storage/torn-evidence tests exercise bounded offline correctness and explicit failure reporting.",
+      "sha256": "e59a455e0acfbd3b77f8b4e0c7b6ee7bc6ccf09515ac3c6f183c14254bdd50c6",
+      "canonical_bytes": 9160,
+      "symbols": [
+        {
+          "name": "ReadinessTests",
+          "kind": "class",
+          "line": 27,
+          "end_line": 173
+        },
+        {
+          "name": "ReadinessTests.sample",
+          "kind": "function",
+          "line": 28,
+          "end_line": 34
+        },
+        {
+          "name": "ReadinessTests.test_all_feature_columns_match_independent_wire_fixture",
+          "kind": "function",
+          "line": 36,
+          "end_line": 40
+        },
+        {
+          "name": "ReadinessTests.test_restart_soak_keeps_rates_counts_novelty_and_unknown",
+          "kind": "function",
+          "line": 42,
+          "end_line": 47
+        },
+        {
+          "name": "ReadinessTests.test_atomic_replace_failure_preserves_previous_checkpoint",
+          "kind": "function",
+          "line": 49,
+          "end_line": 58
+        },
+        {
+          "name": "ReadinessTests.test_corrupt_restart_profile_is_rejected_without_replacing_it",
+          "kind": "function",
+          "line": 60,
+          "end_line": 69
+        },
+        {
+          "name": "ReadinessTests.test_invalid_packet_timestamp_is_counted_without_an_observation",
+          "kind": "function",
+          "line": 71,
+          "end_line": 77
+        },
+        {
+          "name": "ReadinessTests.test_process_lease_conflict_and_crash_release",
+          "kind": "function",
+          "line": 79,
+          "end_line": 88
+        },
+        {
+          "name": "ReadinessTests.test_offline_report_refuses_active_writer",
+          "kind": "function",
+          "line": 90,
+          "end_line": 95
+        },
+        {
+          "name": "ReadinessTests.test_report_catches_interrupted_two_file_write",
+          "kind": "function",
+          "line": 97,
+          "end_line": 104
+        },
+        {
+          "name": "ReadinessTests.test_report_verifies_evidence_digest_and_all_numeric_features",
+          "kind": "function",
+          "line": 106,
+          "end_line": 121
+        },
+        {
+          "name": "ReadinessTests.test_storage_failure_does_not_flush_pending_window",
+          "kind": "function",
+          "line": 123,
+          "end_line": 131
+        },
+        {
+          "name": "ReadinessTests.test_report_does_not_infer_idle_gaps_or_parser_counts_are_attacks",
+          "kind": "function",
+          "line": 133,
+          "end_line": 141
+        },
+        {
+          "name": "ReadinessTests.test_visibility_requires_bound_dated_bidirectional_evidence",
+          "kind": "function",
+          "line": 143,
+          "end_line": 158
+        },
+        {
+          "name": "ReadinessTests.test_preflight_is_noncreating_and_rejects_changed_contract",
+          "kind": "function",
+          "line": 160,
+          "end_line": 173
+        }
+      ],
+      "imports": [
+        "argparse",
+        "collection_io",
+        "collection_report",
+        "copy",
+        "csv",
+        "home_preflight",
+        "home_sensor",
+        "json",
+        "pathlib",
+        "qualify_home_collection",
+        "qualify_home_runtime",
+        "socket",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "test_home_collection",
+        "unittest",
+        "unittest.mock"
+      ]
+    },
+    {
+      "path": "tests/test_docs_launcher.cjs",
+      "purpose": "Node tests cover CLI bounds, declared executable failures, readiness/port checks, no-start failures and owned detached fixture lifecycle.",
+      "sha256": "a2064d2899b138845b72b0e4fd4b1ee8788b40908912cdb3b2ba03c8ada74367",
+      "canonical_bytes": 5154
+    },
+    {
+      "path": "tests/test_docs_sync.py",
+      "purpose": "Isolated Git tests verify affected/changelog/index/unmapped/missing documentation rules across staged and push/PR modes.",
+      "sha256": "5e52b2669f75f04bbc5f274c4c94b02bc259ea7c847375fbb6e1a4478a25b268",
+      "canonical_bytes": 5367,
+      "symbols": [
+        {
+          "name": "DocsSyncTests",
+          "kind": "class",
+          "line": 20,
+          "end_line": 116
+        },
+        {
+          "name": "DocsSyncTests.setUp",
+          "kind": "function",
+          "line": 21,
+          "end_line": 38
+        },
+        {
+          "name": "DocsSyncTests.tearDown",
+          "kind": "function",
+          "line": 40,
+          "end_line": 41
+        },
+        {
+          "name": "DocsSyncTests.git",
+          "kind": "function",
+          "line": 43,
+          "end_line": 44
+        },
+        {
+          "name": "DocsSyncTests.write",
+          "kind": "function",
+          "line": 46,
+          "end_line": 51
+        },
+        {
+          "name": "DocsSyncTests.record",
+          "kind": "function",
+          "line": 53,
+          "end_line": 54
+        },
+        {
+          "name": "DocsSyncTests.guard",
+          "kind": "function",
+          "line": 56,
+          "end_line": 58
+        },
+        {
+          "name": "DocsSyncTests.test_requires_changelog_and_affected_page",
+          "kind": "function",
+          "line": 60,
+          "end_line": 68
+        },
+        {
+          "name": "DocsSyncTests.test_unstaged_page_does_not_satisfy_commit",
+          "kind": "function",
+          "line": 70,
+          "end_line": 76
+        },
+        {
+          "name": "DocsSyncTests.test_deleted_documentation_cannot_satisfy_guard",
+          "kind": "function",
+          "line": 78,
+          "end_line": 82
+        },
+        {
+          "name": "DocsSyncTests.test_unmapped_code_requires_developer_page",
+          "kind": "function",
+          "line": 84,
+          "end_line": 89
+        },
+        {
+          "name": "DocsSyncTests.test_missing_map_blocks_implementation",
+          "kind": "function",
+          "line": 91,
+          "end_line": 96
+        },
+        {
+          "name": "DocsSyncTests.test_pr_and_push_diff_modes",
+          "kind": "function",
+          "line": 98,
+          "end_line": 107
+        },
+        {
+          "name": "DocsSyncTests.test_docs_only_and_runtime_dependency_classification",
+          "kind": "function",
+          "line": 109,
+          "end_line": 116
+        }
+      ],
+      "imports": [
+        "check_docs_sync",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ]
+    },
+    {
+      "path": "tests/test_feature_catalog.py",
+      "purpose": "Coverage tests reject invented/missing/duplicate columns, planned false claims, predictor labels and stale index mappings.",
+      "sha256": "2432c79d6de354b73ad73ec23877942fce04b15b215667255b3ece2118c00906",
+      "canonical_bytes": 4167,
+      "symbols": [
+        {
+          "name": "read",
+          "kind": "function",
+          "line": 17,
+          "end_line": 18
+        },
+        {
+          "name": "CatalogTests",
+          "kind": "class",
+          "line": 21,
+          "end_line": 75
+        },
+        {
+          "name": "CatalogTests.test_all_columns_and_numbered_groups_are_covered",
+          "kind": "function",
+          "line": 22,
+          "end_line": 25
+        },
+        {
+          "name": "CatalogTests.test_missing_invented_duplicate_columns_and_groups_fail",
+          "kind": "function",
+          "line": 27,
+          "end_line": 38
+        },
+        {
+          "name": "CatalogTests.test_planned_group_cannot_claim_implemented_measurements",
+          "kind": "function",
+          "line": 40,
+          "end_line": 44
+        },
+        {
+          "name": "CatalogTests.test_missing_empty_rationale_and_label_predictors_fail",
+          "kind": "function",
+          "line": 46,
+          "end_line": 52
+        },
+        {
+          "name": "CatalogTests.test_dynamic_feature_definition_requires_an_explicit_checker_update",
+          "kind": "function",
+          "line": 54,
+          "end_line": 59
+        },
+        {
+          "name": "CatalogTests.test_dynamic_feature_definition_requires_an_explicit_checker_update.altered",
+          "kind": "function",
+          "line": 55,
+          "end_line": 57
+        },
+        {
+          "name": "CatalogTests.test_staged_check_uses_git_index_instead_of_unstaged_rationale_map",
+          "kind": "function",
+          "line": 61,
+          "end_line": 75
+        }
+      ],
+      "imports": [
+        "check_feature_catalog",
+        "copy",
+        "json",
+        "pathlib",
+        "shutil",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
+      ]
+    },
+    {
+      "path": "tests/test_home_collection.py",
+      "purpose": "Tests rates/history/timestamps, IPv4/IPv6, optional parsers, resource limits, corrupt rows and local-doc path rejection.",
+      "sha256": "454d47ec92a46e796f1f3c5eb5dc80af2ac29dedbafddf7919b40d0b5b5dce33",
+      "canonical_bytes": 8582,
+      "symbols": [
+        {
+          "name": "observation",
+          "kind": "function",
+          "line": 23,
+          "end_line": 27
+        },
+        {
+          "name": "HomeTests",
+          "kind": "class",
+          "line": 30,
+          "end_line": 175
+        },
+        {
+          "name": "HomeTests.collector",
+          "kind": "function",
+          "line": 31,
+          "end_line": 33
+        },
+        {
+          "name": "HomeTests.test_novelty_is_measured_before_history_update",
+          "kind": "function",
+          "line": 35,
+          "end_line": 40
+        },
+        {
+          "name": "HomeTests.test_window_rate_counts_and_ipv6",
+          "kind": "function",
+          "line": 42,
+          "end_line": 54
+        },
+        {
+          "name": "HomeTests.test_daily_rotation_state_reload_and_schema_guard",
+          "kind": "function",
+          "line": 56,
+          "end_line": 71
+        },
+        {
+          "name": "HomeTests.test_late_and_capacity_loss_are_explicit",
+          "kind": "function",
+          "line": 73,
+          "end_line": 80
+        },
+        {
+          "name": "HomeTests.test_storage_limit_stops_writes",
+          "kind": "function",
+          "line": 82,
+          "end_line": 85
+        },
+        {
+          "name": "HomeTests.test_rolling_buckets_expire",
+          "kind": "function",
+          "line": 87,
+          "end_line": 92
+        },
+        {
+          "name": "HomeTests.test_dns_is_opt_in_and_names_are_reduced",
+          "kind": "function",
+          "line": 94,
+          "end_line": 99
+        },
+        {
+          "name": "HomeTests.test_http_is_opt_in_and_fragmented_inputs_do_not_get_full_parse",
+          "kind": "function",
+          "line": 101,
+          "end_line": 107
+        },
+        {
+          "name": "HomeTests.test_complete_tls_and_incomplete_tls",
+          "kind": "function",
+          "line": 109,
+          "end_line": 121
+        },
+        {
+          "name": "HomeTests.test_capped_cardinality_is_recorded",
+          "kind": "function",
+          "line": 123,
+          "end_line": 129
+        },
+        {
+          "name": "HomeTests.test_audit_detects_corrupted_rates",
+          "kind": "function",
+          "line": 131,
+          "end_line": 146
+        },
+        {
+          "name": "HomeTests.test_local_docs_route_and_traversal",
+          "kind": "function",
+          "line": 148,
+          "end_line": 153
+        },
+        {
+          "name": "HomeTests.test_pair_periodicity_has_sample_support",
+          "kind": "function",
+          "line": 155,
+          "end_line": 162
+        },
+        {
+          "name": "HomeTests.test_broadcast_does_not_create_a_device_profile",
+          "kind": "function",
+          "line": 164,
+          "end_line": 168
+        },
+        {
+          "name": "HomeTests.test_ethernet_padding_is_not_application_payload",
+          "kind": "function",
+          "line": 170,
+          "end_line": 175
+        }
+      ],
+      "imports": [
+        "audit_home_data",
+        "collections",
+        "csv",
+        "home_sensor",
+        "json",
+        "local_docs",
+        "pathlib",
+        "scapy.layers.dns",
+        "scapy.layers.inet",
+        "scapy.layers.inet6",
+        "scapy.layers.l2",
+        "site_features",
+        "struct",
+        "sys",
+        "tempfile",
+        "unittest"
+      ]
+    },
+    {
+      "path": "tests/test_nft_quarantine.py",
+      "purpose": "Mocked adapter tests verify scope/protection/idempotency/read-back; actual kernel forwarding and expiry remain separate qualification.",
+      "sha256": "b55356fd811aabd7dd8c7211f006c5163110c99dfb491424d47ccdb946ffd998",
+      "canonical_bytes": 2261,
+      "symbols": [
+        {
+          "name": "QuarantineTests",
+          "kind": "class",
+          "line": 11,
+          "end_line": 49
+        },
+        {
+          "name": "QuarantineTests.test_add_and_verify",
+          "kind": "function",
+          "line": 15,
+          "end_line": 21
+        },
+        {
+          "name": "QuarantineTests.test_protected_and_out_of_scope",
+          "kind": "function",
+          "line": 23,
+          "end_line": 28
+        },
+        {
+          "name": "QuarantineTests.test_remove_only_owned_element",
+          "kind": "function",
+          "line": 30,
+          "end_line": 37
+        },
+        {
+          "name": "QuarantineTests.test_failed_readback_is_not_success",
+          "kind": "function",
+          "line": 39,
+          "end_line": 42
+        },
+        {
+          "name": "QuarantineTests.test_existing_entry_does_not_extend_ttl",
+          "kind": "function",
+          "line": 44,
+          "end_line": 49
+        }
+      ],
+      "imports": [
+        "ipaddress",
+        "nft_quarantine",
+        "pathlib",
+        "sys",
+        "unittest",
+        "unittest.mock"
+      ]
+    },
+    {
+      "path": "tests/test_policy_audit.py",
+      "purpose": "Independent finite-space oracle tests supported symbolic coverage/precedence, witness validity, uncertainty/budgets and read-only transport.",
+      "sha256": "6ec0e6e2c887340c58aa509ec77ee41cd7b533d927e5d16f9a941bb462842ff1",
+      "canonical_bytes": 8752,
+      "symbols": [
+        {
+          "name": "rule",
+          "kind": "function",
+          "line": 25,
+          "end_line": 28
+        },
+        {
+          "name": "policy",
+          "kind": "function",
+          "line": 31,
+          "end_line": 34
+        },
+        {
+          "name": "findings",
+          "kind": "function",
+          "line": 37,
+          "end_line": 38
+        },
+        {
+          "name": "oracle_matches",
+          "kind": "function",
+          "line": 41,
+          "end_line": 50
+        },
+        {
+          "name": "oracle_matches.ports",
+          "kind": "function",
+          "line": 42,
+          "end_line": 47
+        },
+        {
+          "name": "AuditTests",
+          "kind": "class",
+          "line": 53,
+          "end_line": 163
+        },
+        {
+          "name": "AuditTests.test_union_of_prior_rules_shadows_without_pairwise_containment",
+          "kind": "function",
+          "line": 54,
+          "end_line": 59
+        },
+        {
+          "name": "AuditTests.test_prior_action_and_logging_differences_prevent_behavior_equivalence",
+          "kind": "function",
+          "line": 61,
+          "end_line": 66
+        },
+        {
+          "name": "AuditTests.test_shadowing_uses_effective_first_match_not_all_prior_actions",
+          "kind": "function",
+          "line": 68,
+          "end_line": 70
+        },
+        {
+          "name": "AuditTests.test_partial_overlap_has_covered_and_uncovered_witnesses",
+          "kind": "function",
+          "line": 72,
+          "end_line": 76
+        },
+        {
+          "name": "AuditTests.test_unresolved_predecessor_global_context_and_disabled_are_conservative",
+          "kind": "function",
+          "line": 78,
+          "end_line": 88
+        },
+        {
+          "name": "AuditTests.test_ipv6_and_source_port_dimensions",
+          "kind": "function",
+          "line": 90,
+          "end_line": 99
+        },
+        {
+          "name": "AuditTests.test_object_findings_are_explicitly_model_scoped",
+          "kind": "function",
+          "line": 101,
+          "end_line": 108
+        },
+        {
+          "name": "AuditTests.test_caps_fail_without_publishing_a_partial_proof",
+          "kind": "function",
+          "line": 110,
+          "end_line": 114
+        },
+        {
+          "name": "AuditTests.test_whitespace_comment_is_missing_documentation",
+          "kind": "function",
+          "line": 116,
+          "end_line": 119
+        },
+        {
+          "name": "AuditTests.test_exhaustive_oracle_checks_shadow_redundancy_and_witnesses",
+          "kind": "function",
+          "line": 121,
+          "end_line": 144
+        },
+        {
+          "name": "AuditTests.test_cli_and_http_audit_remain_read_only",
+          "kind": "function",
+          "line": 146,
+          "end_line": 163
+        }
+      ],
+      "imports": [
+        "copy",
+        "firewall_policy",
+        "ipaddress",
+        "itertools",
+        "json",
+        "pathlib",
+        "policy_audit",
+        "policy_http",
+        "policy_store",
+        "random",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "threading",
+        "unittest",
+        "urllib.parse",
+        "urllib.request"
+      ]
+    },
+    {
+      "path": "tests/test_policy_change.py",
+      "purpose": "Independent before/after oracle and receipt/CLI/API tests preserve hypothetical access/logging distinctions and unchanged stored/native state.",
+      "sha256": "ce5da54e09793f16bf409ec1bb94929e97f2429a6a2b38c97f27b3b9c1367a33",
+      "canonical_bytes": 10571,
+      "symbols": [
+        {
+          "name": "base",
+          "kind": "function",
+          "line": 27,
+          "end_line": 28
+        },
+        {
+          "name": "request",
+          "kind": "function",
+          "line": 31,
+          "end_line": 33
+        },
+        {
+          "name": "ChangeTests",
+          "kind": "class",
+          "line": 36,
+          "end_line": 171
+        },
+        {
+          "name": "ChangeTests.test_duplicate_disable_is_access_equivalent_but_default_logging_is_unqualified",
+          "kind": "function",
+          "line": 37,
+          "end_line": 45
+        },
+        {
+          "name": "ChangeTests.test_reorder_has_concrete_restriction_and_remove_has_attribution_change",
+          "kind": "function",
+          "line": 47,
+          "end_line": 55
+        },
+        {
+          "name": "ChangeTests.test_broadening_and_default_or_deny_reject_changes",
+          "kind": "function",
+          "line": 57,
+          "end_line": 66
+        },
+        {
+          "name": "ChangeTests.test_logging_change_is_not_access_change",
+          "kind": "function",
+          "line": 68,
+          "end_line": 72
+        },
+        {
+          "name": "ChangeTests.test_unknown_envelope_does_not_hide_known_changes_elsewhere",
+          "kind": "function",
+          "line": 74,
+          "end_line": 84
+        },
+        {
+          "name": "ChangeTests.test_unresolved_address_and_disabled_unknown_are_not_fabricated_matches",
+          "kind": "function",
+          "line": 86,
+          "end_line": 92
+        },
+        {
+          "name": "ChangeTests.test_ipv6_source_port_change_and_display_cap_do_not_skip_analysis",
+          "kind": "function",
+          "line": 94,
+          "end_line": 101
+        },
+        {
+          "name": "ChangeTests.test_context_limits_stale_target_and_operation_validation",
+          "kind": "function",
+          "line": 103,
+          "end_line": 115
+        },
+        {
+          "name": "ChangeTests.test_receipt_tampering_and_even_rehashed_false_state_are_rejected",
+          "kind": "function",
+          "line": 117,
+          "end_line": 122
+        },
+        {
+          "name": "ChangeTests.test_independent_exhaustive_oracle_for_access_changes",
+          "kind": "function",
+          "line": 124,
+          "end_line": 141
+        },
+        {
+          "name": "ChangeTests.test_independent_exhaustive_oracle_for_access_changes.verdict",
+          "kind": "function",
+          "line": 127,
+          "end_line": 128
+        },
+        {
+          "name": "ChangeTests.test_cli_receipt_and_http_preview_are_read_only",
+          "kind": "function",
+          "line": 143,
+          "end_line": 171
+        }
+      ],
+      "imports": [
+        "copy",
+        "firewall_policy",
+        "itertools",
+        "json",
+        "pathlib",
+        "policy_audit",
+        "policy_change",
+        "policy_http",
+        "policy_store",
+        "random",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "test_policy_audit",
+        "threading",
+        "unittest",
+        "urllib.error",
+        "urllib.parse",
+        "urllib.request"
+      ]
+    },
+    {
+      "path": "tests/test_policy_workbench.py",
+      "purpose": "Tests strict schema/resolvers, ordered uncertainty, SQLite integrity/transactions and read-only CLI/HTTP including empty-query compatibility.",
+      "sha256": "2c33abf4b474a78c8eab0007b1091d30549fb3fd8dd692bb1bcc24b5560d0cc6",
+      "canonical_bytes": 15187,
+      "symbols": [
+        {
+          "name": "model",
+          "kind": "function",
+          "line": 28,
+          "end_line": 29
+        },
+        {
+          "name": "point",
+          "kind": "function",
+          "line": 32,
+          "end_line": 33
+        },
+        {
+          "name": "PolicyModelTests",
+          "kind": "class",
+          "line": 36,
+          "end_line": 152
+        },
+        {
+          "name": "PolicyModelTests.test_normalization_is_stable_and_rejects_duplicate_json_keys",
+          "kind": "function",
+          "line": 37,
+          "end_line": 41
+        },
+        {
+          "name": "PolicyModelTests.test_native_vendor_or_unknown_fields_are_never_silently_normalized",
+          "kind": "function",
+          "line": 43,
+          "end_line": 51
+        },
+        {
+          "name": "PolicyModelTests.test_groups_cycles_missing_objects_and_unresolved_selectors",
+          "kind": "function",
+          "line": 53,
+          "end_line": 63
+        },
+        {
+          "name": "PolicyModelTests.test_strict_networks_port_ranges_and_bool_rejection",
+          "kind": "function",
+          "line": 65,
+          "end_line": 73
+        },
+        {
+          "name": "PolicyModelTests.test_duplicate_rule_id_or_position_rejected",
+          "kind": "function",
+          "line": 75,
+          "end_line": 80
+        },
+        {
+          "name": "PolicyModelTests.test_resource_limits_nonfinite_and_unknown_rule_fields",
+          "kind": "function",
+          "line": 82,
+          "end_line": 90
+        },
+        {
+          "name": "PolicyModelTests.test_allow_deny_default_and_disabled_search_are_distinct",
+          "kind": "function",
+          "line": 92,
+          "end_line": 102
+        },
+        {
+          "name": "PolicyModelTests.test_unknown_earlier_rule_cannot_be_overridden_by_later_deny",
+          "kind": "function",
+          "line": 104,
+          "end_line": 108
+        },
+        {
+          "name": "PolicyModelTests.test_unknown_after_decisive_match_does_not_override_model_order",
+          "kind": "function",
+          "line": 110,
+          "end_line": 113
+        },
+        {
+          "name": "PolicyModelTests.test_global_context_unknown_and_missing_source_port",
+          "kind": "function",
+          "line": 115,
+          "end_line": 124
+        },
+        {
+          "name": "PolicyModelTests.test_ipv6_udp_and_invalid_query_contracts",
+          "kind": "function",
+          "line": 126,
+          "end_line": 134
+        },
+        {
+          "name": "PolicyModelTests.test_search_limit_does_not_skip_effective_rules",
+          "kind": "function",
+          "line": 136,
+          "end_line": 140
+        },
+        {
+          "name": "PolicyModelTests.test_diff_has_explicit_context_and_no_actor_guess",
+          "kind": "function",
+          "line": 142,
+          "end_line": 152
+        },
+        {
+          "name": "PolicyStoreTests",
+          "kind": "class",
+          "line": 155,
+          "end_line": 283
+        },
+        {
+          "name": "PolicyStoreTests.create",
+          "kind": "function",
+          "line": 156,
+          "end_line": 160
+        },
+        {
+          "name": "PolicyStoreTests.test_duplicate_import_and_raw_history_preserve_one_snapshot",
+          "kind": "function",
+          "line": 162,
+          "end_line": 179
+        },
+        {
+          "name": "PolicyStoreTests.test_wrong_raw_model_pair_and_transaction_failure_leave_no_partial_snapshot",
+          "kind": "function",
+          "line": 181,
+          "end_line": 194
+        },
+        {
+          "name": "PolicyStoreTests.test_missing_read_store_and_unrelated_database_are_not_overwritten",
+          "kind": "function",
+          "line": 196,
+          "end_line": 207
+        },
+        {
+          "name": "PolicyStoreTests.test_snapshot_tampering_is_detected",
+          "kind": "function",
+          "line": 209,
+          "end_line": 217
+        },
+        {
+          "name": "PolicyStoreTests.test_raw_export_tampering_is_detected_during_read_and_reimport",
+          "kind": "function",
+          "line": 219,
+          "end_line": 230
+        },
+        {
+          "name": "PolicyStoreTests.test_cli_validate_import_list_search_and_diff",
+          "kind": "function",
+          "line": 232,
+          "end_line": 247
+        },
+        {
+          "name": "PolicyStoreTests.test_cli_validate_import_list_search_and_diff.run",
+          "kind": "function",
+          "line": 235,
+          "end_line": 239
+        },
+        {
+          "name": "PolicyStoreTests.test_http_read_only_dashboard_queries_and_invalid_requests",
+          "kind": "function",
+          "line": 249,
+          "end_line": 283
+        }
+      ],
+      "imports": [
+        "contextlib",
+        "copy",
+        "firewall_policy",
+        "json",
+        "pathlib",
+        "policy_http",
+        "policy_store",
+        "sqlite3",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "threading",
+        "unittest",
+        "unittest.mock",
+        "urllib.error",
+        "urllib.parse",
+        "urllib.request"
+      ]
+    },
+    {
+      "path": "tests/test_security_campaign.py",
+      "purpose": "Metric tests preserve independent coverage/truth exclusions, abstentions, verified-traffic distinction and valid event chronology.",
+      "sha256": "96d48f85b799eb9f7d1a78c6c6ca88679a9d82bb64f5e3c09167bd6b0ba408e6",
+      "canonical_bytes": 3198,
+      "symbols": [
+        {
+          "name": "record",
+          "kind": "function",
+          "line": 14,
+          "end_line": 18
+        },
+        {
+          "name": "CampaignTests",
+          "kind": "class",
+          "line": 21,
+          "end_line": 56
+        },
+        {
+          "name": "CampaignTests.test_counts_abstention_and_window_denominators",
+          "kind": "function",
+          "line": 22,
+          "end_line": 29
+        },
+        {
+          "name": "CampaignTests.test_unknown_and_unseen_traffic_are_excluded_not_true_negative",
+          "kind": "function",
+          "line": 31,
+          "end_line": 36
+        },
+        {
+          "name": "CampaignTests.test_readback_is_separate_from_verified_traffic_containment",
+          "kind": "function",
+          "line": 38,
+          "end_line": 48
+        },
+        {
+          "name": "CampaignTests.test_duplicate_mixed_revision_invalid_times_and_inconsistent_verdict_fail",
+          "kind": "function",
+          "line": 50,
+          "end_line": 56
+        }
+      ],
+      "imports": [
+        "copy",
+        "evaluate_security_campaign",
+        "json",
+        "pathlib",
+        "sys",
+        "unittest"
+      ]
+    },
+    {
+      "path": "tests/test_site_policy.py",
+      "purpose": "Shadow/profile/review tests reject replay, poor identity/quality, tampered evidence, active writers and unsafe candidate promotion.",
+      "sha256": "c629aa323148969c3ba16ff4f764f203764b4fc2dadf557012f3760e5672bfb2",
+      "canonical_bytes": 16368,
+      "symbols": [
+        {
+          "name": "policy",
+          "kind": "function",
+          "line": 33,
+          "end_line": 38
+        },
+        {
+          "name": "packet",
+          "kind": "function",
+          "line": 41,
+          "end_line": 44
+        },
+        {
+          "name": "PolicyTests",
+          "kind": "class",
+          "line": 47,
+          "end_line": 308
+        },
+        {
+          "name": "PolicyTests.create",
+          "kind": "function",
+          "line": 48,
+          "end_line": 55
+        },
+        {
+          "name": "PolicyTests.closed_run",
+          "kind": "function",
+          "line": 57,
+          "end_line": 64
+        },
+        {
+          "name": "PolicyTests.review",
+          "kind": "function",
+          "line": 66,
+          "end_line": 68
+        },
+        {
+          "name": "PolicyTests.test_policy_rejects_typo_duplicate_and_invalid_binding",
+          "kind": "function",
+          "line": 70,
+          "end_line": 84
+        },
+        {
+          "name": "PolicyTests.test_role_violation_is_shadow_and_cannot_enter_candidate",
+          "kind": "function",
+          "line": 86,
+          "end_line": 102
+        },
+        {
+          "name": "PolicyTests.test_tcp_reply_and_udp_are_unassessed_by_initiation_policy",
+          "kind": "function",
+          "line": 104,
+          "end_line": 109
+        },
+        {
+          "name": "PolicyTests.test_quality_failure_freezes_later_candidates",
+          "kind": "function",
+          "line": 111,
+          "end_line": 125
+        },
+        {
+          "name": "PolicyTests.test_identity_change_and_expiry_are_not_approved",
+          "kind": "function",
+          "line": 127,
+          "end_line": 140
+        },
+        {
+          "name": "PolicyTests.test_partial_replay_unverified_and_stale_windows_are_held",
+          "kind": "function",
+          "line": 142,
+          "end_line": 151
+        },
+        {
+          "name": "PolicyTests.test_approved_baseline_is_frozen_and_bound_to_policy",
+          "kind": "function",
+          "line": 153,
+          "end_line": 176
+        },
+        {
+          "name": "PolicyTests.test_review_rejects_replay_even_if_early_windows_look_eligible",
+          "kind": "function",
+          "line": 178,
+          "end_line": 184
+        },
+        {
+          "name": "PolicyTests.test_policy_snapshot_does_not_expose_mutable_candidate_state",
+          "kind": "function",
+          "line": 186,
+          "end_line": 191
+        },
+        {
+          "name": "PolicyTests.test_review_rejects_post_window_loss_and_missing_evidence",
+          "kind": "function",
+          "line": 193,
+          "end_line": 205
+        },
+        {
+          "name": "PolicyTests.test_review_rejects_hidden_device_id_and_feature_tampering",
+          "kind": "function",
+          "line": 207,
+          "end_line": 217
+        },
+        {
+          "name": "PolicyTests.test_review_rejects_an_active_writer",
+          "kind": "function",
+          "line": 219,
+          "end_line": 224
+        },
+        {
+          "name": "PolicyTests.test_csv_contract_and_unconfigured_collection_remain_compatible",
+          "kind": "function",
+          "line": 226,
+          "end_line": 234
+        },
+        {
+          "name": "PolicyTests.test_review_cli_creates_loadable_profile_and_refuses_overwrite",
+          "kind": "function",
+          "line": 236,
+          "end_line": 252
+        },
+        {
+          "name": "PolicyTests.test_policy_http_dashboard_docs_and_rejected_write",
+          "kind": "function",
+          "line": 254,
+          "end_line": 279
+        },
+        {
+          "name": "PolicyTests.test_home_cli_replay_emits_shadow_evidence_and_unknown_csv",
+          "kind": "function",
+          "line": 281,
+          "end_line": 308
+        }
+      ],
+      "imports": [
+        "collections",
+        "copy",
+        "csv",
+        "functools",
+        "home_sensor",
+        "http.server",
+        "json",
+        "passive_ids",
+        "pathlib",
+        "review_site_baseline",
+        "scapy.layers.inet",
+        "scapy.layers.l2",
+        "scapy.utils",
+        "site_features",
+        "site_policy",
+        "socket",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "threading",
+        "unittest",
+        "urllib.error",
+        "urllib.request"
+      ]
+    }
+  ],
+  "local_only": {
+    "ML model/eval_live.py": "Observed untracked historical evaluator imports absent column_dropper and expects a separate untracked pipeline; it is not a supported reproducible runtime entry.",
+    "ML dataset/dataset_final_predictions.csv": "Observed untracked local CSV; rows/private identities were not copied or interpreted. Dataset provenance and labels are unqualified.",
+    "new dataset for verification/dataset_session1_normal.csv": "Observed untracked session CSV. A filename containing normal is not independent benign truth; contents remain excluded.",
+    "new dataset for verification/dataset_session2_icmp_c.csv": "Observed untracked experiment CSV with unqualified capture scope/truth; no rows are included in the handbook.",
+    "new dataset for verification/dataset_session3_syn.csv": "Observed untracked experiment CSV with unqualified capture scope/truth; no rows are included in the handbook.",
+    "new dataset for verification/dataset_session4_udp.csv": "Observed untracked experiment CSV with unqualified capture scope/truth; no rows are included in the handbook.",
+    "SDN Topology/ and QoS/": "Local directories had no source files at audit time and are not tracked deliverables. Historical topology/QoS commands are not evidence of runnable current code.",
+    "Quality Of Service  part/": "Ignored local vendored-material location had no observed project files in this bounded audit; it is not integrated functionality.",
+    ".claude/settings.local.json and .cursor/": "Local agent/editor configuration is not product source or authority. Private settings were not copied or interpreted.",
+    ".git/, .local/, .venv/, node_modules/, __pycache__/": "Version-control internals, private runtime logs/captures, installed dependencies and generated caches are excluded from authored per-file inventory.",
+    "Chapter4_System_Implementation (1).docx/.pdf": "Ignored local thesis artifacts are retained unchanged and were not parsed as current code or release evidence.",
+    "Backup/ if present": "Preserve pristine; never edit/delete or promote contents into runtime without explicit user direction."
+  }
+}

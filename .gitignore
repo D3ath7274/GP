@@ -14,3 +14,6 @@ Quality Of Service  part/
 
 # Local documentation preview processes and logs
 /.local/
+
+# Locally installed documentation dependencies are not product source.
+node_modules/

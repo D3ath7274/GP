@@ -12,7 +12,7 @@ CHANGE_LOG = "docs-site/reference/change-log.mdx"
 DOCUMENTATION_MAP = "docs-site/documentation-map.json"
 NON_CODE = {".md", ".mdx", ".rst", ".txt", ".pdf", ".docx", ".csv", ".log", ".pyc"}
 CODE_SUFFIXES = {
-    ".py", ".sh", ".ps1", ".js", ".mjs", ".ts", ".tsx", ".html", ".css",
+    ".py", ".sh", ".ps1", ".js", ".cjs", ".mjs", ".ts", ".tsx", ".html", ".css",
     ".lua", ".rules", ".json", ".yaml", ".yml", ".toml", ".ini",
     ".conf", ".service", ".joblib", ".h5", ".keras", ".ipynb",
     ".nft", ".pkl", ".onnx", ".pt", ".bat", ".cmd",

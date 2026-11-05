@@ -110,7 +110,7 @@ class DocsSyncTests(unittest.TestCase):
         self.write(PAGE, "Documentation-only correction\n", True)
         self.assertEqual(self.guard().returncode, 0)
         for name in ("Controller/requirements-home.txt", "requirements.txt", "Controller/model.onnx",
-                     "Controller/scripts/policy.nft", "scripts/start_docs.ps1",
+                     "Controller/scripts/policy.nft", "scripts/start_docs.ps1", "scripts/start_docs.cjs", "scripts/start_docs.cmd",
                      ".github/workflows/documentation.yml", ".githooks/pre-commit"):
             self.assertTrue(is_implementation(name), name)
         self.assertFalse(is_implementation("docs-site/DOCUMENTATION_VALIDATION.md"))
