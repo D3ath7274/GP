@@ -13,6 +13,8 @@ The JSON companion reference/feature-methods.json covers every **102 legacy plus
 
 ## The method-selection rule
 
+For a group-by-group explanation of what these measurements add compared with simpler approaches, read the [comparative note and editable presentation](/architecture/feature-group-comparison). The presentation covers G1–G24, benign lookalikes and implementation limits; it does not claim experimentally established superiority.
+
 1. Define event time, direction, identity, key, byte layer, horizon and eligible denominator before selecting a formula.
 2. Preserve exact counters and stable online moments; count missing/truncated/capped observations explicitly. Random timestamp subsampling does not preserve adjacent inter-arrival structure. [Stable moment algorithms](https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/), [measurement selection](https://www.rfc-editor.org/info/rfc5475/).
 3. Keep sample count and support. CV is SD divided by the mean and becomes unstable near a zero mean; its value alone does not identify an attack. [NIST CV](https://itl.nist.gov/div898/software/dataplot/refman2/auxillar/coefvari.htm).

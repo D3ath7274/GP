@@ -1,6 +1,8 @@
 {
   "version": "file-purposes-v1",
   "files": {
+    "docs-site/architecture/feature-group-comparison.mdx": "Comparative feature-group note links the editable presentation and distinguishes added information from measured superiority and planned capabilities.",
+    "docs-site/assets/adaptive-ips-feature-group-comparisons.pptx": "Editable thirty-five-slide teaching presentation compares G1–G24 with alternatives, benign controls, implementation limits and sourced speaker notes.",
     ".githooks/pre-commit": "Versioned local hook runs staged documentation, feature-catalog and AI-handoff guards; clone configuration and server-side rules remain separate.",
     ".github/workflows/documentation.yml": "Push/PR workflow qualifies offline Python, committed guards, Node launcher and Mintlify build/link/accessibility checks.",
     ".gitignore": "Excludes generated caches, local state, vendored setup material and Node dependencies from authored product commits.",

@@ -2,6 +2,7 @@
 
 | Source | Site page |
 | --- | --- |
+| G1–G24 explanatory comparisons and editable presentation | Feature groups compared with alternatives; Feature measurement methods and research |
 | Controller launch and packet handler | Install the controller, Quickstart and Packet capture and enforcement |
 | TrafficCapture, RF and AE | Packet capture and enforcement and Collect and validate site data |
 | IPSRestController | Management API, seven JSON operations |

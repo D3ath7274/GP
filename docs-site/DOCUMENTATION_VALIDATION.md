@@ -1,5 +1,13 @@
 # Validation
 
+## Comparative feature-group presentation · 2026-11-05
+
+Created a live editable presentation with 35 slides, including a dedicated comparison for all 24 numbered groups and the six supporting categories. All 35 slides were rendered and visually inspected individually at full resolution. Session inspection confirmed 35 populated speaker-note sections. Read-only checks of the exported PowerPoint package confirmed 35 slide/notes parts, 34 native editable tables, exact authored slide titles and note content, and no elements extending outside the 1280×720 canvas. These checks do not establish PowerPoint/Google Slides application behavior; native application editing was not tested. The deck cites primary references in speaker notes and separates additional information, planned improvements and experimentally demonstrated superiority.
+
+The companion page, navigation, coverage matrix, file-purpose catalog and dated changelog identify the teaching artifact. All three staged documentation/feature/handbook guards and whitespace checks passed with 146 tracked paths, 83 fingerprints, 30 categories and 173 method recommendations. Mintlify build/validation, broken links and accessibility passed on 50 MDX pages, retaining the existing accent AA-versus-AAA advisory. The localhost comparison page returned HTTP 200 with the expected title, and its PowerPoint download matched the validated export by SHA256. The source-checked handbook/snapshot were regenerated for the new files and navigation fingerprint.
+
+There is no executable source, feature semantics/catalog, model artifact, API contract or S01–S70 implementation-status change. Runtime qualification is not repeated for explanatory documentation. Hosted publication remains separate from the successful local preview/build.
+
 ## Primary-source feature methods and offline group evidence · 2026-11-05
 
 Reviewed 26 primary standards, official analyzer/statistics documentation and research sources. The new authored method inventory covers all 173 schema-qualified column occurrences and G18–G24 future requirements; the guard verifies mapping/source/status/page coverage, not source endorsement, mathematical correctness or detection yield. Existing site timing columns are recataloged into G1 and size SD into G6. Git diff confirms no changes to either packet extractor, RF/AE inference, model/weight artifact or rebuilding script. Both 102/71-column contracts and planned-service statuses remain intact.

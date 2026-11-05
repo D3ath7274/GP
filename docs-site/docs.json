@@ -101,6 +101,7 @@
               "architecture/data-flow",
               "architecture/feature-rationale",
               "architecture/feature-methods",
+              "architecture/feature-group-comparison",
               "architecture/feature-lineage",
               "developers/repository-scope"
             ]

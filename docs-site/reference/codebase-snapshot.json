@@ -1,6 +1,6 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "32425125315cdf0966a3f9aade6ab783b4184adf",
+  "reference_base_commit": "e7f337d5f6387c45417ea4c543e05894c0c5d467",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
   "context_sha256": "c4d2a8afb649775c682c7b49ccc356f7b171e72badf283b6fa3df1c413078cf0",
   "files": [
@@ -2385,6 +2385,10 @@
       "purpose": "Authored documentation page: Detection tiers and decisions. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
     },
     {
+      "path": "docs-site/architecture/feature-group-comparison.mdx",
+      "purpose": "Comparative feature-group note links the editable presentation and distinguishes added information from measured superiority and planned capabilities."
+    },
+    {
       "path": "docs-site/architecture/feature-lineage.mdx",
       "purpose": "Preserves original G11–G17 proposed measurements, corrections, implemented-versus-planned boundaries and the legacy/site behavioral lineage."
     },
@@ -2395,6 +2399,10 @@
     {
       "path": "docs-site/architecture/feature-rationale.mdx",
       "purpose": "Authored documentation page: Why each behavioral feature group exists. Source-mapped rationale, benign lookalikes, limits and qualification plans for G1–G24 and supporting evidence."
+    },
+    {
+      "path": "docs-site/assets/adaptive-ips-feature-group-comparisons.pptx",
+      "purpose": "Editable thirty-five-slide teaching presentation compares G1–G24 with alternatives, benign controls, implementation limits and sourced speaker notes."
     },
     {
       "path": "docs-site/collection-openapi.json",
@@ -2489,8 +2497,8 @@
     {
       "path": "docs-site/docs.json",
       "purpose": "Mintlify branding/navigation selects authored pages and separate legacy-Ryu versus policy-workbench API groups.",
-      "sha256": "76f4a1f690ac408515efcdbc396527111e2f1a8a025aaebdd78652e75db4eafc",
-      "canonical_bytes": 4454
+      "sha256": "8a72482eb0b1712c1a4527720950be3d23077e63a78e7832b16dfb3ac2ef39e7",
+      "canonical_bytes": 4509
     },
     {
       "path": "docs-site/documentation-map.json",
@@ -2569,8 +2577,8 @@
     {
       "path": "docs-site/reference/file-purposes.json",
       "purpose": "Authored exact tracked-path roles and local-only exclusions drive complete handbook coverage without ingesting private data.",
-      "sha256": "5e1875ed88b6aca1a90025ff8c94610acb8ada05489a7c9f6e85c440ce615e0b",
-      "canonical_bytes": 28767
+      "sha256": "90f78e0735d90f5f7087822d3d86717173f50d002abf48fa70aa923f24ae8cac",
+      "canonical_bytes": 29203
     },
     {
       "path": "docs-site/roadmap/delivery-phases.mdx",
