@@ -9,6 +9,8 @@ This catalog distinguishes **legacy lab implementation** in Controller/traffic_c
 
 The machine-readable map docs-site/reference/feature-groups.json assigns every current column exactly once: 102 legacy columns and 71 site-v3 columns, including identifiers/labels/audit fields that must not become predictors. It includes G1–G24 plus six supporting categories below. Run python scripts/check_feature_catalog.py to verify source-name/heading/status coverage; --staged reads Git's index for commit checks. This verifies documentation coverage, not mathematical correctness or detection quality. A same-name meaning change still needs review, fixtures, schema/version decisions and retraining.
 
+The [preservation and design-lineage page](/architecture/feature-lineage) retains the older proposed G11–G17 measurements without claiming they all exist. Repository cleanup leaves both extractor implementations, all catalog assignments, model artifacts and planned G18–G24 unchanged. [Repository scope](/developers/repository-scope) records exact decisions and recovery.
+
 ## Measurement and decision contract
 
 | Property | Current implementation / planned discipline |

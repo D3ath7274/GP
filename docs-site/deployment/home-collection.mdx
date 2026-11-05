@@ -3,6 +3,9 @@ title: "Collect home traffic for two weeks"
 description: "Run the site-v3 collector on Ubuntu with daily CSVs, observation history and capture health."
 ---
 
+The shared read-only dashboard transport now lives in Controller/http_dashboard.py. Site collection no longer imports the legacy passive runner or RF/AE modules merely to serve HTTP. Routes/method authority are unchanged. See [repository scope](/developers/repository-scope) for the consolidation and retained behavioral reference lane.
+
+
 If whole-network visibility is unavailable, follow [the no-mirror pilot](/deployment/no-mirror-pilot) for bounded PC endpoint captures and replay on the t530. The live backend skips locally outgoing packet copies for its mirror-input use case; this is why endpoint/router tests use independently captured bidirectional PCAPs. Replay retains its own provenance and review gates, and independent sessions are not a continuous approved baseline.
 
 The dedicated home collector writes the versioned **site-v3.0** dataset and serves the dashboard on loopback port 8081. Its five-second rows summarize each local IP address and VLAN. Historical profiles describe observed behavior. Ground truth stays **UNKNOWN** until you independently review activity.

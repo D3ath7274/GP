@@ -1,9 +1,27 @@
 ---
-title: "Snort and alternate reader path"
+title: "Snort signature evidence: retained lab integration"
 ---
 
-The merged runtime manages Snort and consumes JSON alerts. Choose the mirror path according to placement. The repository supplies `Controller/snort3/sdn_ips.lua` and `sdn_ips_local.rules`. Confirm the alert file changes during a controlled lab test and match the SID to the loaded rules.
+Snort 3 remains an optional signature-comparison source for S06. Controller_main_Claude.py uses SnortManager in snort_monitor.py and the repository Lua/rules. It is not currently connected to home_sensor.py or to native firewall-policy imports. Four local flood rules and the configured inspectors are not comprehensive web-application protection.
 
-The standalone reader and bridge are an alternate integration. The bridge uses `RYU_API_URL`, defaulting to `http://127.0.0.1:8081/ips/block`. Verify the startup destination and the listening controller before using it. Run a single enforcement path for each alert source so testing can attribute a drop to its origin.
+Obsolete standalone readers, bridge relays, mixed-version installers and absent-app launchers were removed; see [the preservation ledger](/developers/repository-scope). Use one intentional alert source/consumer for attribution. These files remain available in the historical tag for research, not active deployment.
 
-The repository config includes four active local rules. Full web application inspection requires a separate documented configuration or WAF integration. Encrypted traffic content requires a point with legitimate visibility into plaintext.
+## Lab configuration preparation
+
+Use Snort 3 built from its official source/build procedure at /usr/local/bin/snort; do not install Snort 2 with apt. Building/installing the binary is an operator prerequisite, not automated here. Before copying, inspect the supplied Lua HOME_NET, static ARP bindings, rule path and inspectors and adapt a private site copy. They are testbed reference settings and must not be deployed unchanged at home or a company.
+
+```bash
+/usr/local/bin/snort -V
+sudo install -d /etc/snort/rules /var/log/snort
+sudo install -m 644 Controller/snort3/sdn_ips_local.rules /etc/snort/rules/sdn_ips_local.rules
+sudo install -m 644 /path/to/reviewed-site.lua /etc/snort/sdn_ips.lua
+sudo /usr/local/bin/snort -T -c /etc/snort/sdn_ips.lua
+```
+
+Only after version/config validation, run a bounded authorized observation on an existing qualified interface:
+
+```bash
+sudo /usr/local/bin/snort -c /etc/snort/sdn_ips.lua -i MIRROR_IFACE -l /var/log/snort -A alert_json
+```
+
+Replace MIRROR_IFACE with the actual interface. This command observes alerts; it is not an inline Snort IPS or native firewall write integration. Record rule/config versions, GID/SID, packet/event time, source/destination and independent scenario truth. Inspectors can overlap and emit benign stream events. Encrypted payloads need an authorized plaintext observation point; high alert counts do not prove attacks or blocks.

@@ -27,7 +27,7 @@ from scapy.layers.l2 import Ether
 from scapy.error import Scapy_Exception
 from scapy.utils import PcapReader
 
-from passive_ids import DashboardHandler
+from http_dashboard import DashboardHandler
 from site_features import DeviceWindow, FeatureHistory, SCHEMA_VERSION, decode
 from site_policy import ShadowPolicy, digest, load_json
 from collection_io import collection_lease

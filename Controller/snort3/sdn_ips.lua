@@ -1,8 +1,5 @@
--- Snort 3 config — shared by BOTH flows:
---   * standalone Snort -> bridge -> Ryu IPS (snort_alert_reader.py), and
---   * the team integrated controller (snort_monitor.py drives Snort with this
---     config and parses its alert_json output).
--- Install with: sudo Controller/scripts/install_snort3_ips_config.sh
+-- Snort 3 lab reference for SnortManager; review HOME_NET/static bindings before use.
+-- Preparation and validation: docs-site/integrations/snort.mdx
 
 HOME_NET = '10.0.0.0/8'
 EXTERNAL_NET = '!$HOME_NET'

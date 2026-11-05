@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Adaptive IPS framework Ryu management API",
-    "description": "Legacy Ryu management contract. Home collection has a separate contract in collection-openapi.json, including /ips/policy. The read-only policy workbench on port 8082 has policy-openapi.json, including GET /policy/audit for a bounded operator-model audit. Those additional routes are not implemented by Ryu. Counterfactual impact/preview are also separate workbench-only routes, not Ryu APIs.",
+    "title": "Adaptive IPS framework — legacy Ryu lab API",
+    "description": "Retained thesis/lab reference only, not the active firewall auto-audit API. Site observations use collection-openapi.json; operator-model audits/impact/previews use policy-openapi.json. Those are separate read-only services. The removed standalone Snort bridge is not an available entry point. Ryu software action state is not proof of switch acknowledgment or traffic containment.",
     "version": "1.0.0"
   },
   "servers": [

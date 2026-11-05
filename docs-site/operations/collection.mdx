@@ -1,6 +1,9 @@
 ---
-title: "Collect and validate site data"
+title: "Legacy feature and model experiments"
 ---
+
+Legacy feature/model research reference only. For real site-v3 data use [home collection](/deployment/home-collection), [pre-test qualification](/deployment/pretest-qualification) and the current pilot. The models and script below use the original schema; do not train them directly on site-v3 rows or assume legacy default-normal labels are independent truth.
+
 
 Enable `IPS_V2_FEATURES=1` and start in capture-only mode. Record device roles, address changes, time ranges and intentional test activity. Separate normal-only windows from attack sessions and preserve raw captures in restricted storage. Controller startup can rotate an existing dataset.
 

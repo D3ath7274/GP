@@ -1,8 +1,8 @@
 ---
-title: "Test the passive sensor"
+title: "Legacy behavioral reference and replay"
 ---
 
-Run Adaptive IPS framework as a standalone IDS on the t530 or attach it to a firewall's supported TAP or mirror output. The firewall keeps forwarding traffic. This integration uses mirrored Ethernet frames and requires no firewall credentials.
+This retained lane reproduces the original 102-column features and trusted RF/AE experiments. Use the separate [site collector](/deployment/home-collection) for current real-data preparation. A mirror supplies observations, not a firewall plugin or automatic policy changes. The reference path has no firewall credentials and does not enforce.
 
 ## Replay a known capture
 
@@ -66,3 +66,10 @@ The parser currently omits IPv6. Profiles use IP addresses and restart with the 
 4. Use a controlled test client and owned destination for a known number of echo requests, an HTTP transaction or a file transfer. Include idle time, one-packet flows and repeated destinations. Record both endpoint activity and network observations.
 5. Compare packet counts, captured byte lengths, protocols and timing using the same observation boundary. Ethernet frame sizes, IP lengths and application bytes have different meanings. Account for mirror duplication, direction, offloads and unsupported IPv6.
 6. Review the first CSV and capture health before extending to a one-hour pilot. Keep long-running baseline collection behind the outstanding measurement and resource gates above. Start model OBSERVE experiments only after distinguishing capture correctness from model detection quality.
+
+
+## Why the original Ryu files remain
+
+Controller_main_Claude.py contains DAI binding checks and the original OpenFlow actuator. ipsctl.py, ips_config.json and traffic_mirror.py support that isolated lab lane. Retaining them prevents cleanup from silently discarding thesis behavior. They are not required by home_sensor.py or the policy workbench. The [scope ledger](/developers/repository-scope) removes obsolete alternate deployment instructions and relays; use the historical tag only to research earlier topology/build environments.
+
+The Ryu lab requires its separately provisioned compatible environment and a disposable OVS path, not your unmodified household LAN. Its mutation API remains documented in openapi.json. DETECT and ML authorization are distinct gates; queue OpenFlow writes onto the hub and verify actual flow counters plus target connectivity. Source config contains testbed assumptions. The [Snort guide](/integrations/snort) provides reviewed configuration preparation without restoring old installers.

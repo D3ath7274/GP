@@ -47,9 +47,8 @@ from traffic_capture import TrafficCapture  # Added
 from ml_inference import MLInferenceEngine  # ML Inference Engine (RF, Tier 3)
 from ae_inference import AEInferenceEngine  # Autoencoder anomaly engine (Tier 4)
 
-# REST API (merged from ryu_ips_app.py) — exposes /ips/block etc. on :8080 so an
-# external Snort flow (snort_alert_reader.py -> snort_ryu_bridge.py) can push IP
-# blocks while the team Snort/rate/RF/AE tiers run at the same time.
+# Retained lab REST API exposes /ips/block on the configured WSGI port so an
+# authorized lab HTTP client can request blocks alongside the integrated tiers.
 import json
 import ipaddress
 import socket as _socket_lib
@@ -209,7 +208,7 @@ class SimpleSwitch(app_manager.RyuApp):
         else:
             self.logger.error(
                 "Snort IDS failed to start! Install the curated config first: "
-                "sudo ./scripts/install_snort3_ips_config.sh. "
+                "see docs-site/integrations/snort.mdx. "
                 "Controller will continue without IDS."
             )
 
@@ -329,7 +328,7 @@ class SimpleSwitch(app_manager.RyuApp):
         self._ext_blocked = {}            # external ip -> timestamp (dedup + audit)
         # --- Deployment config (ips_config.json) ------------------------------
         # Absent/invalid keys fall back to testbed-safe defaults, so the Mininet
-        # testbed keeps working unchanged. See real_world_deployment_plan.md.
+        # testbed keeps working unchanged. See docs-site/deployment/passive-sensor.mdx.
         cfg = self._load_ips_config()
         # "Internal" LAN = the network the controller's OVS manages (OpenFlow's job);
         # anything outside it is "external" (host iptables). Default 10.0.0.0/8 = the
@@ -769,8 +768,7 @@ class SimpleSwitch(app_manager.RyuApp):
     # ===================================================================
     # REST API block helpers (merged from ryu_ips_app.py)
     # ===================================================================
-    # External tools (the friend's snort_alert_reader.py -> snort_ryu_bridge.py,
-    # or any HTTP client) POST {"src_ip": ...} to /ips/block. We resolve the MAC
+    # Authorized lab HTTP clients POST {"src_ip": ...} to /ips/block. We resolve the MAC
     # and reuse the proven MAC-based block_attacker() (OpenFlow 1.0 dl_src DROP);
     # if the MAC is unknown we fall back to an IP-based (nw_src) OF 1.0 DROP.
     # These run ALONGSIDE the controller's own Snort/rate/RF/AE tiers.
@@ -1560,9 +1558,8 @@ class SimpleSwitch(app_manager.RyuApp):
 
 
 # =============================================================================
-# REST controller (merged from ryu_ips_app.py). Same routes/JSON as the friend's
-# standalone IPS, so snort_ryu_bridge.py (RYU_API_URL=http://127.0.0.1:8080/ips/block)
-# works unchanged against this combined controller.
+# Retained Ryu lab REST controller. Contract: docs-site/openapi.json.
+# The active policy workbench and site collector have separate read-only APIs.
 # =============================================================================
 class IPSRestController(ControllerBase):
 

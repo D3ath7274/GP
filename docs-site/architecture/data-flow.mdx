@@ -1,22 +1,28 @@
 ---
-title: "Packet capture and enforcement"
+title: "Behavioral evidence and policy analysis paths"
 ---
 
-The Ryu packet handler parses Ethernet and available protocol headers and passes observations to the collector. The unidirectional key is source IP, destination IP, destination port and protocol. The flush worker builds rows from approximately five-second windows. Features cover packet size, timing, protocol flags, reverse traffic, destination diversity and device context. The normal schema is selected through `IPS_V2_FEATURES`.
+The product goal is a closed evidence/decision/action/verification loop. Today the paths below are separate, deliberately testable foundations. They must not be drawn as an already automatic firewall reconfiguration service.
 
 ```mermaid
 flowchart LR
-  OVS[Managed OVS] --> Ryu[Ryu packet handler]
-  Ryu --> Capture[Windowed flow capture]
-  Ryu --> Snort[Snort 3 alert path]
-  Capture --> Models[Rate checks and model scoring]
-  Capture --> CSV[Dataset CSV]
-  Models --> Queue[OpenFlow request queue]
-  Snort --> Queue
-  Queue --> Hub[Ryu hub worker]
-  Hub --> OVS
+  Frames[Qualified Ethernet capture or PCAP] --> Site[site_features and HomeCollection]
+  Site --> Evidence[Daily paired evidence and quality]
+  Site --> Shadow[Shadow profiles and review]
+  Model[Operator-described policy model] --> Store[Validated SQLite snapshots]
+  Store --> Audit[Rule audit and change impact]
+  Request[Explicit operator CLI request] --> NFT[Scoped nftables adapter]
+  NFT --> Readback[Membership verification]
 ```
 
-The flush thread and Snort monitor can submit mitigation requests. The hub worker sends OpenFlow messages. Known MAC enforcement uses a source MAC match, and the REST fallback uses an IPv4 source match. The opt-in host firewall handles selected host-plane alerts separately.
+home_sensor.py orchestrates site_features.py, collection_io.py and site_policy.py. It writes UNKNOWN-labeled observations, descriptive profiles and shadow evidence. http_dashboard.py supplies only read-only UI/docs/JSON transport. It no longer imports the legacy passive runner or its RF/AE modules merely to serve the dashboard.
 
-The scoring cap defaults to 60 rows per window and favors higher packet rates. Low-rate flows may be recorded without model inference. Per-device statistics can adapt, while RF and AE weights stay fixed. An AE anomaly is a deviation signal, with no proof of compromise.
+policy_inventory.py drives firewall_policy.py, policy_store.py, policy_audit.py and policy_change.py; policy_http.py exposes their read-only viewer. Inputs are operator-described models, not native vendor policy exports. Header-model outcomes are not route/NAT reachability proofs. nft_quarantine.py is separate and operator-run.
+
+## Retained thesis reference path
+
+Controller_main_Claude.py still provides OpenFlow PacketIn/DAI and Snort callbacks; traffic_capture.py constructs the original 102-column flow/device/network rows, rate hysteresis and RF/AE scoring. passive_ids.py reuses those features without Ryu and only observes. site-v3 has a different 71-column contract.
+
+The Ryu flush/Snort OS threads enqueue action requests for a hub worker; they must not call datapath.send_msg directly. Submitted state/banner counts are not independent switch acknowledgments or containment proof. These original paths remain lab references under [repository scope](/developers/repository-scope), not prerequisites for collecting current site data.
+
+The behavioral bridge to policy revisions, calibrated action confidence, native adapters, durable transactions/read-back/rollback and guarded online promotion remain [phased work](/roadmap/delivery-phases). Preserve all [feature groups](/architecture/feature-rationale) and their observation/quality evidence when building that bridge.

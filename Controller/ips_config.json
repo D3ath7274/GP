@@ -1,5 +1,5 @@
 {
-  "_comment": "Deployment config for Controller_main_Claude.py. Missing or invalid keys fall back to testbed-safe defaults, so the Mininet testbed keeps working unchanged. For a real LAN, set lan_cidr to your subnet, list the router/admin in ext_whitelist, and add any never-block devices to protected_macs. See real_world_deployment_plan.md.",
+  "_comment": "Deployment config for Controller_main_Claude.py. Missing or invalid keys fall back to testbed-safe defaults, so the Mininet testbed keeps working unchanged. For a real LAN, set lan_cidr to your subnet, list the router/admin in ext_whitelist, and add any never-block devices to protected_macs. Lab reference only; see docs-site/deployment/passive-sensor.mdx and security/configuration.mdx.",
 
   "lan_cidr": "10.0.0.0/8",
 

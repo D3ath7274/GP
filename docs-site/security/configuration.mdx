@@ -2,6 +2,8 @@
 title: "Configuration and management access"
 ---
 
+The active site collector uses its versioned collection contract and optional site_policy input; the policy workbench uses operator-described models and a private snapshot store. Neither requires the retained Ryu ips_config.json. That file is lab reference configuration only. Its comment now points to the current reference/security docs after obsolete deployment plans were removed; runtime defaults and protection semantics are unchanged. Review [repository scope](/developers/repository-scope) before using any legacy setup assumption.
+
 The controller reads `Controller/ips_config.json`. Set `lan_cidr` for the monitored LAN, `ext_whitelist` for exempt management IPs and `protected_macs` for MAC-based tier protection. The REST IPv4 fallback requires separate consideration when testing exemptions.
 
 | Setting | Purpose |

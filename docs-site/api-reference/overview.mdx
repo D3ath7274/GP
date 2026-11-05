@@ -1,13 +1,15 @@
 ---
-title: "Management API"
+title: "API boundaries and runtime selection"
 ---
 
-The new read-only [policy workbench](/deployment/policy-workbench) is a separate loopback service on port 8082. Its [policy API reference](/api-reference/policy-workbench) documents model status, snapshots/provenance, per-snapshot search and structural diffs. It accepts operator descriptions imported through the CLI; it has no native vendor parser or firewall write endpoint. These routes are not part of the Ryu or home-collection API.
+| Process | Contract | Authority |
+| --- | --- | --- |
+| Site-v3 home collector, loopback 8081 | collection-openapi.json; [collection reference](/api-reference/collection) | Observation/schema/health/shadow reads, static dashboard and local docs; no firewall or model writes |
+| Policy workbench, loopback 8082 | policy-openapi.json; [policy reference](/api-reference/policy-workbench) | Read-only operator-model snapshots, search, audit, impact and hypothetical previews |
+| Retained Ryu lab controller, configured 8081 | openapi.json, legacy reference only | Block/unblock affect its lab datapaths; software success does not prove containment |
 
-The dashboard uses the same origin as the controller WSGI service. The OpenAPI specification uses the runbook's loopback example on port 8081. Set the actual port at launch. Responses are controller state and can precede verification on a switch.
+These similarly named routes are separate processes/contracts. The two 8081 services cannot share the same bound address/port. The passive reference sensor only implements its documented read subset and does not inherit Ryu writes. The shared http_dashboard handler delegates reads to the supplied collector and rejects unsupported methods.
 
-The write endpoints affect forwarding. Use a disposable test client and a restricted management network. The UDP control client is documented under [Detection modes and controls](/operations/modes).
+There is no native vendor policy apply endpoint. The nftables reference CLI is operator-run, separate from both read-only services. Bind management locally and use the documented private tunnel; an internet-facing product management plane with authenticated roles is future work.
 
-The OpenAPI reference describes the Ryu deployment. The [passive sensor](/deployment/passive-sensor) implements the dashboard and read endpoints only. Its status includes `deployment_mode: passive` and a capture state.
-
-The [home collector](/deployment/home-collection) additionally serves /ips/collection, /ips/schema and /ips/policy. The latter reports [shadow policy findings and review eligibility](/security/shadow-policy), while /ips/collection embeds the shadow_policy view. Its separate [collection reference](/api-reference/collection) describes the supported read routes. The service also exposes /docs as a local reader of the checked-out Mintlify sources. These collection routes are unavailable on the legacy Ryu service.
+Use [the workbench](/deployment/policy-workbench), [site collection](/deployment/home-collection) and [legacy reference](/deployment/passive-sensor) guides for the chosen process. Do not infer authority from the dashboard's appearance.

@@ -1,0 +1,70 @@
+---
+title: "Repository scope and preservation ledger"
+---
+
+## Why this consolidation exists
+
+The active product goal is behavioral firewall auto-audit and eventually verified adaptive response across qualified adapters (S01–S70). Multiple old launchers, topology-specific instructions and duplicate plans made it unclear which path to test. Cleanup does not implement new enterprise services, change feature formulas or qualify automatic blocking.
+
+Use home_sensor.py for site measurements/shadow profiles, policy_inventory.py for offline policy audit/change review, the no-mirror pilot for current experiments, and nft_quarantine.py for a separate operator-run namespace test. Native vendor collection/writes, reachability/NAT, calibrated site models and a durable closed control loop remain planned under P0–P13.
+
+## Retained intentionally
+
+- Every legacy/site feature implementation and all G1–G24 rationale/catalog entries. G18–G24 remain planned. [Feature lineage](/architecture/feature-lineage) also preserves the superseded proposal's unimplemented measurement names/formulas.
+- Trusted shipped RF/AE artifacts, H5 weights and rebuilding scripts. Existing model import paths remain compatible; this is not a model release.
+- Controller_main_Claude.py, ipsctl.py, ips_config.json and traffic_mirror.py as a lab reference lane: the controller contains DAI and the original OpenFlow actuator. See [legacy behavioral reference](/deployment/passive-sensor). These are not required by the site collector or policy workbench.
+- SnortManager and Snort 3 Lua/rules for signature comparison; the integrated lab path remains. Alternate HTTP relays, absent-app launchers and old installers are removed. No Snort 2 package installation replaces them.
+- Collection leases/checkpoints, offline qualification fixtures/tests, policy analyzers, read-only APIs, the operator nftables adapter and all current service requirements/release gates.
+- Current study roadmap, source-checked AI handbook, documentation launchers/guards and no-mirror pilot/results template.
+
+## Removed tracked files
+
+All paths below were tracked at ce9a21878025bde98331d32e6cf6716411d25f1c. The annotated recovery tag is pre-auto-audit-cleanup-2026-11-05. No private dataset, untracked experiment, ignored thesis document or Backup directory was selected for deletion.
+
+| Removed path | Replacement or reason |
+| --- | --- |
+| Controller/SNORT_IDS_README.md | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/STANDALONE_SNORT_RYU_FILES.md | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/snort_alert_reader.py | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/snort_ryu_bridge.py | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/snort_setup.sh | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/scripts/disable_capture_offloads.sh | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/scripts/install_snort3_ips_config.sh | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/scripts/setup_external_blocking.sh | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/scripts/setup_vxlan_br_snort.sh | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/scripts/start_snort3_json.sh | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/scripts/start_snort_ryu_ips.sh | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Controller/scripts/verify_snort_ryu_ips.sh | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| docs/SNORT_RYU_INTEGRATION.md | Obsolete alternate relay, absent-app launcher or topology/install helper; retain integrated Snort source and explicit current reference instructions. |
+| Dashboard/PROJECT_DOCUMENTATION.md | PROJECT_AI_HANDBOOK.md and its source-checked authored context replace historical recap material. |
+| IPS_Project_Assessment.pdf | Canonical final-service-scope/delivery-phases and feature rationale replace historical product claims. |
+| SDN_IPS_Snort_Installation_Runbook.pdf | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| NGFW_feature_comparison.md | Canonical final-service-scope/delivery-phases and feature rationale replace historical product claims. |
+| SESSION_HANDOFF.md | PROJECT_AI_HANDBOOK.md and its source-checked authored context replace historical recap material. |
+| STUDY_AND_REBUILD_PLAN.md | DEVELOPER_STUDY_ROADMAP.md is the current consolidated study plan. |
+| apf_implementation_roadmap.md | Canonical final-service-scope/delivery-phases and feature rationale replace historical product claims. |
+| feature_groups_v3_plan.md | Exact proposed measurement tables retained in architecture/feature-lineage; source-mapped rationale is canonical. |
+| firewall_waf_integration_plan.md | Canonical final-service-scope/delivery-phases and feature rationale replace historical product claims. |
+| home_network_test_plan.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| pre_production_collection_runbook.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| production_readiness_results.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| production_readiness_test_plan.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| real_world_deployment_plan.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| red_team_test_runbook.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| t530_bridge_setup.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| t530_full_system_runbook.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+| t530_mode_b_ap_setup.md | Current site-collection, no-mirror pilot, campaign, policy-audit and nftables docs replace lab/hardware-specific or duplicate instructions. |
+
+## Recovery without reviving stale guidance
+
+Inspect a removed text file without changing the current tree:
+
+```bash
+git show pre-auto-audit-cleanup-2026-11-05:feature_groups_v3_plan.md
+```
+
+To research an entire historical tree, create a separate checkout at the tag. Do not restore old scripts into the current active guide by default. The tag preserves committed material only; it cannot preserve a private file that was never tracked.
+
+## Verification and remaining gates
+
+The cleanup compares before/after Git blob hashes for both feature extractors, RF/AE loaders and five model/training artifacts, and checks both source schemas through check_feature_catalog.py. Shared HTTP extraction is covered by actual loopback GET/method tests and an import-isolation test. Existing golden site features, legacy packet-to-CSV extraction and policy/collection tests protect the retained behavior. Actual results are recorded in DOCUMENTATION_VALIDATION.md; physical capture, Snort build, live Ryu and firewall containment are separate operator qualifications.

@@ -4,6 +4,10 @@ title: "Detection tiers and decisions"
 
 See [the complete feature-group rationale](/architecture/feature-rationale) for G1–G24 and supporting device/network/quality/policy evidence. It separates legacy lab features, the bounded site-v3 collection subset and future measurements, including corrected interpretations of timing, port ordering, TCP proxies and encrypted application visibility. The catalog does not enable a trained site-v3 model or universal attack guarantee.
 
+## Original four-tier reference
+
+The table and thresholds below describe the retained Ryu/legacy collector lane only. The active site-v3 collector records evidence and shadow findings; it does not run these models or enforce their decisions. The policy workbench audits operator models independently.
+
 | Tier | Evidence | Outcome and limitations |
 | --- | --- | --- |
 | Snort 3 | Rule and inspector alerts | Eligible alerts can trigger source mitigation with detection enabled. Coverage depends on loaded rules and monitored interfaces. |

@@ -12,7 +12,7 @@ PROJECT_AI_HANDBOOK.md combines this authored context with the purpose of every 
 
 This context does not replace the user's current instructions or AGENTS.md, grant permission for actions or establish production correctness. The next AI should verify freshness, then read only the relevant implementation/functions/tests for the requested edit. A summary cannot remove that verification requirement. Do not claim complete comprehension from generated symbol names alone.
 
-Historical AI_Project_Context.md, SESSION_HANDOFF.md and older root runbooks contain useful history but also stale filenames, counts, assumptions and recommendations. Actual current source plus qualified evidence takes precedence over narrative claims.
+Historical duplicate runbooks and alternate Snort relays were consolidated in the 2026-11-05 cleanup. AI_Project_Context.md is now a short pointer. docs-site/developers/repository-scope.mdx lists exact deletions/replacements; the annotated pre-auto-audit-cleanup-2026-11-05 tag preserves the prior committed tree. docs-site/architecture/feature-lineage.mdx retains earlier G11–G17 proposal tables, while the source-mapped G1–G24 rationale remains canonical.
 
 ## Current goals and deployment facts
 
@@ -33,7 +33,7 @@ Preserve Backup material if present. Do not repoint the system python3 symlink o
 
 User expects rationale for design choices and coherent commits/pushes. Current development branch is docs/readme-ngfw-and-test-plans; inspect Git before acting. Do not stage the user's untracked dataset/model directories. Store private captures/addresses/credentials outside public examples and Git.
 
-## Four independent runtime lanes
+## Active product foundations and retained reference lanes
 
 | Lane | Entry point | Observation/analysis | Enforcement authority |
 | --- | --- | --- | --- |
@@ -45,6 +45,8 @@ User expects rationale for design choices and coherent commits/pushes. Current d
 Controller/nft_quarantine.py is an additional **operator-run** adapter CLI for an explicitly provisioned Linux nftables set. None of the site collector/workbench/dashboard paths automatically calls it. A diagram connecting them is a future goal, not a current call graph.
 
 Do not combine these lanes' schema, labels, thresholds, modes or API semantics merely because some endpoints/dashboard assets share names.
+
+The active next-work order is collection correctness/visibility, supported policy fidelity and behavior-policy correlation with explicit uncertainty. Ryu and passive-v2 remain reference/test lanes, not deployment prerequisites. S01–S70 and P0–P13 are unchanged. Automatic vendor rules, calibrated site inference and guarded online model promotion remain planned.
 
 ## Legacy packet → detection → OpenFlow path
 
@@ -71,7 +73,7 @@ Do not combine these lanes' schema, labels, thresholds, modes or API semantics m
 - Tier MAC block lifetime uses IPS_BLOCK_SECONDS, default 0 = until manual removal. A finite future timestamp is used for JSON bookkeeping; do not reintroduce Infinity.
 - REST unknown-MAC IP timeout handling is separate (default hard timeout 600); it is not globally identical to permanent tier-MAC behavior.
 - CONTROL:CLEAR resets detection state and cooldown bookkeeping. CONTROL:UNBLOCK requests actual rule removal; do not substitute CLEAR for removal.
-- IPS_EXTERNAL_BLOCK is opt-in; its scope/whitelist comes from config/environment. Integrated host blocking and the optional standalone reader have different logic/configuration.
+- IPS_EXTERNAL_BLOCK is opt-in; its scope/whitelist comes from config/environment. The alternate standalone reader was removed; this opt-in applies only to the retained Ryu host-blocking path.
 
 ### Detection tiers
 
@@ -158,13 +160,11 @@ CLI adds require scope, protected networks and TTL 1–300 seconds. Existing mem
 
 No automatic site-model callback invokes it. Current evidence includes mocks and an operator namespace recipe; actual installed-kernel JSON semantics, traffic containment/continuity and expiry still need recorded lab results.
 
-## Snort paths and deployment scripts
+## Signature and reference deployment boundary
 
-Use the intended Snort 3 binary/configuration. Integrated path: SimpleSwitch → SnortManager → processes/log tails → callback. OpenFlow PacketIn can be injected into a TAP by TrafficMirror; a separate remote OVS/VXLAN br-snort transport is another deployment arrangement, not the same path.
+The retained integrated lab path is SimpleSwitch → SnortManager → processes/log tails → callback. TrafficMirror can inject PacketIn frames into a TAP. The source Snort 3 config/rules and original Ryu DAI checks remain for comparison; no standalone reader/bridge, VXLAN installer, mixed-version installer or missing-app launcher remains active. Review HOME_NET/static bindings in a private site copy, use /usr/local/bin/snort version 3 and validate before launching. See docs-site/integrations/snort.mdx.
 
-Alternate standalone path: external Snort JSON → snort_alert_reader.py → HTTP bridge /block → Ryu POST /ips/block for internal sources; reader-side external handling can use its own host chain. The reader has its own hardcoded lab network/protected defaults/local-SID gate; it does not automatically inherit the merged controller's config.
-
-Avoid launching both readers/controllers against the same output without understanding duplicate prevention. Installer/helper scripts can alter Linux interfaces, offloads, forwarding and firewall hooks; read/qualify the relevant script before execution. Installation/runbook presence is not proof that hardware/config exists.
+home_sensor.py now imports DashboardHandler from http_dashboard.py, not passive_ids.py. The neutral module serves static UI/docs and delegates read APIs without importing legacy models. passive_ids.py imports the same handler (preserving its former imported name), and remains the legacy observation lane. Neither read-only handler supports action writes. No feature formula, gate, schema or model byte changed during extraction.
 
 ## Ports, APIs and dashboard behavior
 
@@ -174,7 +174,6 @@ Avoid launching both readers/controllers against the same output without underst
 | Legacy UDP 9999 | Mode/metadata/registration commands | No authenticated acknowledgment; trusted-network control surface |
 | Ryu HTTP, usually configured 8081 | Mutating legacy block/unblock + status/metrics/dashboard | Legacy security and datapath assumptions; startup text still mentions 8080 |
 | Home/passive HTTP default 8081 | Separate process, read-only collection/observation | Cannot coexist on the same address/port without configuration |
-| Bridge loopback 9000 | Alternate Snort block relay | Only when intentionally using that path |
 | Policy loopback 8082 | Separate read-only model workbench | Different contract/database/authority |
 | Mintlify 3333 | Full workstation docs preview | Independent from t530/controller; not reboot autostart |
 | Pilot replay 18081 | Temporary helper-selected dashboard | Closes after replay |
@@ -202,13 +201,13 @@ These are source-review findings/qualification needs, not all reproduced bugs:
 5. Current software maps/display paths do not uniformly represent host iptables and OpenFlow enforcement; audit every requested origin when verifying blocks.
 6. rest_block_ip and protected/no-op paths need semantic review: a successful handler return must not be assumed to mean a rule was installed. Unknown-MAC IPv6 also needs explicit supported behavior; OF 1.0 IPv4-match helpers are not an IPv6 enforcement claim.
 7. Unblock FlowMods use non-strict delete semantics; priority alone does not prove exclusive removal of one drop. Strong cookie/ownership/transaction semantics are future hardening work.
-8. Integrated/standalone Snort and rate/RF/AE gates differ. AE per-row deferral does not satisfy every possible type-/device-wide precedence policy.
+8. Legacy deterministic and RF/AE gates differ, and the passive reference runner does not start Snort. AE per-row deferral does not satisfy every possible type-/device-wide precedence policy.
 9. Old training scripts' row splits/calibration and dataset provenance do not satisfy independent site/campaign deployment evidence.
 10. Authenticated management/RBAC, durable action lifecycle, HA/failure policy and enterprise tenancy are not delivered by the prototype.
 11. Testbed addresses/static bindings and stale comments survive in legacy assets. Do not copy those values into real-network configuration.
 12. Empty local topology/QoS directories and absent notebooks are not current tracked runtime capabilities.
 13. A passing offline suite does not verify t530 AF_PACKET behavior, industrial-firewall semantics, line rate, a multi-day soak or detector accuracy.
-14. Controller/scripts/start_snort_ryu_ips.sh still invokes absent ryu_ips_app.py; use the merged controller's documented entry point. verify_snort_ryu_ips.sh defaults to the historical HTTP port and requires the correct RYU_BASE. snort_setup.sh is a legacy mixed-version installer, not the authorized Snort 3 installation procedure.
+14. Historical relay/install/setup runbooks were removed rather than repaired into competing product entry points. The retained Ryu config is still a lab reference; do not copy static bindings/addresses into a real site.
 
 Do not fix all of these opportunistically during a small unrelated task. Select a scoped next milestone with evidence, relevant tests, documentation and reversible deployment.
 
@@ -243,7 +242,7 @@ Recommended next user action is Stage A of the no-mirror pilot and its redacted 
 
 Generated by scripts/build_ai_handoff.py from the authored file-purpose catalog and AST source index.
 Read CODEBASE_AI_HANDOFF.md first. This index covers every tracked path, not every installed dependency/cache file.
-Reference base: 98b947d2c97458a9e80d8b7e6e771f4f91b32ccd. Source fingerprints, rather than this base alone, identify the described implementation.
+Reference base: ce9a21878025bde98331d32e6cf6716411d25f1c. Source fingerprints, rather than this base alone, identify the described implementation.
 Do not treat file presence, a function name, comments or AST extraction as proof of runtime success.
 
 ## Every tracked file
@@ -254,17 +253,16 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | .github/workflows/documentation.yml | Push/PR workflow qualifies offline Python, committed guards, Node launcher and Mintlify build/link/accessibility checks. |
 | .gitignore | Excludes generated caches, local state, vendored setup material and Node dependencies from authored product commits. |
 | AGENTS.md | Repository maintenance rules require source-related documentation, rationale, release honesty and fresh source-checked AI context. |
-| AI_Project_Context.md | Historical dense index now points to current source-checked context; earlier assumptions remain history rather than guarantees. |
+| AI_Project_Context.md | Short current product-context pointer replaces stale deployment recap and links the source-checked handbook, scope and preserved behavioral lineage. |
 | CODEBASE_AI_HANDOFF.md | Authored continuation core explains goals, runtime lanes, call paths, authority, known risks and scoped next-work procedure. |
 | Controller/Controller_main_Claude.py | Merged Ryu OF1.0 app owns datapaths, learning/DAI, Snort callbacks, hub block queue, UDP control and legacy REST handlers. |
-| Controller/SNORT_IDS_README.md | Legacy integrated-Snort instructions must be compared against current manager/configuration and actual installed build. |
-| Controller/STANDALONE_SNORT_RYU_FILES.md | Historical alternate-chain asset list includes references that are absent from the present tracked controller source. |
 | Controller/ae_inference.py | Legacy NumPy dense reconstruction scorer loads schema-specific trusted bundle weights/scaler/threshold and computes normalized error. |
 | Controller/collection_io.py | Exclusive nonblocking OS lease prevents concurrent writer/reviewer/report access and releases with handle or process closure. |
 | Controller/collection_report.py | Stopped-run auditor validates paired rows/evidence/provenance and summarizes integrity, quality and coverage without assigning benign truth. |
 | Controller/firewall_policy.py | Strict operator-model JSON/schema, bounded address/port resolution, ordered header queries and same-context structural differences. |
-| Controller/home_sensor.py | Site-v3 entry point orchestrates lease, interface/replay capture, device windows, paired evidence/checkpoints and read-only dashboard endpoints. |
-| Controller/ips_config.json | Merged-controller testbed LAN/whitelist/protected-MAC defaults require deliberate real-network configuration rather than copying examples blindly. |
+| Controller/home_sensor.py | Site-v3 lease/capture orchestration, paired evidence/checkpoints and shadow profiles; uses neutral HTTP transport without legacy inference imports. |
+| Controller/http_dashboard.py | Neutral read-only static UI/docs and delegated JSON transport shared by site collection and legacy observation without inference imports. |
+| Controller/ips_config.json | Retained Ryu lab configuration defaults and protection lists; not consumed by current site collector or policy workbench. |
 | Controller/ipsctl.py | Text UDP control sender confirms only sending, not authenticated receipt, accepted configuration or actual containment. |
 | Controller/local_docs.py | Read-only sensor documentation renderer confines requests to docs-site and rejects traversal while presenting lightweight Markdown. |
 | Controller/ml_inference.py | Legacy RF loader and conditional RFPreprocessor preserve artifact columns, force single-job scoring and expose fallback/statistics behavior. |
@@ -274,7 +272,7 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | Controller/ml_models/retrain_rf_v4.py | Offline legacy RF retrainer inherits deployed schema/hyperparameters and refits preprocessing/classifier with optional training resampling. |
 | Controller/ml_models/rf_pipeline.joblib | Opaque tracked legacy sklearn artifact fingerprinted without loading; compatible trusted inspection is needed for actual model metadata. |
 | Controller/nft_quarantine.py | Operator-only scoped IPv4 timeout-set adapter validates dedicated nftables structure and reads back single-element add/remove results. |
-| Controller/passive_ids.py | Standalone legacy Ethernet/PCAP observer adapts packets into TrafficCapture/models and supplies the shared read-only dashboard handler. |
+| Controller/passive_ids.py | Retained legacy 102-column capture/observe runner uses shared read-only HTTP handler; not the active site collection or firewall plugin. |
 | Controller/policy_audit.py | Bounded symbolic header-box algebra emits supported shadow/redundancy/overlap/object/metadata findings with witnesses and preserved uncertainty. |
 | Controller/policy_change.py | Effective-partition comparisons and exact-base hypothetical edits generate review-only candidates and replay-verifiable receipts without native writes. |
 | Controller/policy_http.py | Loopback read-only policy viewer/API exposes snapshots, queries, audits and hypothetical previews; enterprise authentication/native apply are absent. |
@@ -282,38 +280,21 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | Controller/requirements-home.txt | Collection-only Scapy/Markdown dependency constraints are separate from the compatible legacy Ryu/model runtime environment. |
 | Controller/scripts/apf-home.service | Dedicated-account systemd collection template defines raw-capture capability, private state, environment and controlled restart behavior. |
 | Controller/scripts/apf-quarantine.nft | Dedicated timeout set and source-based forward drop must be provisioned only in the intended test/firewall namespace. |
-| Controller/scripts/disable_capture_offloads.sh | Privileged helper changes offload settings on named interfaces to investigate capture artifacts; it is not passive inspection. |
-| Controller/scripts/install_snort3_ips_config.sh | Privileged helper installs tracked Snort 3 configuration/rules to selected system paths and checks their configuration. |
-| Controller/scripts/setup_external_blocking.sh | Standalone reader helper enables forwarding and host INPUT/FORWARD hooks, separate from the scoped nftables adapter. |
-| Controller/scripts/setup_vxlan_br_snort.sh | Explicit local/remote deployment inputs create bridge/VXLAN mirror plumbing; no generic router-mirroring capability is implied. |
-| Controller/scripts/start_snort3_json.sh | Executes selected Snort interface/config/log options to produce JSON alerts for the intended reader arrangement. |
-| Controller/scripts/start_snort_ryu_ips.sh | Historical launcher targets absent ryu_ips_app.py and is not runnable as the merged-controller entry in this checkout. |
-| Controller/scripts/verify_snort_ryu_ips.sh | Alternate-chain health probes need the correct RYU_BASE override because the script retains a historical HTTP port default. |
 | Controller/site_features.py | Ethernet IPv4/IPv6 decoder, online moments, bounded window state and historical features implement the current site measurement subset. |
 | Controller/site_policy.example.json | Sanitized expiring inventory/observation/role example is a configuration template, not an approved household identity source. |
 | Controller/site_policy.py | Strict inventory/role/profile validation produces shadow identity/quality findings and separates unverified candidates from approved profiles. |
-| Controller/snort3/sdn_ips.lua | Snort 3 inspectors/logging/rule include contains lab network/binding assumptions needing deployment-specific validation. |
+| Controller/snort3/sdn_ips.lua | Retained integrated Snort 3 lab configuration with static testbed assumptions; inspect a private reviewed site copy before use. |
 | Controller/snort3/sdn_ips_local.rules | Local lab flood signatures and inspector/fallback notes require workload qualification; labels do not establish universal detection. |
-| Controller/snort_alert_reader.py | Alternate JSON reader has separate SID/network/protection defaults and forwards internal block requests or applies external host filtering. |
-| Controller/snort_monitor.py | Integrated Snort lifecycle manager parses/deduplicates alerts and invokes the merged controller callback. |
-| Controller/snort_ryu_bridge.py | Alternate loopback relay deduplicates priority-selected alerts and posts requests to the configured Ryu block API. |
-| Controller/snort_setup.sh | Historical mixed-version installer is not the authorized Snort 3 setup route; inspect distribution-install side effects before reuse. |
+| Controller/snort_monitor.py | Integrated lab Snort process/JSON alert manager; diagnostic points to current preparation guide after alternate installers were removed. |
 | Controller/traffic_capture.py | Legacy 102-column flow/device/network aggregation, rate labeling, flush-thread RF/AE scoring, CSV output and evidence capture. |
 | Controller/traffic_mirror.py | Linux TAP writer accepts PacketIn copies through a bounded queue for Snort, with explicit injection/drop counters. |
 | DEVELOPER_STUDY_ROADMAP.md | Current complete curriculum ties prerequisites to source, rebuild exercises, competency checks and scientific/operational evidence. |
-| Dashboard/PROJECT_DOCUMENTATION.md | Historical engineering narrative contains stale guide references and ambitions that are not present implementation guarantees. |
 | Dashboard/README.md | Dashboard operation notes require checking the serving backend lane before assuming actions or data semantics. |
 | Dashboard/index.html | Shared dependency-free browser client reads runtime-origin metrics/status/alerts/blocks and collection/shadow views; backend authority remains decisive. |
-| IPS_Project_Assessment.pdf | Historical binary assessment is not executable, parsed by this inventory or current proof of deployment readiness. |
-| NGFW_feature_comparison.md | Time-bound competitor/gap comparison requires fresh vendor-specific verification before making product parity claims. |
 | NO_VISIBILITY_PILOT_RUNBOOK.md | Standalone operator walkthrough covers t530 qualification, bounded endpoint replay, namespaced firewall checks and representative sessions. |
 | PILOT_RESULTS_TEMPLATE.md | Blank handoff form is copied outside Git for actual redacted outcomes and uncertainty; successful tests are never prefilled. |
 | PROJECT_AI_HANDBOOK.md | Generated single-file context includes authored architecture, every tracked file purpose and full Python symbol/import index. |
 | README.md | Project entry page summarizes runtime lanes, present limits, learning/AI context and qualified operator documentation. |
-| SDN_IPS_Snort_Installation_Runbook.pdf | Historical binary installation reference must be reconciled with current source and the intended Snort 3 build. |
-| SESSION_HANDOFF.md | Historical August assessment has a current-context warning; obsolete deployment/missing-file/no-skew claims are not source authority. |
-| STUDY_AND_REBUILD_PLAN.md | Historical legacy exercises are retained with superseding-current-roadmap notice and corrected outdated assumptions. |
-| apf_implementation_roadmap.md | Expanded earlier roadmap connects IPS qualification and firewall-policy goals; current service phases govern release status. |
 | docs-site/AGENTS.md | Documentation rules require source coverage, navigation/contracts and actual validation evidence with implementation changes. |
 | docs-site/DOCUMENTATION_AUDIT.md | Source-review findings record unresolved state/enforcement/visibility/model assumptions; a written audit is not a completed fix. |
 | docs-site/DOCUMENTATION_COVERAGE.md | Human source-to-page coverage matrix complements first-match machine mapping and locates operator/implementation explanations. |
@@ -325,6 +306,7 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | docs-site/api-reference/policy-workbench.mdx | Authored documentation page: Policy workbench read API. Loopback operator-model queries on port 8082, separate from live collection and Ryu. |
 | docs-site/architecture/data-flow.mdx | Authored documentation page: Packet capture and enforcement. Operator/reference explanation with claims scoped by the associated source and qualified evidence. |
 | docs-site/architecture/detection.mdx | Authored documentation page: Detection tiers and decisions. Operator/reference explanation with claims scoped by the associated source and qualified evidence. |
+| docs-site/architecture/feature-lineage.mdx | Preserves original G11–G17 proposed measurements, corrections, implemented-versus-planned boundaries and the legacy/site behavioral lineage. |
 | docs-site/architecture/feature-rationale.mdx | Authored documentation page: Why each behavioral feature group exists. Source-mapped rationale, benign lookalikes, limits and qualification plans for G1–G24 and supporting evidence. |
 | docs-site/collection-openapi.json | Site-v3 read-only schema/health/shadow contract provides observations without trained inference or firewall write authority. |
 | docs-site/deployment/documentation-access.mdx | Authored documentation page: Documentation access and updates. Operator/reference explanation with claims scoped by the associated source and qualified evidence. |
@@ -344,6 +326,7 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | docs-site/developers/policy-change-code-tour.mdx | Authored documentation page: Policy changes and feature rationale: code tour. Understand symbolic impact, hypothetical proposals, reproducibility receipts and source-to-rationale guards. |
 | docs-site/developers/policy-workbench-code-tour.mdx | Authored documentation page: Policy workbench: code and rationale. Read the P7 slice by source line, understand its invariants and distinguish essential checks from implementation choices. |
 | docs-site/developers/qualification-code-tour.mdx | Authored documentation page: Qualification and audit: code and rationale. Trace readiness, feature evidence, restart recovery, reports, campaign scoring and symbolic policy analysis. |
+| docs-site/developers/repository-scope.mdx | Explains active product versus lab lanes, enumerates exact removed paths/replacements, recovery tag and feature/model preservation checks. |
 | docs-site/developers/study-roadmap.mdx | Authored documentation page: Study and rebuild the framework. A complete prerequisite roadmap, source-linked exercises and competency checks from packets and Python to qualified adaptive response. |
 | docs-site/docs.json | Mintlify branding/navigation selects authored pages and separate legacy-Ryu versus policy-workbench API groups. |
 | docs-site/documentation-map.json | First-match source patterns define affected MDX pages eligible to satisfy the staged implementation documentation guard. |
@@ -367,7 +350,6 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | docs-site/security/configuration.mdx | Authored documentation page: Configuration and management access. Operator/reference explanation with claims scoped by the associated source and qualified evidence. |
 | docs-site/security/shadow-policy.mdx | Authored documentation page: Shadow policy and reviewed baselines. Set device roles before collection, hold unsuitable windows and approve descriptive profiles offline. |
 | docs-site/troubleshooting/verification.mdx | Authored documentation page: Verify and troubleshoot. Operator/reference explanation with claims scoped by the associated source and qualified evidence. |
-| docs/SNORT_RYU_INTEGRATION.md | Alternate Snort/Ryu integration narrative complements current source but retains environment/entry-point assumptions requiring review. |
 | examples/policies/audit-reference.json | Sanitized audit model exercises duplicates, union shadows, partial overlap, object findings and unresolved header predicates. |
 | examples/policies/change-reference-v1.json | Known supported base snapshot supplies duplicate/web/partial-source/default cases for exact-base hypothetical change demonstrations. |
 | examples/policies/change-reference-v2.json | Same-context later snapshot broadens supported web access and produces concrete semantic expansion witnesses. |
@@ -377,14 +359,6 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | examples/policies/reference-v2.json | Second same-context operator snapshot changes selected rule fields/order to demonstrate structural revision comparison. |
 | examples/testing/campaign-results.example.json | Unqualified campaign template preserves independent truth/coverage/outcome fields and unavailable metrics instead of fabricated attack success. |
 | examples/testing/visibility.example.json | Deliberately unqualified sanitized visibility template requires actual dated path/direction evidence before meaningful operator attestation. |
-| feature_groups_v3_plan.md | Historical feature proposal is superseded for exact implementation claims by source-mapped current/planned rationale and code. |
-| firewall_waf_integration_plan.md | Planning reference proposes network-firewall/WAF integration without delivering universal vendor support or encrypted application visibility. |
-| home_network_test_plan.md | Earlier home experiment proposal is planning context; current visibility/no-mirror walkthrough governs executable steps. |
-| pre_production_collection_runbook.md | Earlier collection/review steps need current site-v3 schema, flags, eligibility and capture-scope qualification. |
-| production_readiness_results.md | Fill-in readiness scorecard preserves unmeasured results and independent evidence rather than inventing successful deployment. |
-| production_readiness_test_plan.md | Proposed realistic pilot objectives/phases define experiments rather than establish performed production qualification. |
-| real_world_deployment_plan.md | Earlier real-device placement/configuration plan remains conditional on physical observation and qualified network interfaces. |
-| red_team_test_runbook.md | Authorized lab scenario instructions require supported runtime paths, matched benign controls and independently observed outcomes. |
 | scripts/audit_home_data.py | Stopped-data audit CLI writes new private reports and exposes PASS/FAIL/REVIEW exit semantics from collection_report. |
 | scripts/build_ai_handoff.py | Non-executing tracked-file/purpose/AST/fingerprint builder generates the complete handbook and checks staged or working-tree freshness. |
 | scripts/check_docs_sync.py | Staged/PR/push Git guard binds implementation changes to a mapped affected MDX page and dated changelog entry. |
@@ -398,9 +372,6 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | scripts/start_docs.cjs | Node helper validates declared pinned Mint executable and port, launches hidden detached log-backed child and checks branded readiness. |
 | scripts/start_docs.cmd | Windows wrapper locates Node through PATH/default installation and runs the Node helper without changing PowerShell execution policy. |
 | scripts/start_docs.ps1 | Original PowerShell background/foreground helper requires permitted script-file execution and a resolvable global Mint shim. |
-| t530_bridge_setup.md | Conditional transparent-bridge setup requires an actual inline topology and suitable interfaces, absent in the current one-NIC home arrangement. |
-| t530_full_system_runbook.md | Long legacy controller/Snort/topology procedure retains historical environment and missing-file assumptions; validate entry points first. |
-| t530_mode_b_ap_setup.md | Conditional hostapd/AP instructions require compatible Wi-Fi hardware, which has not been established on this t530. |
 | tests/fixtures/site-v3-golden.json | Hand-derived independent feature expectations identify the extraction oracle; do not regenerate them blindly from the extractor. |
 | tests/test_ai_handoff.py | Tests exact file-purpose coverage, conditional/nested AST extraction, private read boundaries, LF/raw hashing and staged readers. |
 | tests/test_collection_readiness.py | Golden/restart/preflight/lease/storage/torn-evidence tests exercise bounded offline correctness and explicit failure reporting. |
@@ -412,6 +383,7 @@ Do not treat file presence, a function name, comments or AST extraction as proof
 | tests/test_policy_audit.py | Independent finite-space oracle tests supported symbolic coverage/precedence, witness validity, uncertainty/budgets and read-only transport. |
 | tests/test_policy_change.py | Independent before/after oracle and receipt/CLI/API tests preserve hypothetical access/logging distinctions and unchanged stored/native state. |
 | tests/test_policy_workbench.py | Tests strict schema/resolvers, ordered uncertainty, SQLite integrity/transactions and read-only CLI/HTTP including empty-query compatibility. |
+| tests/test_reference_preservation.py | Real loopback read/method tests, isolated home import and independently expected legacy packet-to-CSV math protect retained behavioral references. |
 | tests/test_security_campaign.py | Metric tests preserve independent coverage/truth exclusions, abstentions, verified-traffic distinction and valid event chronology. |
 | tests/test_site_policy.py | Shadow/profile/review tests reject replay, poor identity/quality, tampered evidence, active writers and unsafe candidate promotion. |
 
@@ -428,49 +400,49 @@ Direct imports: ae_inference, datetime, eventlet.wsgi, ipaddress, json, logging,
 
 | Symbol | Kind | Source lines |
 | --- | --- | --- |
-| _route_wsgi_access_log_to_file | function | 74–139 |
-| _route_wsgi_access_log_to_file._FileLog | class | 97–111 |
-| _route_wsgi_access_log_to_file._FileLog.write | function | 99–103 |
-| _route_wsgi_access_log_to_file._FileLog.info | function | 104–105 |
-| _route_wsgi_access_log_to_file._FileLog.flush | function | 107–111 |
-| _route_wsgi_access_log_to_file._server | function | 133–134 |
-| SimpleSwitch | class | 142–1559 |
-| SimpleSwitch.__init__ | function | 148–413 |
-| SimpleSwitch._handle_snort_alert | function | 418–466 |
-| SimpleSwitch.close | function | 468–481 |
-| SimpleSwitch._udp_command_listener | function | 486–767 |
-| SimpleSwitch._ip_to_int | function | 778–779 |
-| SimpleSwitch._resolve_mac | function | 781–788 |
-| SimpleSwitch.rest_block_ip | function | 790–831 |
-| SimpleSwitch.rest_unblock_ip | function | 833–855 |
-| SimpleSwitch.get_blocked_list | function | 857–861 |
-| SimpleSwitch.block_attacker | function | 866–902 |
-| SimpleSwitch.unblock_attacker | function | 904–912 |
-| SimpleSwitch._block_worker | function | 914–933 |
-| SimpleSwitch._do_block_attacker | function | 935–1036 |
-| SimpleSwitch._do_unblock_attacker | function | 1038–1060 |
-| SimpleSwitch._load_ips_config | function | 1065–1079 |
-| SimpleSwitch._is_protected_mac | function | 1081–1084 |
-| SimpleSwitch._is_external_ip | function | 1086–1098 |
-| SimpleSwitch._block_external_ip | function | 1100–1124 |
-| SimpleSwitch._unblock_external_ip | function | 1126–1135 |
-| SimpleSwitch.add_flow | function | 1137–1151 |
-| SimpleSwitch.is_iot | function | 1153–1168 |
-| SimpleSwitch.is_gateway | function | 1170–1179 |
-| SimpleSwitch.register_gateway_dynamic | function | 1181–1198 |
-| SimpleSwitch._packet_in_handler | function | 1201–1540 |
-| SimpleSwitch._port_status_handler | function | 1543–1559 |
-| IPSRestController | class | 1567–1689 |
-| IPSRestController.__init__ | function | 1569–1571 |
-| IPSRestController.block_ip | function | 1574–1590 |
-| IPSRestController.unblock_ip | function | 1593–1594 |
-| IPSRestController.list_blocked | function | 1597–1598 |
-| IPSRestController.list_switches | function | 1601–1603 |
-| IPSRestController.status | function | 1606–1614 |
-| IPSRestController.metrics | function | 1617–1661 |
-| IPSRestController.alerts | function | 1664–1672 |
-| IPSRestController.dashboard | function | 1675–1685 |
-| IPSRestController._json | function | 1687–1689 |
+| _route_wsgi_access_log_to_file | function | 73–138 |
+| _route_wsgi_access_log_to_file._FileLog | class | 96–110 |
+| _route_wsgi_access_log_to_file._FileLog.write | function | 98–102 |
+| _route_wsgi_access_log_to_file._FileLog.info | function | 103–104 |
+| _route_wsgi_access_log_to_file._FileLog.flush | function | 106–110 |
+| _route_wsgi_access_log_to_file._server | function | 132–133 |
+| SimpleSwitch | class | 141–1557 |
+| SimpleSwitch.__init__ | function | 147–412 |
+| SimpleSwitch._handle_snort_alert | function | 417–465 |
+| SimpleSwitch.close | function | 467–480 |
+| SimpleSwitch._udp_command_listener | function | 485–766 |
+| SimpleSwitch._ip_to_int | function | 776–777 |
+| SimpleSwitch._resolve_mac | function | 779–786 |
+| SimpleSwitch.rest_block_ip | function | 788–829 |
+| SimpleSwitch.rest_unblock_ip | function | 831–853 |
+| SimpleSwitch.get_blocked_list | function | 855–859 |
+| SimpleSwitch.block_attacker | function | 864–900 |
+| SimpleSwitch.unblock_attacker | function | 902–910 |
+| SimpleSwitch._block_worker | function | 912–931 |
+| SimpleSwitch._do_block_attacker | function | 933–1034 |
+| SimpleSwitch._do_unblock_attacker | function | 1036–1058 |
+| SimpleSwitch._load_ips_config | function | 1063–1077 |
+| SimpleSwitch._is_protected_mac | function | 1079–1082 |
+| SimpleSwitch._is_external_ip | function | 1084–1096 |
+| SimpleSwitch._block_external_ip | function | 1098–1122 |
+| SimpleSwitch._unblock_external_ip | function | 1124–1133 |
+| SimpleSwitch.add_flow | function | 1135–1149 |
+| SimpleSwitch.is_iot | function | 1151–1166 |
+| SimpleSwitch.is_gateway | function | 1168–1177 |
+| SimpleSwitch.register_gateway_dynamic | function | 1179–1196 |
+| SimpleSwitch._packet_in_handler | function | 1199–1538 |
+| SimpleSwitch._port_status_handler | function | 1541–1557 |
+| IPSRestController | class | 1564–1686 |
+| IPSRestController.__init__ | function | 1566–1568 |
+| IPSRestController.block_ip | function | 1571–1587 |
+| IPSRestController.unblock_ip | function | 1590–1591 |
+| IPSRestController.list_blocked | function | 1594–1595 |
+| IPSRestController.list_switches | function | 1598–1600 |
+| IPSRestController.status | function | 1603–1611 |
+| IPSRestController.metrics | function | 1614–1658 |
+| IPSRestController.alerts | function | 1661–1669 |
+| IPSRestController.dashboard | function | 1672–1682 |
+| IPSRestController._json | function | 1684–1686 |
 
 ### Controller/ae_inference.py
 
@@ -550,9 +522,9 @@ Direct imports: dataclasses, datetime, hashlib, ipaddress, json, pathlib, re.
 
 ### Controller/home_sensor.py
 
-Site-v3 entry point orchestrates lease, interface/replay capture, device windows, paired evidence/checkpoints and read-only dashboard endpoints.
+Site-v3 lease/capture orchestration, paired evidence/checkpoints and shadow profiles; uses neutral HTTP transport without legacy inference imports.
 
-Direct imports: argparse, collection_io, collections, csv, datetime, functools, hashlib, http.server, ipaddress, json, logging, math, os, passive_ids, pathlib, platform, psutil, scapy, scapy.error, scapy.layers.l2, scapy.utils, shutil, signal, site_features, site_policy, socket, struct, sys, threading, time, uuid.
+Direct imports: argparse, collection_io, collections, csv, datetime, functools, hashlib, http.server, http_dashboard, ipaddress, json, logging, math, os, pathlib, platform, psutil, scapy, scapy.error, scapy.layers.l2, scapy.utils, shutil, signal, site_features, site_policy, socket, struct, sys, threading, time, uuid.
 
 | Symbol | Kind | Source lines |
 | --- | --- | --- |
@@ -573,6 +545,20 @@ Direct imports: argparse, collection_io, collections, csv, datetime, functools, 
 | collect.ingest | function | 299–305 |
 | collect.sample_kernel_statistics | function | 326–331 |
 | main | function | 368–423 |
+
+### Controller/http_dashboard.py
+
+Neutral read-only static UI/docs and delegated JSON transport shared by site collection and legacy observation without inference imports.
+
+Direct imports: http.server, json, local_docs, pathlib, urllib.parse.
+
+| Symbol | Kind | Source lines |
+| --- | --- | --- |
+| DashboardHandler | class | 12–44 |
+| DashboardHandler.__init__ | function | 15–17 |
+| DashboardHandler.do_GET | function | 19–33 |
+| DashboardHandler.respond | function | 35–41 |
+| DashboardHandler.log_message | function | 43–44 |
 
 ### Controller/ipsctl.py
 
@@ -657,25 +643,20 @@ Direct imports: argparse, ipaddress, json, subprocess.
 
 ### Controller/passive_ids.py
 
-Standalone legacy Ethernet/PCAP observer adapts packets into TrafficCapture/models and supplies the shared read-only dashboard handler.
+Retained legacy 102-column capture/observe runner uses shared read-only HTTP handler; not the active site collection or firewall plugin.
 
-Direct imports: ae_inference, argparse, collections, datetime, functools, http.server, json, local_docs, logging, ml_inference, os, pathlib, scapy.layers.inet, scapy.layers.l2, scapy.utils, signal, socket, struct, threading, time, traffic_capture, urllib.parse.
+Direct imports: ae_inference, argparse, collections, datetime, functools, http.server, http_dashboard, logging, ml_inference, os, pathlib, scapy.layers.inet, scapy.layers.l2, scapy.utils, signal, socket, struct, threading, time, traffic_capture.
 
 | Symbol | Kind | Source lines |
 | --- | --- | --- |
-| packet_info | function | 32–61 |
-| PassiveSensor | class | 64–108 |
-| PassiveSensor.__init__ | function | 65–75 |
-| PassiveSensor.on_detection_observed | function | 77–83 |
-| PassiveSensor.read | function | 85–108 |
-| DashboardHandler | class | 111–141 |
-| DashboardHandler.__init__ | function | 112–114 |
-| DashboardHandler.do_GET | function | 116–130 |
-| DashboardHandler.respond | function | 132–138 |
-| DashboardHandler.log_message | function | 140–141 |
-| capture_packets | function | 144–177 |
-| capture_packets.record | function | 145–148 |
-| main | function | 180–214 |
+| packet_info | function | 31–60 |
+| PassiveSensor | class | 63–107 |
+| PassiveSensor.__init__ | function | 64–74 |
+| PassiveSensor.on_detection_observed | function | 76–82 |
+| PassiveSensor.read | function | 84–107 |
+| capture_packets | function | 110–143 |
+| capture_packets.record | function | 111–114 |
+| main | function | 146–180 |
 
 ### Controller/policy_audit.py
 
@@ -796,35 +777,9 @@ Direct imports: collections, copy, datetime, hashlib, ipaddress, json, math, pat
 | ShadowPolicy._residuals | function | 277–284 |
 | ShadowPolicy.snapshot | function | 286–293 |
 
-### Controller/snort_alert_reader.py
-
-Alternate JSON reader has separate SID/network/protection defaults and forwards internal block requests or applies external host filtering.
-
-Direct imports: ipaddress, json, logging, os, requests, subprocess, sys, time.
-
-| Symbol | Kind | Source lines |
-| --- | --- | --- |
-| parse_sid | function | 55–64 |
-| parse_addr_port | function | 67–79 |
-| get_endpoint | function | 82–89 |
-| alert_name | function | 92–99 |
-| show_ids_alert | function | 102–128 |
-| show_blocked_retry_alert | function | 131–157 |
-| alert_key | function | 160–164 |
-| should_display_alert | function | 167–174 |
-| should_send_block | function | 177–184 |
-| should_display_blocked_retry | function | 187–194 |
-| is_internal_sdn_ip | function | 197–201 |
-| is_protected_ip | function | 204–205 |
-| send_block | function | 208–215 |
-| block_external_ip | function | 218–249 |
-| is_external_ip_blocked | function | 252–266 |
-| process_line | function | 269–302 |
-| tail_file | function | 305–323 |
-
 ### Controller/snort_monitor.py
 
-Integrated Snort lifecycle manager parses/deduplicates alerts and invokes the merged controller callback.
+Integrated lab Snort process/JSON alert manager; diagnostic points to current preparation guide after alternate installers were removed.
 
 Direct imports: collections, datetime, json, os, re, signal, subprocess, sys, threading, time.
 
@@ -852,23 +807,6 @@ Direct imports: collections, datetime, json, os, re, signal, subprocess, sys, th
 | SnortManager.get_alerts_by_source | function | 776–783 |
 | SnortManager.is_snort_running | function | 785–789 |
 | on_alert_callback | function | 840–841 |
-
-### Controller/snort_ryu_bridge.py
-
-Alternate loopback relay deduplicates priority-selected alerts and posts requests to the configured Ryu block API.
-
-Direct imports: datetime, http.server, json, logging, os, requests, threading, time.
-
-| Symbol | Kind | Source lines |
-| --- | --- | --- |
-| should_block | function | 26–41 |
-| push_block_to_ryu | function | 43–55 |
-| BridgeHandler | class | 57–93 |
-| BridgeHandler.log_message | function | 58–58 |
-| BridgeHandler.do_POST | function | 60–79 |
-| BridgeHandler.do_GET | function | 81–85 |
-| BridgeHandler._respond | function | 87–93 |
-| cleanup_cache | function | 95–101 |
 
 ### Controller/traffic_capture.py
 
@@ -1274,6 +1212,21 @@ Direct imports: contextlib, copy, firewall_policy, json, pathlib, policy_http, p
 | PolicyStoreTests.test_cli_validate_import_list_search_and_diff | function | 232–247 |
 | PolicyStoreTests.test_cli_validate_import_list_search_and_diff.run | function | 235–239 |
 | PolicyStoreTests.test_http_read_only_dashboard_queries_and_invalid_requests | function | 249–283 |
+
+### tests/test_reference_preservation.py
+
+Real loopback read/method tests, isolated home import and independently expected legacy packet-to-CSV math protect retained behavioral references.
+
+Direct imports: csv, functools, http.server, http_dashboard, json, os, pathlib, subprocess, sys, tempfile, threading, traffic_capture, unittest, unittest.mock, urllib.error, urllib.request.
+
+| Symbol | Kind | Source lines |
+| --- | --- | --- |
+| ReferencePreservationTests | class | 25–106 |
+| ReferencePreservationTests.test_home_import_needs_no_legacy_runner_or_inference | function | 26–41 |
+| ReferencePreservationTests.test_shared_read_transport_serves_ui_docs_json_and_rejects_writes | function | 43–72 |
+| ReferencePreservationTests.test_shared_read_transport_serves_ui_docs_json_and_rejects_writes.Sensor | class | 44–46 |
+| ReferencePreservationTests.test_shared_read_transport_serves_ui_docs_json_and_rejects_writes.Sensor.read | function | 45–46 |
+| ReferencePreservationTests.test_original_packets_still_produce_full_legacy_schema_and_known_math | function | 74–106 |
 
 ### tests/test_security_campaign.py
 

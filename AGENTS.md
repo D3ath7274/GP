@@ -1,5 +1,7 @@
 # Repository instructions
 
+Active scope is the behavioral firewall auto-audit product. Use `README.md`, the current collection/policy qualification guides, and `docs-site/roadmap/` as the canonical entry points. Keep original Ryu/passive-v2 code explicitly scoped as behavioral lab/reference material. Do not restore removed deployment helpers/runbooks from history as active instructions without a justified, tested milestone. Preserve old/new feature groups and their rationale; any future retirement or mathematical change needs an explicit migration and evidence, not cleanup by filename. `docs-site/developers/repository-scope.mdx` and `docs-site/architecture/feature-lineage.mdx` record the 2026-11-05 consolidation.
+
 When changing executable code, runtime configuration, deployment scripts, Snort rules or model artifacts, update the affected documentation under `docs-site/` and add an entry to `docs-site/reference/change-log.mdx` in the same change. Record behavior, operator impact and verification. For an internal-only change, record the reason and checks in the changelog.
 
 Check the coverage matrix to locate the relevant page. Update `docs-site/openapi.json` when REST contracts change and update navigation for new pages. Keep runtime claims tied to implementation. Exclude real addresses, device data and credentials from examples. Leave planned capabilities marked as planned.

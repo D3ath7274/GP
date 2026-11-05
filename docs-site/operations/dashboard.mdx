@@ -2,6 +2,9 @@
 title: "Dashboard and unblock workflow"
 ---
 
+The shared read-only dashboard transport now lives in Controller/http_dashboard.py. Site collection no longer imports the legacy passive runner or RF/AE modules merely to serve HTTP. Routes/method authority are unchanged. See [repository scope](/developers/repository-scope) for the consolidation and retained behavioral reference lane.
+
+
 Open `/` on the controller's REST origin. The single dashboard screen polls status, metrics, alerts and blocks.
 
 The header shows connection state, the last successful status update, DETECT, ML mode and switch count. Status is polled every two seconds. If status fails, the header shows **controller offline** and panels can retain the last values. When status succeeds but a panel request fails, that panel can show empty or default data.

@@ -4,8 +4,7 @@ import argparse
 from collections import Counter, deque
 from datetime import datetime, timedelta, timezone
 from functools import partial
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import json
+from http.server import ThreadingHTTPServer
 import logging
 import os
 from pathlib import Path
@@ -14,7 +13,6 @@ import socket
 import struct
 import threading
 import time
-from urllib.parse import urlsplit
 
 from scapy.layers.inet import ICMP, IP, TCP, UDP
 from scapy.layers.l2 import ARP, Ether
@@ -23,6 +21,7 @@ from scapy.utils import PcapReader
 from ae_inference import AEInferenceEngine
 from ml_inference import MLInferenceEngine
 from traffic_capture import TrafficCapture
+from http_dashboard import DashboardHandler
 
 
 ROOT = Path(__file__).resolve().parent
@@ -106,39 +105,6 @@ class PassiveSensor:
                             by_attack={}, by_tier={k.lower(): v for k, v in self.totals.items()},
                             cpu_pct=None, ram_pct=None, disk_pct=None)
         return None
-
-
-class DashboardHandler(BaseHTTPRequestHandler):
-    def __init__(self, *args, sensor, **kwargs):
-        self.sensor = sensor
-        super().__init__(*args, **kwargs)
-
-    def do_GET(self):
-        path = urlsplit(self.path).path
-        if path == "/docs" or path.startswith("/docs/"):
-            from local_docs import document
-            status, content_type, data = document(path)
-            self.respond(status, content_type, data)
-            return
-        if path == "/":
-            data = (ROOT.parent / "Dashboard" / "index.html").read_bytes()
-            self.respond(200, "text/html; charset=utf-8", data)
-            return
-        payload = self.sensor.read(path)
-        self.respond(200 if payload is not None else 404, "application/json",
-                     json.dumps(payload if payload is not None else
-                                {"status": "not_found"}, allow_nan=False).encode())
-
-    def respond(self, status, content_type, data):
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(data)
-
-    def log_message(self, *_args):
-        pass
 
 
 def capture_packets(args, sensor, stop):

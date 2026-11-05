@@ -2,6 +2,12 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-05 · Consolidate auto-audit scope without discarding behavioral features
+
+Removed 31 superseded tracked helpers/runbooks/assessments, including alternate Snort relays, the launcher for an absent Ryu app and topology-specific deployment instructions. The annotated pre-auto-audit-cleanup-2026-11-05 tag preserves the prior committed tree. The [scope ledger](/developers/repository-scope) lists every removal/replacement; private datasets, ignored thesis inputs and Backup are outside cleanup. Current collection/policy/no-mirror qualification guides and S01–S70/P0–P13 remain canonical. Retained Ryu/DAI, TrafficCapture, RF/AE artifacts/builders and Snort sources are explicitly lab/reference code, not new production service evidence.
+
+Preserved both 102/71-column schemas and all G1–G24 catalog/rationale entries. [Feature lineage](/architecture/feature-lineage) carries earlier proposed G11–G17 metric tables, including missing session/parsing measurements; planned groups stay planned. Extracted read-only DashboardHandler to http_dashboard.py so home_sensor no longer imports legacy models through passive_ids. JSON shapes/method authority and feature/model semantics are unchanged; operator diagnostics now point to the current Snort configuration guide rather than a removed installer. API navigation labels distinguish active collection/policy services from retained lab REST. Verification: protected source/artifact Git hashes, import isolation, real loopback HTTP and legacy packet-to-CSV regression plus the full qualification/guard/Mintlify results in DOCUMENTATION_VALIDATION.md. Live hardware, Snort/Ryu and native containment are not certified by cleanup.
+
 ## 2026-11-05 · Source-checked AI handbook, study roadmap and Windows docs launcher
 
 Added a complete prerequisite [study roadmap](/developers/study-roadmap), source-based [AI continuation context](/developers/ai-handoff), and a single generated PROJECT_AI_HANDBOOK.md covering every tracked file and Python symbols/imports. The authored file-purpose catalog and normalized source/raw-model fingerprints are checked against staged/committed files by the hook/CI; new source/path/context changes require reviewed regeneration. This detects drift, not semantic accuracy or production qualification. Historical study/handoff notes now point to the current context; local-only datasets and agent settings are explicitly excluded.

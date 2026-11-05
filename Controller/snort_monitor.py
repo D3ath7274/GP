@@ -514,7 +514,7 @@ class SnortManager:
         if not os.path.exists(config_path):
             self._log_error(
                 "Snort config not found at %s. Install the curated Snort 3 config "
-                "first: sudo ./scripts/install_snort3_ips_config.sh", config_path
+                "first: see docs-site/integrations/snort.mdx", config_path
             )
             return False
 

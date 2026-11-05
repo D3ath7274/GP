@@ -1,6 +1,9 @@
 ---
-title: "UDP control protocol"
+title: "Legacy lab UDP control protocol"
 ---
+
+Legacy lab protocol only: this listener is not required by home_sensor.py or the policy workbench and is not an authenticated production firewall-control API. Retained for reproducible thesis tests; see [repository scope](/developers/repository-scope).
+
 
 The listener binds UDP 9999 on all IPv4 interfaces. Run `ipsctl.py` locally unless the management network deliberately permits remote control. The client sends text and prints a send receipt. Review controller logs for processing results.
 

@@ -2,6 +2,9 @@
 title: "Verify, contain and recover"
 ---
 
+This page describes evidence handling and the retained lab actuator checks. The active site collector only records observations/shadow findings and cannot automatically contain an incident. Native policy actions and an authenticated incident workflow remain planned; the nftables exercise is separately operator-run.
+
+
 1. Record time, source, destination, evidence tier and network placement. Check the alert against expected device activity and confirm that the source crossed the monitored datapath.
 2. Check the installed OpenFlow match and packet counters. For host firewall mitigation, inspect the host firewall separately. For a mirror deployment verify any enforcement on the device that actually forwards traffic.
 3. Compare an authorized test source with an unaffected client. Record the mitigation window and application availability.

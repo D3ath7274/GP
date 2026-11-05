@@ -1,22 +1,17 @@
 ---
-title: "Install the controller"
+title: "Prepare the active development environment"
 ---
 
-## Prerequisites
-
-Use an Ubuntu/Linux controller host with Open vSwitch, Python and a management connection. The project runbook records a Python 3.10 environment with Ryu 4.34, an Eventlet compatibility patch and scikit-learn 1.6.1 for the shipped RF artifact. Install and test the Python dependencies in the environment that actually launches Ryu. Keep the system Python symlink intact.
-
-Build Snort 3 and LibDAQ from source using the repository installation runbook. Verify the installed version before copying the project configuration.
+Site collection and offline policy audit do not need Ryu or the shipped RF/AE models. Use Python 3.10 on Ubuntu 22.04 for the target pilot, with a separate virtual environment. Keep the system Python symlink intact. The workstation may run the offline checks without raw-socket privileges.
 
 ```bash
-/usr/local/bin/snort -V
-sudo install -d /etc/snort/rules /var/log/snort
-sudo install -m 644 Controller/snort3/sdn_ips.lua /etc/snort/sdn_ips.lua
-sudo install -m 644 Controller/snort3/sdn_ips_local.rules /etc/snort/rules/sdn_ips_local.rules
-sudo /usr/local/bin/snort -T -c /etc/snort/sdn_ips.lua -i enp1s0
-python3 -c 'import ryu, sklearn, numpy, pandas, joblib'
+python3 -m venv .venv-home
+. .venv-home/bin/activate
+python -m pip install -r Controller/requirements-home.txt
+python -m unittest discover -s tests
+python scripts/check_feature_catalog.py
 ```
 
-Replace `enp1s0` with a suitable interface present on the installation host. Install `psutil` in the controller Python environment for resource metrics. Verify that both shipped model files are present before enabling inference.
+For Windows use the virtual environment's Scripts/python.exe explicitly if shell activation is blocked. The dependencies support collection/qualification only. Model artifacts have a different dependency and input contract; see [the reference lane](/deployment/passive-sensor).
 
-Use the [placement guide](/deployment/placement) to choose a traffic path before following the [quickstart](/getting-started/quickstart).
+Proceed to [offline quickstart](/getting-started/quickstart), [the no-mirror pilot](/deployment/no-mirror-pilot) or [qualified collection](/deployment/home-collection). Do not start a multi-day capture until its actual traffic visibility and measurement checks pass.

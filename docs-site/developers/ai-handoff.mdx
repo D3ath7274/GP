@@ -1,6 +1,5 @@
 ---
 title: "AI continuation and codebase architecture"
-description: "Current runtime lanes, source-based data flows, authority boundaries, limitations and a freshness-checked continuation procedure."
 ---
 
 Version: 2026-11-05. Read this context before interpreting historical documents.
@@ -13,7 +12,7 @@ PROJECT_AI_HANDBOOK.md combines this authored context with the purpose of every 
 
 This context does not replace the user's current instructions or AGENTS.md, grant permission for actions or establish production correctness. The next AI should verify freshness, then read only the relevant implementation/functions/tests for the requested edit. A summary cannot remove that verification requirement. Do not claim complete comprehension from generated symbol names alone.
 
-Historical AI_Project_Context.md, SESSION_HANDOFF.md and older root runbooks contain useful history but also stale filenames, counts, assumptions and recommendations. Actual current source plus qualified evidence takes precedence over narrative claims.
+Historical duplicate runbooks and alternate Snort relays were consolidated in the 2026-11-05 cleanup. AI_Project_Context.md is now a short pointer. docs-site/developers/repository-scope.mdx lists exact deletions/replacements; the annotated pre-auto-audit-cleanup-2026-11-05 tag preserves the prior committed tree. docs-site/architecture/feature-lineage.mdx retains earlier G11–G17 proposal tables, while the source-mapped G1–G24 rationale remains canonical.
 
 ## Current goals and deployment facts
 
@@ -34,7 +33,7 @@ Preserve Backup material if present. Do not repoint the system python3 symlink o
 
 User expects rationale for design choices and coherent commits/pushes. Current development branch is docs/readme-ngfw-and-test-plans; inspect Git before acting. Do not stage the user's untracked dataset/model directories. Store private captures/addresses/credentials outside public examples and Git.
 
-## Four independent runtime lanes
+## Active product foundations and retained reference lanes
 
 | Lane | Entry point | Observation/analysis | Enforcement authority |
 | --- | --- | --- | --- |
@@ -46,6 +45,8 @@ User expects rationale for design choices and coherent commits/pushes. Current d
 Controller/nft_quarantine.py is an additional **operator-run** adapter CLI for an explicitly provisioned Linux nftables set. None of the site collector/workbench/dashboard paths automatically calls it. A diagram connecting them is a future goal, not a current call graph.
 
 Do not combine these lanes' schema, labels, thresholds, modes or API semantics merely because some endpoints/dashboard assets share names.
+
+The active next-work order is collection correctness/visibility, supported policy fidelity and behavior-policy correlation with explicit uncertainty. Ryu and passive-v2 remain reference/test lanes, not deployment prerequisites. S01–S70 and P0–P13 are unchanged. Automatic vendor rules, calibrated site inference and guarded online model promotion remain planned.
 
 ## Legacy packet → detection → OpenFlow path
 
@@ -72,7 +73,7 @@ Do not combine these lanes' schema, labels, thresholds, modes or API semantics m
 - Tier MAC block lifetime uses IPS_BLOCK_SECONDS, default 0 = until manual removal. A finite future timestamp is used for JSON bookkeeping; do not reintroduce Infinity.
 - REST unknown-MAC IP timeout handling is separate (default hard timeout 600); it is not globally identical to permanent tier-MAC behavior.
 - CONTROL:CLEAR resets detection state and cooldown bookkeeping. CONTROL:UNBLOCK requests actual rule removal; do not substitute CLEAR for removal.
-- IPS_EXTERNAL_BLOCK is opt-in; its scope/whitelist comes from config/environment. Integrated host blocking and the optional standalone reader have different logic/configuration.
+- IPS_EXTERNAL_BLOCK is opt-in; its scope/whitelist comes from config/environment. The alternate standalone reader was removed; this opt-in applies only to the retained Ryu host-blocking path.
 
 ### Detection tiers
 
@@ -159,13 +160,11 @@ CLI adds require scope, protected networks and TTL 1–300 seconds. Existing mem
 
 No automatic site-model callback invokes it. Current evidence includes mocks and an operator namespace recipe; actual installed-kernel JSON semantics, traffic containment/continuity and expiry still need recorded lab results.
 
-## Snort paths and deployment scripts
+## Signature and reference deployment boundary
 
-Use the intended Snort 3 binary/configuration. Integrated path: SimpleSwitch → SnortManager → processes/log tails → callback. OpenFlow PacketIn can be injected into a TAP by TrafficMirror; a separate remote OVS/VXLAN br-snort transport is another deployment arrangement, not the same path.
+The retained integrated lab path is SimpleSwitch → SnortManager → processes/log tails → callback. TrafficMirror can inject PacketIn frames into a TAP. The source Snort 3 config/rules and original Ryu DAI checks remain for comparison; no standalone reader/bridge, VXLAN installer, mixed-version installer or missing-app launcher remains active. Review HOME_NET/static bindings in a private site copy, use /usr/local/bin/snort version 3 and validate before launching. See docs-site/integrations/snort.mdx.
 
-Alternate standalone path: external Snort JSON → snort_alert_reader.py → HTTP bridge /block → Ryu POST /ips/block for internal sources; reader-side external handling can use its own host chain. The reader has its own hardcoded lab network/protected defaults/local-SID gate; it does not automatically inherit the merged controller's config.
-
-Avoid launching both readers/controllers against the same output without understanding duplicate prevention. Installer/helper scripts can alter Linux interfaces, offloads, forwarding and firewall hooks; read/qualify the relevant script before execution. Installation/runbook presence is not proof that hardware/config exists.
+home_sensor.py now imports DashboardHandler from http_dashboard.py, not passive_ids.py. The neutral module serves static UI/docs and delegates read APIs without importing legacy models. passive_ids.py imports the same handler (preserving its former imported name), and remains the legacy observation lane. Neither read-only handler supports action writes. No feature formula, gate, schema or model byte changed during extraction.
 
 ## Ports, APIs and dashboard behavior
 
@@ -175,7 +174,6 @@ Avoid launching both readers/controllers against the same output without underst
 | Legacy UDP 9999 | Mode/metadata/registration commands | No authenticated acknowledgment; trusted-network control surface |
 | Ryu HTTP, usually configured 8081 | Mutating legacy block/unblock + status/metrics/dashboard | Legacy security and datapath assumptions; startup text still mentions 8080 |
 | Home/passive HTTP default 8081 | Separate process, read-only collection/observation | Cannot coexist on the same address/port without configuration |
-| Bridge loopback 9000 | Alternate Snort block relay | Only when intentionally using that path |
 | Policy loopback 8082 | Separate read-only model workbench | Different contract/database/authority |
 | Mintlify 3333 | Full workstation docs preview | Independent from t530/controller; not reboot autostart |
 | Pilot replay 18081 | Temporary helper-selected dashboard | Closes after replay |
@@ -203,13 +201,13 @@ These are source-review findings/qualification needs, not all reproduced bugs:
 5. Current software maps/display paths do not uniformly represent host iptables and OpenFlow enforcement; audit every requested origin when verifying blocks.
 6. rest_block_ip and protected/no-op paths need semantic review: a successful handler return must not be assumed to mean a rule was installed. Unknown-MAC IPv6 also needs explicit supported behavior; OF 1.0 IPv4-match helpers are not an IPv6 enforcement claim.
 7. Unblock FlowMods use non-strict delete semantics; priority alone does not prove exclusive removal of one drop. Strong cookie/ownership/transaction semantics are future hardening work.
-8. Integrated/standalone Snort and rate/RF/AE gates differ. AE per-row deferral does not satisfy every possible type-/device-wide precedence policy.
+8. Legacy deterministic and RF/AE gates differ, and the passive reference runner does not start Snort. AE per-row deferral does not satisfy every possible type-/device-wide precedence policy.
 9. Old training scripts' row splits/calibration and dataset provenance do not satisfy independent site/campaign deployment evidence.
 10. Authenticated management/RBAC, durable action lifecycle, HA/failure policy and enterprise tenancy are not delivered by the prototype.
 11. Testbed addresses/static bindings and stale comments survive in legacy assets. Do not copy those values into real-network configuration.
 12. Empty local topology/QoS directories and absent notebooks are not current tracked runtime capabilities.
 13. A passing offline suite does not verify t530 AF_PACKET behavior, industrial-firewall semantics, line rate, a multi-day soak or detector accuracy.
-14. Controller/scripts/start_snort_ryu_ips.sh still invokes absent ryu_ips_app.py; use the merged controller's documented entry point. verify_snort_ryu_ips.sh defaults to the historical HTTP port and requires the correct RYU_BASE. snort_setup.sh is a legacy mixed-version installer, not the authorized Snort 3 installation procedure.
+14. Historical relay/install/setup runbooks were removed rather than repaired into competing product entry points. The retained Ryu config is still a lab reference; do not copy static bindings/addresses into a real site.
 
 Do not fix all of these opportunistically during a small unrelated task. Select a scoped next milestone with evidence, relevant tests, documentation and reversible deployment.
 

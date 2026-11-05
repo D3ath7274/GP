@@ -1,8 +1,8 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "98b947d2c97458a9e80d8b7e6e771f4f91b32ccd",
+  "reference_base_commit": "ce9a21878025bde98331d32e6cf6716411d25f1c",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
-  "context_sha256": "89989e6e826253a528740b3f0b550b5f56d571f70aacc1f1ca219514902ba61d",
+  "context_sha256": "0496f8718513071ebd6276e825fdc7f2c6d7fffb68aad46ad372d6368a3f8646",
   "files": [
     {
       "path": ".githooks/pre-commit",
@@ -26,7 +26,7 @@
     },
     {
       "path": "AI_Project_Context.md",
-      "purpose": "Historical dense index now points to current source-checked context; earlier assumptions remain history rather than guarantees."
+      "purpose": "Short current product-context pointer replaces stale deployment recap and links the source-checked handbook, scope and preserved behavioral lineage."
     },
     {
       "path": "CODEBASE_AI_HANDOFF.md",
@@ -35,266 +35,266 @@
     {
       "path": "Controller/Controller_main_Claude.py",
       "purpose": "Merged Ryu OF1.0 app owns datapaths, learning/DAI, Snort callbacks, hub block queue, UDP control and legacy REST handlers.",
-      "sha256": "0057d822e381cb7974521bea2c56b272bcb68d8bc7a5a8253702eb2993ec5c07",
-      "canonical_bytes": 93962,
+      "sha256": "42223e938ccc07f75ab47d87ea9a536fdc7491d81b6eaa11a205e2b85c2c858b",
+      "canonical_bytes": 93746,
       "symbols": [
         {
           "name": "_route_wsgi_access_log_to_file",
           "kind": "function",
-          "line": 74,
-          "end_line": 139
+          "line": 73,
+          "end_line": 138
         },
         {
           "name": "_route_wsgi_access_log_to_file._FileLog",
           "kind": "class",
-          "line": 97,
-          "end_line": 111
+          "line": 96,
+          "end_line": 110
         },
         {
           "name": "_route_wsgi_access_log_to_file._FileLog.write",
           "kind": "function",
-          "line": 99,
-          "end_line": 103
+          "line": 98,
+          "end_line": 102
         },
         {
           "name": "_route_wsgi_access_log_to_file._FileLog.info",
           "kind": "function",
-          "line": 104,
-          "end_line": 105
+          "line": 103,
+          "end_line": 104
         },
         {
           "name": "_route_wsgi_access_log_to_file._FileLog.flush",
           "kind": "function",
-          "line": 107,
-          "end_line": 111
+          "line": 106,
+          "end_line": 110
         },
         {
           "name": "_route_wsgi_access_log_to_file._server",
           "kind": "function",
-          "line": 133,
-          "end_line": 134
+          "line": 132,
+          "end_line": 133
         },
         {
           "name": "SimpleSwitch",
           "kind": "class",
-          "line": 142,
-          "end_line": 1559
+          "line": 141,
+          "end_line": 1557
         },
         {
           "name": "SimpleSwitch.__init__",
           "kind": "function",
-          "line": 148,
-          "end_line": 413
+          "line": 147,
+          "end_line": 412
         },
         {
           "name": "SimpleSwitch._handle_snort_alert",
           "kind": "function",
-          "line": 418,
-          "end_line": 466
+          "line": 417,
+          "end_line": 465
         },
         {
           "name": "SimpleSwitch.close",
           "kind": "function",
-          "line": 468,
-          "end_line": 481
+          "line": 467,
+          "end_line": 480
         },
         {
           "name": "SimpleSwitch._udp_command_listener",
           "kind": "function",
-          "line": 486,
-          "end_line": 767
+          "line": 485,
+          "end_line": 766
         },
         {
           "name": "SimpleSwitch._ip_to_int",
           "kind": "function",
-          "line": 778,
-          "end_line": 779
+          "line": 776,
+          "end_line": 777
         },
         {
           "name": "SimpleSwitch._resolve_mac",
           "kind": "function",
-          "line": 781,
-          "end_line": 788
+          "line": 779,
+          "end_line": 786
         },
         {
           "name": "SimpleSwitch.rest_block_ip",
           "kind": "function",
-          "line": 790,
-          "end_line": 831
+          "line": 788,
+          "end_line": 829
         },
         {
           "name": "SimpleSwitch.rest_unblock_ip",
           "kind": "function",
-          "line": 833,
-          "end_line": 855
+          "line": 831,
+          "end_line": 853
         },
         {
           "name": "SimpleSwitch.get_blocked_list",
           "kind": "function",
-          "line": 857,
-          "end_line": 861
+          "line": 855,
+          "end_line": 859
         },
         {
           "name": "SimpleSwitch.block_attacker",
           "kind": "function",
-          "line": 866,
-          "end_line": 902
+          "line": 864,
+          "end_line": 900
         },
         {
           "name": "SimpleSwitch.unblock_attacker",
           "kind": "function",
-          "line": 904,
-          "end_line": 912
+          "line": 902,
+          "end_line": 910
         },
         {
           "name": "SimpleSwitch._block_worker",
           "kind": "function",
-          "line": 914,
-          "end_line": 933
+          "line": 912,
+          "end_line": 931
         },
         {
           "name": "SimpleSwitch._do_block_attacker",
           "kind": "function",
-          "line": 935,
-          "end_line": 1036
+          "line": 933,
+          "end_line": 1034
         },
         {
           "name": "SimpleSwitch._do_unblock_attacker",
           "kind": "function",
-          "line": 1038,
-          "end_line": 1060
+          "line": 1036,
+          "end_line": 1058
         },
         {
           "name": "SimpleSwitch._load_ips_config",
           "kind": "function",
-          "line": 1065,
-          "end_line": 1079
+          "line": 1063,
+          "end_line": 1077
         },
         {
           "name": "SimpleSwitch._is_protected_mac",
           "kind": "function",
-          "line": 1081,
-          "end_line": 1084
+          "line": 1079,
+          "end_line": 1082
         },
         {
           "name": "SimpleSwitch._is_external_ip",
           "kind": "function",
-          "line": 1086,
-          "end_line": 1098
+          "line": 1084,
+          "end_line": 1096
         },
         {
           "name": "SimpleSwitch._block_external_ip",
           "kind": "function",
-          "line": 1100,
-          "end_line": 1124
+          "line": 1098,
+          "end_line": 1122
         },
         {
           "name": "SimpleSwitch._unblock_external_ip",
           "kind": "function",
-          "line": 1126,
-          "end_line": 1135
+          "line": 1124,
+          "end_line": 1133
         },
         {
           "name": "SimpleSwitch.add_flow",
           "kind": "function",
-          "line": 1137,
-          "end_line": 1151
+          "line": 1135,
+          "end_line": 1149
         },
         {
           "name": "SimpleSwitch.is_iot",
           "kind": "function",
-          "line": 1153,
-          "end_line": 1168
+          "line": 1151,
+          "end_line": 1166
         },
         {
           "name": "SimpleSwitch.is_gateway",
           "kind": "function",
-          "line": 1170,
-          "end_line": 1179
+          "line": 1168,
+          "end_line": 1177
         },
         {
           "name": "SimpleSwitch.register_gateway_dynamic",
           "kind": "function",
-          "line": 1181,
-          "end_line": 1198
+          "line": 1179,
+          "end_line": 1196
         },
         {
           "name": "SimpleSwitch._packet_in_handler",
           "kind": "function",
-          "line": 1201,
-          "end_line": 1540
+          "line": 1199,
+          "end_line": 1538
         },
         {
           "name": "SimpleSwitch._port_status_handler",
           "kind": "function",
-          "line": 1543,
-          "end_line": 1559
+          "line": 1541,
+          "end_line": 1557
         },
         {
           "name": "IPSRestController",
           "kind": "class",
-          "line": 1567,
-          "end_line": 1689
+          "line": 1564,
+          "end_line": 1686
         },
         {
           "name": "IPSRestController.__init__",
           "kind": "function",
-          "line": 1569,
-          "end_line": 1571
+          "line": 1566,
+          "end_line": 1568
         },
         {
           "name": "IPSRestController.block_ip",
           "kind": "function",
-          "line": 1574,
-          "end_line": 1590
+          "line": 1571,
+          "end_line": 1587
         },
         {
           "name": "IPSRestController.unblock_ip",
           "kind": "function",
-          "line": 1593,
-          "end_line": 1594
+          "line": 1590,
+          "end_line": 1591
         },
         {
           "name": "IPSRestController.list_blocked",
           "kind": "function",
-          "line": 1597,
-          "end_line": 1598
+          "line": 1594,
+          "end_line": 1595
         },
         {
           "name": "IPSRestController.list_switches",
           "kind": "function",
-          "line": 1601,
-          "end_line": 1603
+          "line": 1598,
+          "end_line": 1600
         },
         {
           "name": "IPSRestController.status",
           "kind": "function",
-          "line": 1606,
-          "end_line": 1614
+          "line": 1603,
+          "end_line": 1611
         },
         {
           "name": "IPSRestController.metrics",
           "kind": "function",
-          "line": 1617,
-          "end_line": 1661
+          "line": 1614,
+          "end_line": 1658
         },
         {
           "name": "IPSRestController.alerts",
           "kind": "function",
-          "line": 1664,
-          "end_line": 1672
+          "line": 1661,
+          "end_line": 1669
         },
         {
           "name": "IPSRestController.dashboard",
           "kind": "function",
-          "line": 1675,
-          "end_line": 1685
+          "line": 1672,
+          "end_line": 1682
         },
         {
           "name": "IPSRestController._json",
           "kind": "function",
-          "line": 1687,
-          "end_line": 1689
+          "line": 1684,
+          "end_line": 1686
         }
       ],
       "imports": [
@@ -327,14 +327,6 @@
         "traffic_mirror",
         "webob"
       ]
-    },
-    {
-      "path": "Controller/SNORT_IDS_README.md",
-      "purpose": "Legacy integrated-Snort instructions must be compared against current manager/configuration and actual installed build."
-    },
-    {
-      "path": "Controller/STANDALONE_SNORT_RYU_FILES.md",
-      "purpose": "Historical alternate-chain asset list includes references that are absent from the present tracked controller source."
     },
     {
       "path": "Controller/ae_inference.py",
@@ -646,9 +638,9 @@
     },
     {
       "path": "Controller/home_sensor.py",
-      "purpose": "Site-v3 entry point orchestrates lease, interface/replay capture, device windows, paired evidence/checkpoints and read-only dashboard endpoints.",
-      "sha256": "e923cc0ee7e82b3150c9573319ea642659fe6be93caa2cb785883a9100e36d9c",
-      "canonical_bytes": 22405,
+      "purpose": "Site-v3 lease/capture orchestration, paired evidence/checkpoints and shadow profiles; uses neutral HTTP transport without legacy inference imports.",
+      "sha256": "6dfba05e1143f96c77156d0c6a3fd2ad3cf6a5193aa403a0d9c49ce442a8cb39",
+      "canonical_bytes": 22408,
       "symbols": [
         {
           "name": "utc",
@@ -762,12 +754,12 @@
         "functools",
         "hashlib",
         "http.server",
+        "http_dashboard",
         "ipaddress",
         "json",
         "logging",
         "math",
         "os",
-        "passive_ids",
         "pathlib",
         "platform",
         "psutil",
@@ -788,10 +780,55 @@
       ]
     },
     {
+      "path": "Controller/http_dashboard.py",
+      "purpose": "Neutral read-only static UI/docs and delegated JSON transport shared by site collection and legacy observation without inference imports.",
+      "sha256": "c91b2f1076e5d0f71143b04627da59ee026a82a7b410f3b84a701a0536c6de76",
+      "canonical_bytes": 1603,
+      "symbols": [
+        {
+          "name": "DashboardHandler",
+          "kind": "class",
+          "line": 12,
+          "end_line": 44
+        },
+        {
+          "name": "DashboardHandler.__init__",
+          "kind": "function",
+          "line": 15,
+          "end_line": 17
+        },
+        {
+          "name": "DashboardHandler.do_GET",
+          "kind": "function",
+          "line": 19,
+          "end_line": 33
+        },
+        {
+          "name": "DashboardHandler.respond",
+          "kind": "function",
+          "line": 35,
+          "end_line": 41
+        },
+        {
+          "name": "DashboardHandler.log_message",
+          "kind": "function",
+          "line": 43,
+          "end_line": 44
+        }
+      ],
+      "imports": [
+        "http.server",
+        "json",
+        "local_docs",
+        "pathlib",
+        "urllib.parse"
+      ]
+    },
+    {
       "path": "Controller/ips_config.json",
-      "purpose": "Merged-controller testbed LAN/whitelist/protected-MAC defaults require deliberate real-network configuration rather than copying examples blindly.",
-      "sha256": "07db785413b8e97ccfcc6e81da7186346a7bf8b04d87d92d487275efe426e410",
-      "canonical_bytes": 478
+      "purpose": "Retained Ryu lab configuration defaults and protection lists; not consumed by current site collector or policy workbench.",
+      "sha256": "c50516e32a14ffbdf7b73ea2eb132723eaba881edec8daeb4442359c1422757f",
+      "canonical_bytes": 539
     },
     {
       "path": "Controller/ipsctl.py",
@@ -1076,87 +1113,57 @@
     },
     {
       "path": "Controller/passive_ids.py",
-      "purpose": "Standalone legacy Ethernet/PCAP observer adapts packets into TrafficCapture/models and supplies the shared read-only dashboard handler.",
-      "sha256": "380661308a4093e8ca3a9ca21e908c4248d8166c39ff1863d0b2ed7f59d4681d",
-      "canonical_bytes": 8749,
+      "purpose": "Retained legacy 102-column capture/observe runner uses shared read-only HTTP handler; not the active site collection or firewall plugin.",
+      "sha256": "70ed4de189be51d5f38a7d5fb59b5521bb3df43cb1849a1b20d15ca0bf26e16c",
+      "canonical_bytes": 7446,
       "symbols": [
         {
           "name": "packet_info",
           "kind": "function",
-          "line": 32,
-          "end_line": 61
+          "line": 31,
+          "end_line": 60
         },
         {
           "name": "PassiveSensor",
           "kind": "class",
-          "line": 64,
-          "end_line": 108
+          "line": 63,
+          "end_line": 107
         },
         {
           "name": "PassiveSensor.__init__",
           "kind": "function",
-          "line": 65,
-          "end_line": 75
+          "line": 64,
+          "end_line": 74
         },
         {
           "name": "PassiveSensor.on_detection_observed",
           "kind": "function",
-          "line": 77,
-          "end_line": 83
+          "line": 76,
+          "end_line": 82
         },
         {
           "name": "PassiveSensor.read",
           "kind": "function",
-          "line": 85,
-          "end_line": 108
-        },
-        {
-          "name": "DashboardHandler",
-          "kind": "class",
-          "line": 111,
-          "end_line": 141
-        },
-        {
-          "name": "DashboardHandler.__init__",
-          "kind": "function",
-          "line": 112,
-          "end_line": 114
-        },
-        {
-          "name": "DashboardHandler.do_GET",
-          "kind": "function",
-          "line": 116,
-          "end_line": 130
-        },
-        {
-          "name": "DashboardHandler.respond",
-          "kind": "function",
-          "line": 132,
-          "end_line": 138
-        },
-        {
-          "name": "DashboardHandler.log_message",
-          "kind": "function",
-          "line": 140,
-          "end_line": 141
+          "line": 84,
+          "end_line": 107
         },
         {
           "name": "capture_packets",
           "kind": "function",
-          "line": 144,
-          "end_line": 177
+          "line": 110,
+          "end_line": 143
         },
         {
           "name": "capture_packets.record",
           "kind": "function",
-          "line": 145,
-          "end_line": 148
+          "line": 111,
+          "end_line": 114
         },
         {
           "name": "main",
           "kind": "function",
-          "line": 180,
-          "end_line": 214
+          "line": 146,
+          "end_line": 180
         }
       ],
       "imports": [
@@ -1166,8 +1173,7 @@
         "datetime",
         "functools",
         "http.server",
-        "json",
-        "local_docs",
+        "http_dashboard",
         "logging",
         "ml_inference",
         "os",
@@ -1180,8 +1186,7 @@
         "struct",
         "threading",
         "time",
-        "traffic_capture",
-        "urllib.parse"
+        "traffic_capture"
       ]
     },
     {
@@ -1491,48 +1496,6 @@
       "canonical_bytes": 229
     },
     {
-      "path": "Controller/scripts/disable_capture_offloads.sh",
-      "purpose": "Privileged helper changes offload settings on named interfaces to investigate capture artifacts; it is not passive inspection.",
-      "sha256": "807cbf2f5bb7677c871e84ce74de5b2fb3d0bc06299c3aecbfead102c2f7ffbf",
-      "canonical_bytes": 1486
-    },
-    {
-      "path": "Controller/scripts/install_snort3_ips_config.sh",
-      "purpose": "Privileged helper installs tracked Snort 3 configuration/rules to selected system paths and checks their configuration.",
-      "sha256": "ea906121998155b86f3e595869b8fa4a25043e8d2b2e837cff9fcea4c14e1314",
-      "canonical_bytes": 1286
-    },
-    {
-      "path": "Controller/scripts/setup_external_blocking.sh",
-      "purpose": "Standalone reader helper enables forwarding and host INPUT/FORWARD hooks, separate from the scoped nftables adapter.",
-      "sha256": "7f99f9a56cbe312d3760c084317c1948ec4e8e9cac4c581b402c9a7b4d883176",
-      "canonical_bytes": 690
-    },
-    {
-      "path": "Controller/scripts/setup_vxlan_br_snort.sh",
-      "purpose": "Explicit local/remote deployment inputs create bridge/VXLAN mirror plumbing; no generic router-mirroring capability is implied.",
-      "sha256": "2241e6504f1beb3f2ba1c967b243f25e11362d6e8dd0862d59961c92f567e9f8",
-      "canonical_bytes": 1586
-    },
-    {
-      "path": "Controller/scripts/start_snort3_json.sh",
-      "purpose": "Executes selected Snort interface/config/log options to produce JSON alerts for the intended reader arrangement.",
-      "sha256": "c685e4ade01bac103c4cad3d27146130a6b3191329727f70bde10a2811e564af",
-      "canonical_bytes": 499
-    },
-    {
-      "path": "Controller/scripts/start_snort_ryu_ips.sh",
-      "purpose": "Historical launcher targets absent ryu_ips_app.py and is not runnable as the merged-controller entry in this checkout.",
-      "sha256": "667183e381214c99e8aa4881574383a972a24a40c2b374537e2f4a5d7936b9aa",
-      "canonical_bytes": 347
-    },
-    {
-      "path": "Controller/scripts/verify_snort_ryu_ips.sh",
-      "purpose": "Alternate-chain health probes need the correct RYU_BASE override because the script retains a historical HTTP port default.",
-      "sha256": "c1c9feb06a4f1cbbb4a5d059d52578c58cf6af38e99c59d69c8a1453610692ec",
-      "canonical_bytes": 427
-    },
-    {
       "path": "Controller/site_features.py",
       "purpose": "Ethernet IPv4/IPv6 decoder, online moments, bounded window state and historical features implement the current site measurement subset.",
       "sha256": "9c78be06e94a28871b9a52c1da10ce7ead3093493515a395a095eba9b3b287ba",
@@ -1748,9 +1711,9 @@
     },
     {
       "path": "Controller/snort3/sdn_ips.lua",
-      "purpose": "Snort 3 inspectors/logging/rule include contains lab network/binding assumptions needing deployment-specific validation.",
-      "sha256": "a9973fdfb676f1c124e11cb0b86e9e2fddd8023d555cd71307c2e6ed02b690b4",
-      "canonical_bytes": 2868
+      "purpose": "Retained integrated Snort 3 lab configuration with static testbed assumptions; inspect a private reviewed site copy before use.",
+      "sha256": "81fb7471286723bfa6ec83754a4664e21db47e569f3c71c4a367155b5377dadc",
+      "canonical_bytes": 2703
     },
     {
       "path": "Controller/snort3/sdn_ips_local.rules",
@@ -1759,130 +1722,10 @@
       "canonical_bytes": 3976
     },
     {
-      "path": "Controller/snort_alert_reader.py",
-      "purpose": "Alternate JSON reader has separate SID/network/protection defaults and forwards internal block requests or applies external host filtering.",
-      "sha256": "c3a96894b01ce2bf501f90fd9a0a86b8761242bed5abcb65aba2e7148242ad99",
-      "canonical_bytes": 8657,
-      "symbols": [
-        {
-          "name": "parse_sid",
-          "kind": "function",
-          "line": 55,
-          "end_line": 64
-        },
-        {
-          "name": "parse_addr_port",
-          "kind": "function",
-          "line": 67,
-          "end_line": 79
-        },
-        {
-          "name": "get_endpoint",
-          "kind": "function",
-          "line": 82,
-          "end_line": 89
-        },
-        {
-          "name": "alert_name",
-          "kind": "function",
-          "line": 92,
-          "end_line": 99
-        },
-        {
-          "name": "show_ids_alert",
-          "kind": "function",
-          "line": 102,
-          "end_line": 128
-        },
-        {
-          "name": "show_blocked_retry_alert",
-          "kind": "function",
-          "line": 131,
-          "end_line": 157
-        },
-        {
-          "name": "alert_key",
-          "kind": "function",
-          "line": 160,
-          "end_line": 164
-        },
-        {
-          "name": "should_display_alert",
-          "kind": "function",
-          "line": 167,
-          "end_line": 174
-        },
-        {
-          "name": "should_send_block",
-          "kind": "function",
-          "line": 177,
-          "end_line": 184
-        },
-        {
-          "name": "should_display_blocked_retry",
-          "kind": "function",
-          "line": 187,
-          "end_line": 194
-        },
-        {
-          "name": "is_internal_sdn_ip",
-          "kind": "function",
-          "line": 197,
-          "end_line": 201
-        },
-        {
-          "name": "is_protected_ip",
-          "kind": "function",
-          "line": 204,
-          "end_line": 205
-        },
-        {
-          "name": "send_block",
-          "kind": "function",
-          "line": 208,
-          "end_line": 215
-        },
-        {
-          "name": "block_external_ip",
-          "kind": "function",
-          "line": 218,
-          "end_line": 249
-        },
-        {
-          "name": "is_external_ip_blocked",
-          "kind": "function",
-          "line": 252,
-          "end_line": 266
-        },
-        {
-          "name": "process_line",
-          "kind": "function",
-          "line": 269,
-          "end_line": 302
-        },
-        {
-          "name": "tail_file",
-          "kind": "function",
-          "line": 305,
-          "end_line": 323
-        }
-      ],
-      "imports": [
-        "ipaddress",
-        "json",
-        "logging",
-        "os",
-        "requests",
-        "subprocess",
-        "sys",
-        "time"
-      ]
-    },
-    {
       "path": "Controller/snort_monitor.py",
-      "purpose": "Integrated Snort lifecycle manager parses/deduplicates alerts and invokes the merged controller callback.",
-      "sha256": "fc18a7003a8113f983e4c85ef24840cb65ef798b8853aaabd141f625e29a2f04",
-      "canonical_bytes": 34944,
+      "purpose": "Integrated lab Snort process/JSON alert manager; diagnostic points to current preparation guide after alternate installers were removed.",
+      "sha256": "5c1262d24e5baee07d2beafeffbdaa39677781dc4b4fa83666dbfdb52f239722",
+      "canonical_bytes": 34937,
       "symbols": [
         {
           "name": "classify_attack",
@@ -2029,78 +1872,6 @@
         "threading",
         "time"
       ]
-    },
-    {
-      "path": "Controller/snort_ryu_bridge.py",
-      "purpose": "Alternate loopback relay deduplicates priority-selected alerts and posts requests to the configured Ryu block API.",
-      "sha256": "6ad93922b1d48d43e764d5907a1ed7e18a6ab2ddf258eeaa234dbaeb345696ca",
-      "canonical_bytes": 4320,
-      "symbols": [
-        {
-          "name": "should_block",
-          "kind": "function",
-          "line": 26,
-          "end_line": 41
-        },
-        {
-          "name": "push_block_to_ryu",
-          "kind": "function",
-          "line": 43,
-          "end_line": 55
-        },
-        {
-          "name": "BridgeHandler",
-          "kind": "class",
-          "line": 57,
-          "end_line": 93
-        },
-        {
-          "name": "BridgeHandler.log_message",
-          "kind": "function",
-          "line": 58,
-          "end_line": 58
-        },
-        {
-          "name": "BridgeHandler.do_POST",
-          "kind": "function",
-          "line": 60,
-          "end_line": 79
-        },
-        {
-          "name": "BridgeHandler.do_GET",
-          "kind": "function",
-          "line": 81,
-          "end_line": 85
-        },
-        {
-          "name": "BridgeHandler._respond",
-          "kind": "function",
-          "line": 87,
-          "end_line": 93
-        },
-        {
-          "name": "cleanup_cache",
-          "kind": "function",
-          "line": 95,
-          "end_line": 101
-        }
-      ],
-      "imports": [
-        "datetime",
-        "http.server",
-        "json",
-        "logging",
-        "os",
-        "requests",
-        "threading",
-        "time"
-      ]
-    },
-    {
-      "path": "Controller/snort_setup.sh",
-      "purpose": "Historical mixed-version installer is not the authorized Snort 3 setup route; inspect distribution-install side effects before reuse.",
-      "sha256": "5b2b491ba202a11555e2daf813e7701cb076755e4a1a22ceabeb40b9d841a14c",
-      "canonical_bytes": 8726
     },
     {
       "path": "Controller/traffic_capture.py",
@@ -2401,10 +2172,6 @@
       "purpose": "Current complete curriculum ties prerequisites to source, rebuild exercises, competency checks and scientific/operational evidence."
     },
     {
-      "path": "Dashboard/PROJECT_DOCUMENTATION.md",
-      "purpose": "Historical engineering narrative contains stale guide references and ambitions that are not present implementation guarantees."
-    },
-    {
       "path": "Dashboard/README.md",
       "purpose": "Dashboard operation notes require checking the serving backend lane before assuming actions or data semantics."
     },
@@ -2413,14 +2180,6 @@
       "purpose": "Shared dependency-free browser client reads runtime-origin metrics/status/alerts/blocks and collection/shadow views; backend authority remains decisive.",
       "sha256": "340a2ab0e021bb34875338fcb72988d77d06913f5d172c8f552af0b469a2fb96",
       "canonical_bytes": 23117
-    },
-    {
-      "path": "IPS_Project_Assessment.pdf",
-      "purpose": "Historical binary assessment is not executable, parsed by this inventory or current proof of deployment readiness."
-    },
-    {
-      "path": "NGFW_feature_comparison.md",
-      "purpose": "Time-bound competitor/gap comparison requires fresh vendor-specific verification before making product parity claims."
     },
     {
       "path": "NO_VISIBILITY_PILOT_RUNBOOK.md",
@@ -2437,22 +2196,6 @@
     {
       "path": "README.md",
       "purpose": "Project entry page summarizes runtime lanes, present limits, learning/AI context and qualified operator documentation."
-    },
-    {
-      "path": "SDN_IPS_Snort_Installation_Runbook.pdf",
-      "purpose": "Historical binary installation reference must be reconciled with current source and the intended Snort 3 build."
-    },
-    {
-      "path": "SESSION_HANDOFF.md",
-      "purpose": "Historical August assessment has a current-context warning; obsolete deployment/missing-file/no-skew claims are not source authority."
-    },
-    {
-      "path": "STUDY_AND_REBUILD_PLAN.md",
-      "purpose": "Historical legacy exercises are retained with superseding-current-roadmap notice and corrected outdated assumptions."
-    },
-    {
-      "path": "apf_implementation_roadmap.md",
-      "purpose": "Expanded earlier roadmap connects IPS qualification and firewall-policy goals; current service phases govern release status."
     },
     {
       "path": "docs-site/AGENTS.md",
@@ -2497,6 +2240,10 @@
     {
       "path": "docs-site/architecture/detection.mdx",
       "purpose": "Authored documentation page: Detection tiers and decisions. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/architecture/feature-lineage.mdx",
+      "purpose": "Preserves original G11–G17 proposed measurements, corrections, implemented-versus-planned boundaries and the legacy/site behavioral lineage."
     },
     {
       "path": "docs-site/architecture/feature-rationale.mdx",
@@ -2577,20 +2324,24 @@
       "purpose": "Authored documentation page: Qualification and audit: code and rationale. Trace readiness, feature evidence, restart recovery, reports, campaign scoring and symbolic policy analysis."
     },
     {
+      "path": "docs-site/developers/repository-scope.mdx",
+      "purpose": "Explains active product versus lab lanes, enumerates exact removed paths/replacements, recovery tag and feature/model preservation checks."
+    },
+    {
       "path": "docs-site/developers/study-roadmap.mdx",
       "purpose": "Authored documentation page: Study and rebuild the framework. A complete prerequisite roadmap, source-linked exercises and competency checks from packets and Python to qualified adaptive response."
     },
     {
       "path": "docs-site/docs.json",
       "purpose": "Mintlify branding/navigation selects authored pages and separate legacy-Ryu versus policy-workbench API groups.",
-      "sha256": "1b0ea5c3ecf9eae531bedd39e31fa4cdb8bd05e33126a2eba62282f9978c89ce",
-      "canonical_bytes": 2409
+      "sha256": "b946a9f7bacf12f75cb23732470cb18181f6d6b6cac9c17bd4bfcc482d75d8a0",
+      "canonical_bytes": 2715
     },
     {
       "path": "docs-site/documentation-map.json",
       "purpose": "First-match source patterns define affected MDX pages eligible to satisfy the staged implementation documentation guard.",
-      "sha256": "03bdbab52bbb1d64bec83d59774d699692e68405217ffcf8e3d2b2283b70d172",
-      "canonical_bytes": 3960
+      "sha256": "7633b0fb41ddfc97a69cce728d6aa6d987cd7bfdfd5e32cfe6d2bd5a665b634e",
+      "canonical_bytes": 5187
     },
     {
       "path": "docs-site/getting-started/install.mdx",
@@ -2611,8 +2362,8 @@
     {
       "path": "docs-site/openapi.json",
       "purpose": "Legacy merged-Ryu mutating management contract is separate from collection and read-only policy workbench APIs.",
-      "sha256": "975e0812d18586373c65869a699996096c11e7b519503107accd57793e534c22",
-      "canonical_bytes": 9192
+      "sha256": "c2e319297698b9222c73cd4bff7bb41f76d3b2673797213049dc07820aa9bae3",
+      "canonical_bytes": 9185
     },
     {
       "path": "docs-site/operations/collection.mdx",
@@ -2657,8 +2408,8 @@
     {
       "path": "docs-site/reference/file-purposes.json",
       "purpose": "Authored exact tracked-path roles and local-only exclusions drive complete handbook coverage without ingesting private data.",
-      "sha256": "81bacc627eab534944d317ba2c4aea8b13bcb1d8939bdf9532c9fbecbb9eb56b",
-      "canonical_bytes": 31799
+      "sha256": "6e5779678528af94ce9bb1a67f4f85b417155f2a9884a2ebdca5e0c466cd02f8",
+      "canonical_bytes": 27400
     },
     {
       "path": "docs-site/roadmap/delivery-phases.mdx",
@@ -2679,10 +2430,6 @@
     {
       "path": "docs-site/troubleshooting/verification.mdx",
       "purpose": "Authored documentation page: Verify and troubleshoot. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
-    },
-    {
-      "path": "docs/SNORT_RYU_INTEGRATION.md",
-      "purpose": "Alternate Snort/Ryu integration narrative complements current source but retains environment/entry-point assumptions requiring review."
     },
     {
       "path": "examples/policies/audit-reference.json",
@@ -2737,38 +2484,6 @@
       "purpose": "Deliberately unqualified sanitized visibility template requires actual dated path/direction evidence before meaningful operator attestation.",
       "sha256": "6c60a6a6c347468e1c0a91c50c09ea5fcef504c7cd24c152ebafd53dcf52dd6d",
       "canonical_bytes": 482
-    },
-    {
-      "path": "feature_groups_v3_plan.md",
-      "purpose": "Historical feature proposal is superseded for exact implementation claims by source-mapped current/planned rationale and code."
-    },
-    {
-      "path": "firewall_waf_integration_plan.md",
-      "purpose": "Planning reference proposes network-firewall/WAF integration without delivering universal vendor support or encrypted application visibility."
-    },
-    {
-      "path": "home_network_test_plan.md",
-      "purpose": "Earlier home experiment proposal is planning context; current visibility/no-mirror walkthrough governs executable steps."
-    },
-    {
-      "path": "pre_production_collection_runbook.md",
-      "purpose": "Earlier collection/review steps need current site-v3 schema, flags, eligibility and capture-scope qualification."
-    },
-    {
-      "path": "production_readiness_results.md",
-      "purpose": "Fill-in readiness scorecard preserves unmeasured results and independent evidence rather than inventing successful deployment."
-    },
-    {
-      "path": "production_readiness_test_plan.md",
-      "purpose": "Proposed realistic pilot objectives/phases define experiments rather than establish performed production qualification."
-    },
-    {
-      "path": "real_world_deployment_plan.md",
-      "purpose": "Earlier real-device placement/configuration plan remains conditional on physical observation and qualified network interfaces."
-    },
-    {
-      "path": "red_team_test_runbook.md",
-      "purpose": "Authorized lab scenario instructions require supported runtime paths, matched benign controls and independently observed outcomes."
     },
     {
       "path": "scripts/audit_home_data.py",
@@ -3273,18 +2988,6 @@
       "purpose": "Original PowerShell background/foreground helper requires permitted script-file execution and a resolvable global Mint shim.",
       "sha256": "112bd71d873beee1cdbd806c577ed15c4aa90257922f87eb5306dc2002fdcd64",
       "canonical_bytes": 3961
-    },
-    {
-      "path": "t530_bridge_setup.md",
-      "purpose": "Conditional transparent-bridge setup requires an actual inline topology and suitable interfaces, absent in the current one-NIC home arrangement."
-    },
-    {
-      "path": "t530_full_system_runbook.md",
-      "purpose": "Long legacy controller/Snort/topology procedure retains historical environment and missing-file assumptions; validate entry points first."
-    },
-    {
-      "path": "t530_mode_b_ap_setup.md",
-      "purpose": "Conditional hostapd/AP instructions require compatible Wi-Fi hardware, which has not been established on this t530."
     },
     {
       "path": "tests/fixtures/site-v3-golden.json",
@@ -4259,6 +3962,68 @@
         "unittest.mock",
         "urllib.error",
         "urllib.parse",
+        "urllib.request"
+      ]
+    },
+    {
+      "path": "tests/test_reference_preservation.py",
+      "purpose": "Real loopback read/method tests, isolated home import and independently expected legacy packet-to-CSV math protect retained behavioral references.",
+      "sha256": "c50a732c538bf77f299f8b3946bd31d8ae416cc9fbcfbd4dde61ab81d85dd42e",
+      "canonical_bytes": 5350,
+      "symbols": [
+        {
+          "name": "ReferencePreservationTests",
+          "kind": "class",
+          "line": 25,
+          "end_line": 106
+        },
+        {
+          "name": "ReferencePreservationTests.test_home_import_needs_no_legacy_runner_or_inference",
+          "kind": "function",
+          "line": 26,
+          "end_line": 41
+        },
+        {
+          "name": "ReferencePreservationTests.test_shared_read_transport_serves_ui_docs_json_and_rejects_writes",
+          "kind": "function",
+          "line": 43,
+          "end_line": 72
+        },
+        {
+          "name": "ReferencePreservationTests.test_shared_read_transport_serves_ui_docs_json_and_rejects_writes.Sensor",
+          "kind": "class",
+          "line": 44,
+          "end_line": 46
+        },
+        {
+          "name": "ReferencePreservationTests.test_shared_read_transport_serves_ui_docs_json_and_rejects_writes.Sensor.read",
+          "kind": "function",
+          "line": 45,
+          "end_line": 46
+        },
+        {
+          "name": "ReferencePreservationTests.test_original_packets_still_produce_full_legacy_schema_and_known_math",
+          "kind": "function",
+          "line": 74,
+          "end_line": 106
+        }
+      ],
+      "imports": [
+        "csv",
+        "functools",
+        "http.server",
+        "http_dashboard",
+        "json",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "threading",
+        "traffic_capture",
+        "unittest",
+        "unittest.mock",
+        "urllib.error",
         "urllib.request"
       ]
     },

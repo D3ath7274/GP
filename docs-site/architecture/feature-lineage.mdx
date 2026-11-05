@@ -1,0 +1,137 @@
+---
+title: "Feature preservation and design lineage"
+---
+
+The firewall auto-audit direction extends the thesis behavioral method; it does not replace it with rule parsing alone. This page preserves the earlier G11–G17 measurement proposals, including measurements not implemented yet. The [G1–G24 rationale](/architecture/feature-rationale) and reference/feature-groups.json remain authoritative for actual columns, benign controls, missingness and qualification. The source catalog guard checks both the legacy 102-column schema and the site 71-column schema.
+
+## Preserved foundations
+
+| Foundation | Retained implementation | Relationship to firewall audit |
+| --- | --- | --- |
+| G1–G4: rhythm, direction, TCP proxies, entropy | traffic_capture.py | Describe behavior beyond rule hits; validate exact denominators and partial visibility. |
+| G5–G8: ARP, sizes, ports, broadcast context | traffic_capture.py; Ryu DAI binding checks | Preserve Layer-2 and benign diagnostic context alongside volumetric evidence. |
+| G9–G10 and device/network context | traffic_capture.py | Flow-creation pressure and explanatory provenance; audit fields are not training predictors. |
+| G11–G17 bounded measurements | site_features.py; home_sensor.py | Evidence for recon, long horizons, service, DNS/TLS/HTTP behavior; not a trained attack classifier. |
+| G18–G24 | feature-rationale.mdx and feature-groups.json, planned | Resource/identity/control-plane/auth/authorization/C2/exploitation evidence requires new implementation and qualification. |
+| Four-tier lab comparison | Controller_main_Claude.py, snort_monitor.py, ml_inference.py, ae_inference.py, shipped models | Historical comparison and regression lane; not a universal firewall plugin. |
+| Model rebuilding references | ml_models/retrain_rf_v4.py, build_ae_bundle.py and H5 weights | Preserve artifact contracts and earlier experiments; future release training needs independent splits/calibration. |
+
+## Read the original design with these corrections
+
+- The earlier append-only IPS_V3_FEATURES/IPS_META_INSPECT/IPS_CONTENT_INSPECT/IPS_V3_HORIZONS scheme was a proposal. It is not installed. Site collection uses a separate site-v3.0 contract and explicit CLI options.
+- A proposed name below is not an implemented column unless the source-mapped catalog says so. Similar names are not proof of mathematical equivalence. ACK/session correlation, exact unanswered probes, long-open state and certificate validation need richer state/parsers than the current collector.
+- Tool names and “catches” in early designs describe test hypotheses only. Low timing variation, high entropy, fixed lengths, unusual ports, self-signed certificates or missing SNI also occur in benign traffic. Encryption, loss and one-sided observation create missing evidence.
+- Fingerprint hashes are not automatically JA4, application identities or malicious software identities. A response-size pattern is not a verified login outcome or HTTP status. A scan observed at a sensor is not proof of successful reachability or a firewall failure.
+- Legacy destination novelty and session/timing approximations remain legacy limitations. The site implementation scores destination novelty before history update; this is not an implicit migration of the legacy trained input contract.
+- The original suggested RF/AE/rate assignments and enlarged AE dimensions are research choices, not delivered detectors or release specifications. Candidate groups need matched benign controls, resource measurements, independent labels, ablation and held-out tool/device/time/site evaluation.
+
+## Original proposed measurements
+
+All tables below are preserved design candidates, even where a bounded site equivalent now exists. “Computation” records the original intended metric; qualify it before implementation. This keeps unimplemented ideas from disappearing during repository cleanup.
+
+
+
+Each row is one CSV column computed per flow (or per source) per 5 s window, unless stated
+otherwise.
+
+## G11 — Reconnaissance technique (level H, ~12 columns)
+Needs URG/ECE/CWR flag parsing, plus correlating replies that come back to the source.
+
+| Column | Computation | Original research hypothesis (unqualified) |
+|---|---|---|
+| `null_flag_count` | TCP packets with no flags set | NULL scan (`nmap -sN`) |
+| `xmas_flag_count` | FIN + PSH + URG together | XMAS scan (`-sX`) |
+| `fin_only_count` | FIN without ACK | FIN scan (`-sF`) |
+| `ack_no_session_count` | ACK with no SYN ever seen on that flow | ACK scan / firewall mapping (`-sA`) |
+| `rst_reply_ratio` | RSTs coming back ÷ SYNs sent | Probing closed ports — scans "fail loudly" |
+| `icmp_unreach_reply_count` | ICMP type 3 code 3 returned to the source | UDP scan (`-sU`) |
+| `src_dst_ip_fanout` | Distinct destination IPs this source contacted on the same port | Horizontal sweep (one port, many hosts) |
+| `src_dst_port_fanout` | Distinct (destination, port) pairs per source | Vertical vs. mixed scans |
+| `icmp_echo_fanout` | Distinct hosts that received an echo request from this source | Ping sweep |
+| `unanswered_probe_ratio` | (destination, port) pairs that got no reply ÷ pairs probed | Scanning, whatever the scan technique |
+| `syn_options_uniform` | Share of SYNs with identical TCP option layouts | Tool-crafted SYNs (nmap and masscan use fixed option sets) |
+| `probe_payload_zero_ratio` | Probe packets carrying no payload | Pure probing as opposed to real sessions |
+
+## G12 — Header fingerprint and evasion (level H, ~9 columns)
+| Column | Computation | Original research hypothesis (unqualified) |
+|---|---|---|
+| `ttl_mean`, `ttl_std` | TTL statistics for the flow | Spoofed floods (TTLs vary); the OS family |
+| `ttl_deviation_from_device` | Current TTL vs. the device's baseline TTL | **Impersonation** — a different OS behind a familiar IP or MAC |
+| `tcp_window_mean`, `tcp_window_std` | TCP window sizes | Tool traffic (fixed windows); zero-window slow attacks |
+| `zero_window_count` | Packets advertising window = 0 | Sockstress-type and slow-read attacks |
+| `frag_count`, `tiny_frag_count` | IP fragments, and fragments under 64 bytes | Fragmentation evasion, Teardrop-family attacks |
+| `ip_id_sequential_score` | How monotonic the IP ID field is | Idle/zombie scan, crafted traffic |
+
+## G13 — Long-horizon memory (level H, ~8 columns)
+The 5 s window is the system's biggest structural blind spot: anything slower than a window
+looks innocent in every window. This group adds per-source and per-pair state that lasts
+across windows, each piece with an explicit horizon.
+
+| Column | Computation | Horizon | Original research hypothesis (unqualified) |
+|---|---|---|---|
+| `src_distinct_dst_ports_10m` | Distinct destination ports, rolling | 10 min | Slow vertical scan |
+| `src_distinct_dst_ips_1h` | Distinct destination IPs, rolling | 1 h | Slow sweep, worm spread |
+| `pair_contact_count_1h` | Windows in which this (src, dst) pair talked | 1 h | Persistent check-ins |
+| `pair_interval_cv` | Coefficient of variation of the intervals between contacts | 1 h | **Beaconing** (low CV = clockwork regular) |
+| `pair_interval_mean` | Mean interval between contacts | 1 h | Beacon period |
+| `long_open_conn_count` | TCP connections open > 60 s that move < 50 B/s | rolling | **Slowloris / slow POST** |
+| `half_open_age_max` | Oldest unanswered SYN for this source | rolling | Slow SYN exhaustion |
+| `src_bytes_out_1h` | Total upload, rolling | 1 h | Slow exfiltration |
+
+Memory has to be bounded: cap the number of tracked pairs (LRU), age entries out by horizon,
+and make the horizons tunable via `IPS_V3_HORIZONS`.
+
+## G14 — Service-behaviour (level H, ~10 columns)
+Computed only for flows to service ports: web (80, 443, 8080, 8443), auth (22, 23, 3389, 445,
+21), and IoT management (1883, 8883, 554). Uses payload **length** only, never content.
+
+| Column | Computation | Original research hypothesis (unqualified) |
+|---|---|---|
+| `svc_class` | web / auth / iot-mgmt / other (one-hot) | Context for the model |
+| `new_conn_rate` | New TCP sessions per second to that service | Brute force, scanners, HTTP floods |
+| `short_session_ratio` | Sessions shorter than 2 s ÷ all sessions | Login failures, enumeration |
+| `req_size_cv` | Coefficient of variation of client→server payload lengths | Scripted requests (identical sizes) |
+| `resp_size_entropy` | Entropy of server→client response lengths | **Directory enumeration**: many "404"s with the same size → low entropy at high volume |
+| `resp_size_mode_ratio` | Share of responses with the single most common size | Repeated failed logins (identical "wrong password" pages) |
+| `bytes_up_down_ratio` | Client bytes ÷ server bytes | Upload-heavy exfiltration vs. normal downloads |
+| `conn_reuse_ratio` | Requests per TCP session (keep-alive) | Browsers reuse connections; many tools don't |
+| `auth_port_session_count` | Sessions to auth ports this window | SSH/RDP/Telnet brute force (Mirai-style) |
+| `tls_fail_ratio` | TLS sessions closed before 1 KB of data | Failed handshakes, TLS scanners |
+
+## G15 — DNS metadata (level M, ~8 columns)
+| Column | Computation | Original research hypothesis (unqualified) |
+|---|---|---|
+| `dns_query_rate` | Queries per second for this source | Tunnelling, DGA bursts |
+| `dns_qname_len_mean` | Mean query-name length | Tunnelling (long encoded labels) |
+| `dns_qname_entropy` | Character entropy of query names | **DGA domains** (random-looking names) |
+| `dns_unique_domains` | Distinct registered domains | DGA churn |
+| `dns_nxdomain_ratio` | NXDOMAIN answers ÷ queries | DGA (most generated names don't exist) |
+| `dns_txt_null_ratio` | TXT/NULL record queries ÷ all | DNS tunnelling tools (iodine, dnscat2) |
+| `dns_new_domain_ratio` | Domains never seen before for this device | Compromised IoT contacting new infrastructure |
+| `dns_external_resolver` | 1 if the source bypasses the LAN resolver | Malware with a hardcoded DNS server |
+
+## G16 — TLS handshake metadata (level M, ~6 columns)
+| Column | Computation | Original research hypothesis (unqualified) |
+|---|---|---|
+| `tls_version_min` | Lowest TLS version offered | Legacy or malware TLS stacks |
+| `tls_sni_missing_ratio` | ClientHellos without SNI | Malware, raw-IP C2 |
+| `tls_fp_new_for_device` | 1 if this client fingerprint (JA4-style hash of ClientHello fields) is new for the device | **A new piece of software** running on a known device |
+| `tls_fp_rarity` | How rarely this fingerprint has been seen across the network | Unknown clients |
+| `tls_cert_selfsigned` | Server certificate is self-signed (TLS 1.2 only; 1.3 encrypts certificates) | C2 servers, MITM proxies |
+| `tls_sni_entropy` | Character entropy of the SNI | DGA over TLS |
+
+## G17 — HTTP lexical (level C, opt-in, ~6 columns; cleartext HTTP only)
+Complements the Snort signatures; it doesn't replace them.
+`uri_len_mean`, `uri_entropy`, `uri_special_char_ratio` (`'"<>%;()`), `uri_encoded_ratio`
+(`%xx` density), `http_method_rare_ratio` (methods other than GET/POST), `ua_new_for_device`.
+These are candidate lexical measurements, not proof that a payload or scanner is malicious.
+
+---
+
+
+
+## Research and release procedure
+
+For each proposed group: specify the observation boundary and mathematical denominator; define unsupported/missing states; construct deterministic packets and independent expected values; add realistic benign controls at matched volume; measure drops, CPU and memory; collect independent campaign truth; train with campaign/device/time splits before preprocessing; then test group ablation, calibration, false actions and drift/poisoning resistance. Compare signature-only, behavior-only and fused decisions separately.
+
+The source tree before consolidation is recoverable from the annotated tag pre-auto-audit-cleanup-2026-11-05. It is historical evidence, not an alternative deployment guide. See [repository scope](/developers/repository-scope) for exact deletions and replacements.

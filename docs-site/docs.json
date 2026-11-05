@@ -21,8 +21,6 @@
         "group": "Operate",
         "pages": [
           "operations/dashboard",
-          "operations/modes",
-          "operations/collection",
           "troubleshooting/verification",
           "operations/incident-response"
         ]
@@ -34,13 +32,12 @@
           "deployment/placement",
           "security/configuration",
           "security/shadow-policy",
-          "integrations/snort",
-          "architecture/detection",
           "architecture/feature-rationale",
+          "architecture/feature-lineage",
           "developers/maintenance",
+          "developers/repository-scope",
           "developers/study-roadmap",
           "developers/ai-handoff",
-          "deployment/passive-sensor",
           "deployment/nftables-lab",
           "deployment/home-collection",
           "deployment/documentation-access",
@@ -69,17 +66,31 @@
           "api-reference/overview",
           "api-reference/collection",
           "api-reference/policy-workbench",
-          "reference/control-protocol",
           "reference/change-log"
         ]
       },
       {
-        "group": "REST endpoints",
+        "group": "Legacy behavioral reference",
+        "pages": [
+          "deployment/passive-sensor",
+          "architecture/detection",
+          "integrations/snort",
+          "operations/modes",
+          "operations/collection",
+          "reference/control-protocol"
+        ]
+      },
+      {
+        "group": "Legacy Ryu lab endpoints",
         "openapi": "/openapi.json"
       },
       {
-        "group": "Policy workbench endpoints",
+        "group": "Current policy workbench endpoints",
         "openapi": "/policy-openapi.json"
+      },
+      {
+        "group": "Current collection endpoints",
+        "openapi": "/collection-openapi.json"
       }
     ]
   },
