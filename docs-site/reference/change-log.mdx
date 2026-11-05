@@ -2,6 +2,12 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-05 · Primary-source feature methods and frozen group evidence
+
+Added [measurement-method research](/architecture/feature-methods) with 26 primary references and 173 schema-qualified column recommendations, current/proposed boundaries and G18–G24 requirements. The existing feature guard now checks exact method coverage, group/source/status and authored-page presence; it cannot validate mathematical correctness or detector accuracy. Cataloged existing site timing mean/SD/CV under G1 and size SD under G6 rather than BASE; field names, values/order, 102/71-column contracts and shipped model bytes are unchanged.
+
+Added an [offline research workflow](/deployment/feature-evidence) and [code rationale](/developers/feature-evidence-code-tour): bounded chronological slice preparation with omission receipts; explicit reviewed-reference acknowledgment; frozen median/deviation ranks; separate group and global maximum calibration with inclusive ties/+1 resolution; per-feature parser/support/history eligibility; unknown/missing/context abstention and zero-MAD diagnostics. Exact parsed input bytes and method/catalog/reference fingerprints accompany private new-only outputs. No live dashboard ingestion, site model promotion, online adaptation or firewall call is added. WITHIN_REFERENCE is not a benign verdict; empirical tails are not malicious probabilities or guaranteed time-series false-alarm control. Physical visibility, independent labels/identity and attack/benign campaigns remain operator/release gates. Verification and limits are recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-05 · Task-based documentation navigation
 
 Replaced the crowded combined deployment/development sidebar with five task tabs: Start here, Collect data, Audit firewalls, Develop and Reference. Smaller numbered collection/audit groups give an execution order; architecture, code tours and original lab references have separate homes. The homepage now routes readers by their actual setup, including the no-mirror path, rather than presenting fifteen equally weighted entry cards. All existing page paths and three OpenAPI sources remain assigned exactly once; no runtime, feature, model, service status or API behavior changes. Operator impact: switch the top tab to see its focused sidebar. Verification is recorded in DOCUMENTATION_VALIDATION.md, including navigation coverage, browser checks, staged guards and Mintlify validation/link/accessibility results.

@@ -5,7 +5,7 @@
     {
       "id": "G1",
       "title": "Timing and burst rhythm",
-      "status": "legacy_lab",
+      "status": "partial_site",
       "model_use": "requires_qualification",
       "legacy_columns": [
         "inter_arrival_mean",
@@ -16,7 +16,11 @@
         "burst_count",
         "burst_duration_avg"
       ],
-      "site_columns": [],
+      "site_columns": [
+        "inter_arrival_mean",
+        "inter_arrival_std",
+        "inter_arrival_cv"
+      ],
       "rationale_heading": "G1: Timing and burst rhythm"
     },
     {
@@ -83,7 +87,7 @@
     {
       "id": "G6",
       "title": "Packet-size distribution",
-      "status": "legacy_lab",
+      "status": "partial_site",
       "model_use": "requires_qualification",
       "legacy_columns": [
         "pkt_size_std",
@@ -91,7 +95,9 @@
         "small_pkt_ratio",
         "large_pkt_ratio"
       ],
-      "site_columns": [],
+      "site_columns": [
+        "packet_size_std"
+      ],
       "rationale_heading": "G6: Packet-size distribution"
     },
     {
@@ -379,11 +385,7 @@
         "in_bytes",
         "out_pps",
         "out_bytes_per_second",
-        "packet_size_mean",
-        "packet_size_std",
-        "inter_arrival_mean",
-        "inter_arrival_std",
-        "inter_arrival_cv"
+        "packet_size_mean"
       ],
       "rationale_heading": "BASE: Base traffic measurements"
     },

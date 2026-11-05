@@ -49,3 +49,9 @@ Superseded root runbooks are removed. Current qualification/deployment pages and
 ## Task navigation
 
 The site groups pages into Start here, Collect data, Audit firewalls, Develop and Reference. This changes only how readers find the existing routes; source-to-content mappings remain the same. The homepage supplies reading sequences and the docs README records tab ownership. Keep every authored page and each current/legacy API contract reachable when editing docs.json.
+
+
+| Feature-method research source | Site page |
+| --- | --- |
+| behavioral_evidence.py, score_feature_groups.py and test_behavioral_evidence.py | Feature measurement methods and research; Inspect feature-group evidence offline; Feature-group evidence: code and rationale |
+| feature-methods.json, G1/G6 site assignment and check_feature_catalog.validate_methods | Feature measurement methods and research; Why each behavioral feature group exists; Develop and verify changes |

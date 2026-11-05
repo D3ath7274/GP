@@ -10,6 +10,8 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = "docs-site/reference/feature-groups.json"
 RATIONALE = "docs-site/architecture/feature-rationale.mdx"
+METHODS = "docs-site/reference/feature-methods.json"
+METHODS_PAGE = "docs-site/architecture/feature-methods.mdx"
 
 
 def source_columns(read):
@@ -75,6 +77,45 @@ def validate(catalog, page, columns):
             "meaning": "Source names/status/rationale coverage only; mathematical definitions and detection value need review and independent experiments."}
 
 
+def validate_methods(methods, page, catalog):
+    """Require an authored recommendation for every schema-qualified column."""
+    if (not isinstance(methods,dict) or set(methods) != {"version","research_date","page","sources","features","future_groups"}
+            or methods["version"] != "feature-methods-v1" or methods["page"] != METHODS_PAGE):
+        raise ValueError("Invalid feature method inventory")
+    sources=methods["sources"]
+    if (not isinstance(sources,dict) or not sources or any(not isinstance(v,dict) or set(v)!={"title","url"}
+            or not isinstance(v["url"],str) or not v["url"].startswith("https://") for v in sources.values())):
+        raise ValueError("Invalid method sources")
+    expected={(schema,name):g["id"] for g in catalog["groups"]
+              for schema,key in (("legacy","legacy_columns"),("site_v3","site_columns")) for name in g[key]}
+    actual={}
+    for feature in methods["features"]:
+        if (not isinstance(feature,dict) or set(feature)!={"schema","name","group","units","recommended_measurement",
+                "current_limit","qualification","references","recommendation_status"}):
+            raise ValueError("Invalid method feature fields")
+        key=(feature["schema"],feature["name"])
+        if key in actual or expected.get(key)!=feature["group"]:
+            raise ValueError("Missing, duplicate or misgrouped feature method")
+        for field,minimum in (("units",1),("recommended_measurement",10),("current_limit",6),("qualification",6)):
+            if not isinstance(feature[field],str) or len(feature[field].split())<minimum:
+                raise ValueError("Feature method lacks substantive measurement/qualification")
+        if (not feature["references"] or set(feature["references"])-set(sources)
+                or feature["recommendation_status"]!="existing_measurement_requires_qualification_or_versioned_future_work"):
+            raise ValueError("Method source/status mismatch")
+        if "`"+feature["name"]+"`" not in page:
+            raise ValueError("Method page omits a column")
+        actual[key]=feature["group"]
+    if actual!=expected:
+        raise ValueError("Missing method inventory coverage")
+    future=methods["future_groups"]
+    if Counter(g["id"] for g in future)!=Counter(f"G{n}" for n in range(18,25)):
+        raise ValueError("Planned method inventory must retain G18–G24")
+    for group in catalog["groups"]:
+        if "## "+group["id"]+":" not in page:
+            raise ValueError("Method page omits a feature group")
+    return len(actual)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--staged", action="store_true")
@@ -84,7 +125,9 @@ def main():
             return subprocess.run(["git","show",":"+name],cwd=ROOT,check=True,capture_output=True).stdout.decode("utf-8")
         return (ROOT/name).read_text(encoding="utf-8")
     try:
-        result = validate(json.loads(read(CATALOG)),read(RATIONALE),source_columns(read))
+        catalog=json.loads(read(CATALOG))
+        result = validate(catalog,read(RATIONALE),source_columns(read))
+        result["method_recommendations"]=validate_methods(json.loads(read(METHODS)),read(METHODS_PAGE),catalog)
     except (OSError,ValueError,TypeError,KeyError,StopIteration,SyntaxError,subprocess.CalledProcessError) as error:
         parser.exit(1,"Feature catalog check failed: "+str(error)+"\n")
     print(json.dumps(result,indent=2))

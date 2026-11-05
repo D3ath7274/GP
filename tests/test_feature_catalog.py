@@ -11,7 +11,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"scripts"))
-from check_feature_catalog import CATALOG,RATIONALE,source_columns,validate
+from check_feature_catalog import CATALOG,RATIONALE,METHODS,METHODS_PAGE,source_columns,validate,validate_methods
 
 
 def read(name):
@@ -61,7 +61,7 @@ class CatalogTests(unittest.TestCase):
     def test_staged_check_uses_git_index_instead_of_unstaged_rationale_map(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
-            files=[CATALOG,RATIONALE,"Controller/traffic_capture.py","Controller/home_sensor.py","Controller/site_features.py","scripts/check_feature_catalog.py"]
+            files=[CATALOG,RATIONALE,METHODS,METHODS_PAGE,"Controller/traffic_capture.py","Controller/home_sensor.py","Controller/site_features.py","scripts/check_feature_catalog.py"]
             for name in files:
                 path=root/name;path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,path)
             subprocess.run(["git","init","-q"],cwd=root,check=True,capture_output=True)
@@ -73,3 +73,16 @@ class CatalogTests(unittest.TestCase):
             self.assertNotEqual(subprocess.run(command,cwd=root,capture_output=True,timeout=15).returncode,0)
             subprocess.run(["git","add",CATALOG],cwd=root,check=True,capture_output=True)
             self.assertNotEqual(subprocess.run(command+["--staged"],cwd=root,capture_output=True,timeout=15).returncode,0)
+
+    def test_method_recommendations_cover_every_schema_column(self):
+        self.assertEqual(validate_methods(json.loads(read(METHODS)),read(METHODS_PAGE),json.loads(read(CATALOG))),173)
+
+    def test_missing_misgrouped_unsourced_or_empty_method_is_rejected(self):
+        for kind in ("missing","group","source","empty"):
+            methods=json.loads(read(METHODS))
+            if kind=="missing":methods["features"].pop()
+            elif kind=="group":methods["features"][0]["group"]="G24"
+            elif kind=="source":methods["features"][0]["references"]=["invented"]
+            else:methods["features"][0]["recommended_measurement"]="Use best method"
+            with self.subTest(kind=kind),self.assertRaises(ValueError):
+                validate_methods(methods,read(METHODS_PAGE),json.loads(read(CATALOG)))

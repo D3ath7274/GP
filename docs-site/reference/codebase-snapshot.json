@@ -1,8 +1,8 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "034df70c237dad4e84600be6b0da426171084fd3",
+  "reference_base_commit": "32425125315cdf0966a3f9aade6ab783b4184adf",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
-  "context_sha256": "0496f8718513071ebd6276e825fdc7f2c6d7fffb68aad46ad372d6368a3f8646",
+  "context_sha256": "c4d2a8afb649775c682c7b49ccc356f7b171e72badf283b6fa3df1c413078cf0",
   "files": [
     {
       "path": ".githooks/pre-commit",
@@ -388,6 +388,149 @@
         "numpy",
         "os",
         "pandas"
+      ]
+    },
+    {
+      "path": "Controller/behavioral_evidence.py",
+      "purpose": "Offline frozen feature-group reference mathematics, strict eligibility/profile checks, tie-aware ranks and explained abstaining observations without actuators.",
+      "sha256": "4f5a837e332eafbd555d91f8a714e0c0df5991f903397d192719e02fb229b9b5",
+      "canonical_bytes": 22431,
+      "symbols": [
+        {
+          "name": "digest",
+          "kind": "function",
+          "line": 34,
+          "end_line": 36
+        },
+        {
+          "name": "strict_json",
+          "kind": "function",
+          "line": 39,
+          "end_line": 56
+        },
+        {
+          "name": "strict_json.pairs",
+          "kind": "function",
+          "line": 42,
+          "end_line": 48
+        },
+        {
+          "name": "strict_json.constant",
+          "kind": "function",
+          "line": 49,
+          "end_line": 50
+        },
+        {
+          "name": "catalog_groups",
+          "kind": "function",
+          "line": 59,
+          "end_line": 68
+        },
+        {
+          "name": "number",
+          "kind": "function",
+          "line": 71,
+          "end_line": 78
+        },
+        {
+          "name": "timestamp",
+          "kind": "function",
+          "line": 81,
+          "end_line": 88
+        },
+        {
+          "name": "row_identity",
+          "kind": "function",
+          "line": 91,
+          "end_line": 96
+        },
+        {
+          "name": "row_issues",
+          "kind": "function",
+          "line": 99,
+          "end_line": 122
+        },
+        {
+          "name": "supported_value",
+          "kind": "function",
+          "line": 125,
+          "end_line": 169
+        },
+        {
+          "name": "read_dataset",
+          "kind": "function",
+          "line": 172,
+          "end_line": 193
+        },
+        {
+          "name": "read_rows",
+          "kind": "function",
+          "line": 196,
+          "end_line": 197
+        },
+        {
+          "name": "tail_rank",
+          "kind": "function",
+          "line": 200,
+          "end_line": 202
+        },
+        {
+          "name": "feature_score",
+          "kind": "function",
+          "line": 205,
+          "end_line": 206
+        },
+        {
+          "name": "group_score",
+          "kind": "function",
+          "line": 209,
+          "end_line": 216
+        },
+        {
+          "name": "chronological",
+          "kind": "function",
+          "line": 219,
+          "end_line": 235
+        },
+        {
+          "name": "fit_reference",
+          "kind": "function",
+          "line": 238,
+          "end_line": 301
+        },
+        {
+          "name": "validate_reference",
+          "kind": "function",
+          "line": 304,
+          "end_line": 374
+        },
+        {
+          "name": "validate_reference.vector",
+          "kind": "function",
+          "line": 329,
+          "end_line": 333
+        },
+        {
+          "name": "score_row",
+          "kind": "function",
+          "line": 377,
+          "end_line": 423
+        }
+      ],
+      "imports": [
+        "bisect",
+        "collections",
+        "copy",
+        "csv",
+        "datetime",
+        "hashlib",
+        "io",
+        "ipaddress",
+        "json",
+        "math",
+        "pathlib",
+        "re",
+        "statistics"
       ]
     },
     {
@@ -2246,6 +2389,10 @@
       "purpose": "Preserves original G11–G17 proposed measurements, corrections, implemented-versus-planned boundaries and the legacy/site behavioral lineage."
     },
     {
+      "path": "docs-site/architecture/feature-methods.mdx",
+      "purpose": "Comprehensive per-feature/group scientific measurement recommendations, source links, current limits and model/evaluation choices with no universal guarantee."
+    },
+    {
       "path": "docs-site/architecture/feature-rationale.mdx",
       "purpose": "Authored documentation page: Why each behavioral feature group exists. Source-mapped rationale, benign lookalikes, limits and qualification plans for G1–G24 and supporting evidence."
     },
@@ -2258,6 +2405,10 @@
     {
       "path": "docs-site/deployment/documentation-access.mdx",
       "purpose": "Authored documentation page: Documentation access and updates. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
+    },
+    {
+      "path": "docs-site/deployment/feature-evidence.mdx",
+      "purpose": "Optional post-qualification private-data prepare/fit/score walkthrough with sample resolution, exclusion, interpretation and campaign gates."
     },
     {
       "path": "docs-site/deployment/home-collection.mdx",
@@ -2308,6 +2459,10 @@
       "purpose": "Authored documentation page: AI continuation and codebase architecture. Current runtime lanes, source-based data flows, authority boundaries, limitations and a freshness-checked continuation procedure."
     },
     {
+      "path": "docs-site/developers/feature-evidence-code-tour.mdx",
+      "purpose": "Function-by-function rationale for frozen offline group calibration, provenance, eligibility, bounds and independent tests."
+    },
+    {
       "path": "docs-site/developers/maintenance.mdx",
       "purpose": "Authored documentation page: Develop and verify changes. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
     },
@@ -2334,14 +2489,14 @@
     {
       "path": "docs-site/docs.json",
       "purpose": "Mintlify branding/navigation selects authored pages and separate legacy-Ryu versus policy-workbench API groups.",
-      "sha256": "95355075edf010a06ba63776730385018f00b99bc4e1e8c2b41f51f7e7a039d7",
-      "canonical_bytes": 4308
+      "sha256": "76f4a1f690ac408515efcdbc396527111e2f1a8a025aaebdd78652e75db4eafc",
+      "canonical_bytes": 4454
     },
     {
       "path": "docs-site/documentation-map.json",
       "purpose": "First-match source patterns define affected MDX pages eligible to satisfy the staged implementation documentation guard.",
-      "sha256": "7633b0fb41ddfc97a69cce728d6aa6d987cd7bfdfd5e32cfe6d2bd5a665b634e",
-      "canonical_bytes": 5187
+      "sha256": "f222ad8058b75c19e55c2479d14a2ce1d14b2eb84109019bfec0ceea8363f42d",
+      "canonical_bytes": 5561
     },
     {
       "path": "docs-site/getting-started/install.mdx",
@@ -2402,14 +2557,20 @@
     {
       "path": "docs-site/reference/feature-groups.json",
       "purpose": "Authored current/planned G1-G24/supporting map assigns all legacy/site columns and rationale/model-use classifications.",
-      "sha256": "469c82a26c32a72901b797f2cedc61ed085a5cdc3bd729a2d0ddca7f91a3d259",
-      "canonical_bytes": 13287
+      "sha256": "458c700e16dd998b513d5df0e285bd632d8f45f096d1a33fdaca04f929d8fa26",
+      "canonical_bytes": 13303
+    },
+    {
+      "path": "docs-site/reference/feature-methods.json",
+      "purpose": "Authored primary-source recommended measurement, units, current limits and qualification for all schema-qualified columns and planned groups.",
+      "sha256": "5eb67bbe21e53d56d5defd1950eea11d8ce357271072f3a9fe4b016049f09088",
+      "canonical_bytes": 142938
     },
     {
       "path": "docs-site/reference/file-purposes.json",
       "purpose": "Authored exact tracked-path roles and local-only exclusions drive complete handbook coverage without ingesting private data.",
-      "sha256": "6e5779678528af94ce9bb1a67f4f85b417155f2a9884a2ebdca5e0c466cd02f8",
-      "canonical_bytes": 27400
+      "sha256": "5e1875ed88b6aca1a90025ff8c94610acb8ada05489a7c9f6e85c440ce615e0b",
+      "canonical_bytes": 28767
     },
     {
       "path": "docs-site/roadmap/delivery-phases.mdx",
@@ -2652,32 +2813,38 @@
     {
       "path": "scripts/check_feature_catalog.py",
       "purpose": "AST/index guard checks column ownership/current-planned rationale coverage without importing models or proving mathematical correctness.",
-      "sha256": "5f77e2eaf0c0ec56bf7310a938f0a0e75262e0134bcc04f46b0e43e9e56c9c12",
-      "canonical_bytes": 5875,
+      "sha256": "1a2ba24dac63f6f4491c773eb3622235c8ff588d7b0f0d370235e4d7d4c1100b",
+      "canonical_bytes": 8689,
       "symbols": [
         {
           "name": "source_columns",
           "kind": "function",
-          "line": 15,
-          "end_line": 37
+          "line": 17,
+          "end_line": 39
         },
         {
           "name": "validate",
           "kind": "function",
-          "line": 40,
-          "end_line": 75
+          "line": 42,
+          "end_line": 77
+        },
+        {
+          "name": "validate_methods",
+          "kind": "function",
+          "line": 80,
+          "end_line": 116
         },
         {
           "name": "main",
           "kind": "function",
-          "line": 78,
-          "end_line": 90
+          "line": 119,
+          "end_line": 133
         },
         {
           "name": "main.read",
           "kind": "function",
-          "line": 82,
-          "end_line": 85
+          "line": 123,
+          "end_line": 126
         }
       ],
       "imports": [
@@ -2972,6 +3139,42 @@
       ]
     },
     {
+      "path": "scripts/score_feature_groups.py",
+      "purpose": "Bounded new-only prepare/fit/score CLI snapshots site CSV bytes, records research provenance and never changes runtime models or firewall state.",
+      "sha256": "a002732440433f723368f382bb381fceaf2f445dc76821f87456e0f8d1753e41",
+      "canonical_bytes": 7565,
+      "symbols": [
+        {
+          "name": "source_hash",
+          "kind": "function",
+          "line": 17,
+          "end_line": 18
+        },
+        {
+          "name": "write_new",
+          "kind": "function",
+          "line": 21,
+          "end_line": 27
+        },
+        {
+          "name": "main",
+          "kind": "function",
+          "line": 30,
+          "end_line": 118
+        }
+      ],
+      "imports": [
+        "argparse",
+        "behavioral_evidence",
+        "collections",
+        "csv",
+        "hashlib",
+        "json",
+        "pathlib",
+        "sys"
+      ]
+    },
+    {
       "path": "scripts/start_docs.cjs",
       "purpose": "Node helper validates declared pinned Mint executable and port, launches hidden detached log-backed child and checks branded readiness.",
       "sha256": "c2309ddb7bb7d495d8c883800332effc053790d97c350fc350b35e829d8665a0",
@@ -3048,6 +3251,153 @@
         "tempfile",
         "unittest",
         "unittest.mock"
+      ]
+    },
+    {
+      "path": "tests/test_behavioral_evidence.py",
+      "purpose": "Independent rank/median/MAD and missingness/chronology/correlation tests plus actual offline CLI slicing/reference/report preservation regressions.",
+      "sha256": "b67678a81d6979be36fade1a28fe3fcda09b5becdb8c4fd3880b1461f2d9445c",
+      "canonical_bytes": 12157,
+      "symbols": [
+        {
+          "name": "rows",
+          "kind": "function",
+          "line": 20,
+          "end_line": 39
+        },
+        {
+          "name": "EvidenceTests",
+          "kind": "class",
+          "line": 42,
+          "end_line": 210
+        },
+        {
+          "name": "EvidenceTests.setUp",
+          "kind": "function",
+          "line": 43,
+          "end_line": 46
+        },
+        {
+          "name": "EvidenceTests.model",
+          "kind": "function",
+          "line": 48,
+          "end_line": 50
+        },
+        {
+          "name": "EvidenceTests.later",
+          "kind": "function",
+          "line": 52,
+          "end_line": 53
+        },
+        {
+          "name": "EvidenceTests.test_inclusive_rank_arithmetic_and_ties",
+          "kind": "function",
+          "line": 55,
+          "end_line": 58
+        },
+        {
+          "name": "EvidenceTests.test_zero_mad_change_is_unusual_instead_of_fabricated_zero_z",
+          "kind": "function",
+          "line": 60,
+          "end_line": 71
+        },
+        {
+          "name": "EvidenceTests.test_duplicate_correlated_features_do_not_sum_votes",
+          "kind": "function",
+          "line": 73,
+          "end_line": 78
+        },
+        {
+          "name": "EvidenceTests.test_median_mad_and_rank_are_independently_expected",
+          "kind": "function",
+          "line": 80,
+          "end_line": 86
+        },
+        {
+          "name": "EvidenceTests.test_review_split_overlap_and_resolution_are_required",
+          "kind": "function",
+          "line": 88,
+          "end_line": 100
+        },
+        {
+          "name": "EvidenceTests.test_missing_sparse_and_nonfinite_measurements_abstain",
+          "kind": "function",
+          "line": 102,
+          "end_line": 106
+        },
+        {
+          "name": "EvidenceTests.test_context_change_warmup_capped_unknown_and_past_rows_abstain",
+          "kind": "function",
+          "line": 108,
+          "end_line": 115
+        },
+        {
+          "name": "EvidenceTests.test_inconsistent_rates_or_fractional_counters_are_not_attack_findings",
+          "kind": "function",
+          "line": 117,
+          "end_line": 123
+        },
+        {
+          "name": "EvidenceTests.test_warmup_is_feature_specific_instead_of_discarding_all_rhythm",
+          "kind": "function",
+          "line": 125,
+          "end_line": 131
+        },
+        {
+          "name": "EvidenceTests.test_scoring_is_frozen_and_audit_support_fields_are_excluded",
+          "kind": "function",
+          "line": 133,
+          "end_line": 139
+        },
+        {
+          "name": "EvidenceTests.test_optional_parsers_are_unqualified_when_inspection_is_disabled",
+          "kind": "function",
+          "line": 141,
+          "end_line": 145
+        },
+        {
+          "name": "EvidenceTests.test_reference_validation_rejects_hash_sorting_and_authority_tampering",
+          "kind": "function",
+          "line": 147,
+          "end_line": 157
+        },
+        {
+          "name": "EvidenceTests.test_strict_json_and_csv_reject_ambiguous_input",
+          "kind": "function",
+          "line": 159,
+          "end_line": 166
+        },
+        {
+          "name": "EvidenceTests.test_real_cli_roundtrip_does_not_overwrite_or_update_reference",
+          "kind": "function",
+          "line": 168,
+          "end_line": 191
+        },
+        {
+          "name": "EvidenceTests.test_real_cli_roundtrip_does_not_overwrite_or_update_reference.write",
+          "kind": "function",
+          "line": 171,
+          "end_line": 175
+        },
+        {
+          "name": "EvidenceTests.test_prepare_preserves_chronology_reports_omissions_and_refuses_existing_directory",
+          "kind": "function",
+          "line": 193,
+          "end_line": 210
+        }
+      ],
+      "imports": [
+        "behavioral_evidence",
+        "copy",
+        "csv",
+        "datetime",
+        "home_sensor",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest"
       ]
     },
     {
@@ -3278,8 +3628,8 @@
     {
       "path": "tests/test_feature_catalog.py",
       "purpose": "Coverage tests reject invented/missing/duplicate columns, planned false claims, predictor labels and stale index mappings.",
-      "sha256": "2432c79d6de354b73ad73ec23877942fce04b15b215667255b3ece2118c00906",
-      "canonical_bytes": 4167,
+      "sha256": "a10bca86f70ea9f8cb7adc2de0af948b9680df1f7d45088f4cfb5d8d75bafd06",
+      "canonical_bytes": 5049,
       "symbols": [
         {
           "name": "read",
@@ -3291,7 +3641,7 @@
           "name": "CatalogTests",
           "kind": "class",
           "line": 21,
-          "end_line": 75
+          "end_line": 88
         },
         {
           "name": "CatalogTests.test_all_columns_and_numbered_groups_are_covered",
@@ -3334,6 +3684,18 @@
           "kind": "function",
           "line": 61,
           "end_line": 75
+        },
+        {
+          "name": "CatalogTests.test_method_recommendations_cover_every_schema_column",
+          "kind": "function",
+          "line": 77,
+          "end_line": 78
+        },
+        {
+          "name": "CatalogTests.test_missing_misgrouped_unsourced_or_empty_method_is_rejected",
+          "kind": "function",
+          "line": 80,
+          "end_line": 88
         }
       ],
       "imports": [

@@ -11,6 +11,8 @@ The machine-readable map docs-site/reference/feature-groups.json assigns every c
 
 The [preservation and design-lineage page](/architecture/feature-lineage) retains the older proposed G11–G17 measurements without claiming they all exist. Repository cleanup leaves both extractor implementations, all catalog assignments, model artifacts and planned G18–G24 unchanged. [Repository scope](/developers/repository-scope) records exact decisions and recovery.
 
+The [primary-source method inventory](/architecture/feature-methods) now records a recommendation for every current column and each planned group. The [offline group scorer](/deployment/feature-evidence) provides frozen reference/held-out rank diagnostics, not a live maliciousness probability or action engine. Capture formulas and schemas are unchanged; site timing mean/SD/CV are assigned to G1 and site size SD to G6 instead of the broad BASE bucket. The source catalog and new method-coverage check preserve unique column membership.
+
 ## Measurement and decision contract
 
 | Property | Current implementation / planned discipline |
@@ -64,7 +66,7 @@ Possible future measurements include newly permitted service edges, traffic viol
 
 ## G1: Timing and burst rhythm
 
-**Legacy lab: seven timing/burst columns. Site equivalents are a smaller BASE subset.** Inter-arrival mean, spread/CV and burst summaries seek regular or pulsed generation patterns beyond mean PPS. CV = sample standard deviation / mean interval; two streams with the same volume can have different timing structures. Burst context can expose short pressure episodes hidden by a window average.
+**Legacy lab: seven timing/burst columns. Partial site G1 exports mean, sample SD and CV.** Inter-arrival mean, spread/CV and burst summaries seek regular or pulsed generation patterns beyond mean PPS. CV = sample standard deviation / mean interval; two streams with the same volume can have different timing structures. Burst context can expose short pressure episodes hidden by a window average.
 
 Regularity is not inherently malicious: sensors, health checks, telemetry and game loops are periodic. An attacker can introduce jitter. Legacy bounded timestamp sampling changes the observed interval distribution at high volume; its burst threshold is heuristic, not a physical attack invariant. Current site has no full burst detector. Test periodic legitimate devices, jittered beacons, load bursts and sparse samples. Do not authorize a block solely because CV is low or claim that low-rate floods are always regular.
 
@@ -94,7 +96,7 @@ Current unsolicited logic is a window/request-target and baseline-conflict heuri
 
 ## G6: Packet-size distribution
 
-**Legacy standard deviation, variance and small/large ratios; site BASE keeps online moments.** Fixed-size pressure can differ from an application's mixture of headers/data, so size complements rate and timing. It is cheap to update and works without reading encrypted payloads. The actual legacy small threshold is below 64 captured bytes and large threshold above 1,000; earlier prose using 100 must not replace source semantics.
+**Legacy standard deviation, variance and small/large ratios; partial site G6 keeps outgoing sample SD, with the mean in BASE.** Fixed-size pressure can differ from an application's mixture of headers/data, so size complements rate and timing. It is cheap to update and works without reading encrypted payloads. The actual legacy small threshold is below 64 captured bytes and large threshold above 1,000; earlier prose using 100 must not replace source semantics.
 
 Small ACK/control packets and fixed-size sensor messages are normal. Legitimate streams can be nearly constant-size; attacks can randomize size. Variance is standard deviation squared and often adds no independent information. Neither is robust to all outliers. Ethernet/VLAN/tunnel overhead, MTU and offloads affect measurements. Test the same application and attack across MTUs/padding/encapsulation, and perform group/within-group ablation before retaining redundant columns or calling size alone a universal signature.
 

@@ -1,0 +1,547 @@
+---
+title: "Feature measurement methods and research"
+description: "Per-feature formulas, primary-source methods, current limits and the path from measurements to group evidence."
+---
+
+Research review: **2026-11-05**. This is an APF engineering synthesis of primary standards, official analyzer documentation and research papers, not a ranking established by experiments on your home network. “Preferred” means the method worth testing under the stated assumptions. No method makes a finite feature set universally distinguish attacks from benign behavior.
+
+## What has been implemented in this milestone
+
+The [offline group-evidence tool](/deployment/feature-evidence) now fits frozen per-device/VLAN references, separately calibrates group maxima, reports the contributing measurements and retains insufficient-evidence outcomes. It does not change packet extraction, feature values/order, shipped RF/AE artifacts, online adaptation or firewall writes. Site inter-arrival mean/SD/CV are now cataloged under G1 and site size SD under G6, correcting their scientific grouping without changing either CSV schema.
+
+The JSON companion reference/feature-methods.json covers every **102 legacy plus 71 site** column occurrence, with group, units, recommended computation, current limitation and source IDs. Recommendations requiring new state/parsers remain future work. G18–G24 stay planned.
+
+## The method-selection rule
+
+1. Define event time, direction, identity, key, byte layer, horizon and eligible denominator before selecting a formula.
+2. Preserve exact counters and stable online moments; count missing/truncated/capped observations explicitly. Random timestamp subsampling does not preserve adjacent inter-arrival structure. [Stable moment algorithms](https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/), [measurement selection](https://www.rfc-editor.org/info/rfc5475/).
+3. Keep sample count and support. CV is SD divided by the mean and becomes unstable near a zero mean; its value alone does not identify an attack. [NIST CV](https://itl.nist.gov/div898/software/dataplot/refman2/auxillar/coefvari.htm).
+4. Compare like-for-like device/role/service/time contexts. A legitimate camera can be periodic and a backup can be asymmetric. Binding a score to an IP/VLAN still needs independent identity validation.
+5. Evaluate robust residuals and empirical reference tails. A zero MAD is an explicit zero-scale condition, not a reason to manufacture a zero deviation. [NIST outlier diagnostics](https://itl.nist.gov/div898/handbook/eda/section3/eda35h.htm).
+6. Calibrate the maximum within a group on separate reviewed windows, and separately calibrate the overall maximum. This avoids adding several correlated columns as though they were independent votes. It remains an APF candidate scorer requiring experiments.
+
+## From five measurements to one group finding
+
+For each feature j, the fit interval freezes its median m_j and the sorted absolute deviations d_ij. A later value uses s_j = -log2((1 + number of fit deviations at least abs(x_j - m_j))/(n_fit + 1)). The group statistic is max(s_j), not a sum of votes. The later calibration interval records group statistics; its inclusive upper-tail rank is (1 + number of calibration statistics at least the current statistic)/(n_cal + 1). A second maximum across the qualified groups is calibrated directly on complete calibration rows for the overall finding. Missing required measurements produce insufficient evidence.
+
+The +1 rank/tie convention follows [conformal outlier research](https://doi.org/10.1214/22-AOS2244). Formal validity needs assumptions about reference/test sampling; network time series have dependence and drift, so this implementation makes no distribution-free real-network false-alarm guarantee. See [non-exchangeable calibration](https://jmlr.org/papers/v25/23-1553.html). A tail rank is not malicious probability, and repeated windows/devices still need a campaign-level alert/action budget.
+
+For example, G1's current site mean, SD and CV may all change during one workload shift. That is one rhythm finding with supporting values. With low mean/SD support, a clock-resolution problem or a legitimate newly periodic sensor, the correct result can be insufficient evidence or an unusual-but-benign finding. Confirm attack mechanisms using G11/service outcomes, signatures or independent application evidence before claiming malicious behavior.
+
+## Per-group and per-feature recommendations
+
+Each table row names an actual current column. Formulas below are recommended measurement contracts, not a claim that every legacy proxy already implements the recommendation. Compare the stated current limits with source and the [existing rationale](/architecture/feature-rationale). Reference-source tables summarize shared requirements; thresholds and model choices still need matched benign controls and ablation.
+
+## G1: Timing and burst rhythm
+
+**Preferred method:** Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.
+
+**Current boundary:** Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.
+
+Primary basis: [Pébay, numerically stable one-pass moments](https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/), [NIST coefficient of variation](https://itl.nist.gov/div898/software/dataplot/refman2/auxillar/coefvari.htm), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/), [Kitsune, NDSS 2018](https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_03A-3_Mirsky_paper.pdf).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `inter_arrival_mean` | seconds | Mean of consecutive event-time gaps in a declared direction/key; retain interval count and timestamp resolution. |
+| legacy / `inter_arrival_std` | seconds | Sample SD of consecutive event-time gaps using stable online moments; at least two valid intervals. |
+| legacy / `inter_arrival_cv` | dimensionless | Sample SD / positive mean of gaps; report interval count, ties/reorders and timestamp resolution. |
+| legacy / `inter_arrival_min` | seconds | Minimum genuine adjacent event-time gap; distinguish quantized timestamps and duplicate observations. |
+| legacy / `inter_arrival_max` | seconds | Maximum adjacent gap, with idle/window censoring recorded rather than invented connection termination. |
+| legacy / `burst_count` | episodes | Count disjoint over-threshold subwindow episodes using a threshold frozen from reference data; qualify timescale. |
+| legacy / `burst_duration_avg` | seconds, new contract | Mean duration of defined episodes; legacy emits milliseconds and needs an explicit versioned conversion. |
+| site_v3 / `inter_arrival_mean` | seconds | Mean of consecutive event-time gaps in a declared direction/key; retain interval count and timestamp resolution. |
+| site_v3 / `inter_arrival_std` | seconds | Sample SD of consecutive event-time gaps using stable online moments; at least two valid intervals. |
+| site_v3 / `inter_arrival_cv` | dimensionless | Sample SD / positive mean of gaps; report interval count, ties/reorders and timestamp resolution. |
+
+## G2: Directionality and asymmetry
+
+**Preferred method:** Use canonical biflow identity, declared originator/responder direction and matching exposure/byte layer. Preserve no-reply and unseen-reply as distinct states.
+
+**Current boundary:** Legacy reverse aggregates are IP-pair/protocol, not full sessions; +1 ratio smoothing and raw reply ratio are not success probabilities.
+
+Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `fwd_packet_count` | packets | Count originator packets in an identity/context-bound canonical bidirectional session or declared device window. |
+| legacy / `bwd_packet_count` | packets | Count matched responder packets for that same canonical session/context; report observation coverage. |
+| legacy / `fwd_bwd_packet_ratio` | dimensionless | Forward / reverse packet count with explicit denominator and undefined/no-reply state; smoothing must be declared. |
+| legacy / `fwd_bwd_bytes_ratio` | dimensionless | Forward / reverse bytes at the same layer; preserve zero-denominator state and optional declared log-ratio. |
+| legacy / `fwd_avg_packet_size` | captured bytes | Forward captured bytes / forward packets; null with no forward support. |
+| legacy / `bwd_avg_packet_size` | captured bytes | Reverse captured bytes / reverse packets; null with no reverse support. |
+| legacy / `reply_rate` | fraction or named packet ratio | Use matched request-response successes / eligible requests for true responsiveness; raw reverse/forward counts are a different metric. |
+
+## G3: TCP lifecycle proxies
+
+**Preferred method:** Use bounded persistent sequence-aware TCP state, deduplicated attempts, explicit timeout/censoring and matched completion outcomes.
+
+**Current boundary:** Legacy completed_sessions is a 0/1 window proxy and incomplete_ratio uses +1 smoothing. Exact session state is planned.
+
+Primary basis: [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `syn_ack_ratio` | dimensionless | Separate initial SYN attempts from retransmissions; compare eligible handshakes with matching SYN-ACK/ACK progression. |
+| legacy / `completed_sessions` | sessions | Count sequence-consistent established sessions in a bounded persistent five-tuple state machine, not a window-level Boolean. |
+| legacy / `incomplete_ratio` | fraction | Uncompleted eligible attempts / eligible attempts after an explicit timeout; distinguish pending, censored and unobserved. |
+| legacy / `avg_session_duration` | seconds | Mean actual completed-session lifetime by declared start/end criteria; unfinished sessions are censored. |
+
+## G4: Distribution entropy
+
+**Preferred method:** Use categorical frequencies, Shannon H=-sum(p*log2(p)), count, richness and top share together. Test bias/normalization and distribution divergence under matched support.
+
+**Current boundary:** Legacy size entropy is captured-frame size, not application payload. Entropy needs sample/context controls; high or low alone is not malicious.
+
+Primary basis: [Lakhina/Crovella/Diot feature-distribution research](https://cs-pub.bu.edu/faculty/crovella/anomalies.html), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `payload_size_entropy` | bits | Shannon entropy of the declared length categories; captured-frame size and payload length must have different names/contracts. |
+| legacy / `src_port_entropy` | bits | Shannon entropy of source-port frequencies at a source/context/horizon scope; report sample count and category richness. |
+| legacy / `icmp_type_entropy` | bits | Shannon entropy of observed ICMP family/type/code categories; separate IPv4/IPv6 and diagnostic traffic. |
+
+## G5: ARP binding behavior
+
+**Preferred method:** Use chronological ARP request/reply and time-valid authenticated lease/port/binding context. Retain gratuitous/probe/failover controls.
+
+**Current boundary:** Legacy unsolicited/binding heuristics are not exact request matching. ARP does not cover IPv6 NDP and first-seen bindings can be poisoned.
+
+Primary basis: [RFC 5227 legitimate IPv4 probes and announcements](https://datatracker.ietf.org/doc/rfc5227/), [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `arp_reply_rate` | messages/second | Observed ARP replies / actual elapsed observation interval; retain count and packet loss context. |
+| legacy / `arp_request_rate` | messages/second | Observed ARP requests / actual elapsed interval; classify legitimate probes/announcements separately. |
+| legacy / `arp_reply_request_ratio` | dimensionless | Replies / requests with explicit zero state; exact request/reply correlation is preferable for unsolicited claims. |
+| legacy / `arp_gratuitous_count` | messages | Count defined ARP announcement forms without equating legitimate announcements with poisoning. |
+| legacy / `arp_unsolicited_count` | messages | Time-correlate replies with outstanding requests and verified binding evidence; record expired/missing request visibility. |
+| legacy / `mac_ip_binding_changes` | binding events | Count changes against time-valid MAC-to-IP sets/leases, allowing legitimate multi-address ownership. |
+| legacy / `ip_mac_binding_changes` | binding events | Count conflicting IP-to-MAC claims against verified leases/ports/time; separate DHCP reuse/failover. |
+
+## G6: Packet-size distribution
+
+**Preferred method:** Use stable sample moments plus declared size-band proportions. Retain support, frame layer/MTU/offloads and matched-volume benign controls.
+
+**Current boundary:** Legacy small-packet boundary is below 64 captured bytes; site currently exports the outgoing size SD and BASE mean only.
+
+Primary basis: [Pébay, numerically stable one-pass moments](https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `pkt_size_std` | captured bytes | Sample SD of explicitly defined captured sizes using online moments; keep n and compare protocol/role context. |
+| legacy / `pkt_size_variance` | captured bytes squared | Sample variance M2/(n-1); ablate against SD because the two encode the same scalar information. |
+| legacy / `small_pkt_ratio` | fraction | Count sizes below a declared byte boundary / observed packets; boundary and encapsulation are part of the schema. |
+| legacy / `large_pkt_ratio` | fraction | Count sizes above a declared boundary / observed packets; qualify MTU/offload effects and sample support. |
+| site_v3 / `packet_size_std` | captured bytes | Online sample SD of outgoing sizes, null below two observations. |
+
+## G7: Port-use structure
+
+**Preferred method:** Use categorical port concentration, service edges and arrival-ordered probe patterns; compare a role/service baseline rather than numeric port distances.
+
+**Current boundary:** Legacy sequential score sorts a set, so it is density, not scan order; its ephemeral predicate excludes boundary 49152.
+
+Primary basis: [MITRE ATT&CK network service discovery](https://attack.mitre.org/techniques/T1046/), [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `top_dst_port` | categorical identifier | Mode destination-port category; use service semantics/categorical encoding, not numeric distance. |
+| legacy / `top_dst_port_ratio` | fraction | Packets to the modal destination port / eligible transport packets at a declared source/horizon scope. |
+| legacy / `dst_port_std` | port-number units, heuristic | Prefer categorical concentration/entropy and service classes; integer port-number SD is only a legacy heuristic. |
+| legacy / `well_known_port_ratio` | fraction | Eligible contacts or packets to ports 0–1023 / corresponding eligible total; state which weighting is used. |
+| legacy / `ephemeral_port_ratio` | fraction | Eligible contacts or packets to ports 49152–65535 inclusive / eligible total; qualify OS-specific client behavior. |
+| legacy / `sequential_port_score` | fraction | Compute adjacency from actual arrival-ordered probes for an order metric; sorted-set density must remain separately named. |
+
+## G8: Broadcast and multicast context
+
+**Preferred method:** Use separate Ethernet broadcast/multicast and ARP denominator counts with VLAN/site context. Preserve legitimate discovery and malicious storms.
+
+**Current boundary:** Current site does not reproduce the complete legacy network-ratio set; high broadcast share is not an automatic benign exemption.
+
+Primary basis: [RFC 5227 legitimate IPv4 probes and announcements](https://datatracker.ietf.org/doc/rfc5227/), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `is_broadcast_dst` | indicator | Ethernet destination broadcast indicator, with VLAN/scope and IP broadcast interpretation explicitly distinguished. |
+| legacy / `broadcast_ratio` | fraction | Broadcast frames / all frames at the identical observation boundary and horizon. |
+| legacy / `multicast_ratio` | fraction | Multicast frames / all observed frames; distinguish multicast from Ethernet broadcast in the implementation. |
+| legacy / `arp_broadcast_ratio` | fraction | Broadcast ARP messages / observed ARP messages; retain support and legitimate address-resolution controls. |
+
+## G9: Flow creation pressure
+
+**Preferred method:** Count new canonical keys, active sessions and actual resource occupancy separately; measure exposure and state eviction.
+
+**Current boundary:** Legacy flows_per_window counts its four-field keys and an overflow aggregation cap, not switch-table occupancy or established sessions.
+
+Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html), [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `flows_per_window` | new keys/window | Count new canonical connection/flow keys with LRU/time bounds; separate new arrivals from active entries and sessions. |
+
+## G10: Audit metadata and provenance
+
+**Preferred method:** Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.
+
+**Current boundary:** Audit values, tool names, window identifiers and truth fields must not become attacker predictors.
+
+Primary basis: [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `meta_window_id` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `meta_src_mac_oui` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `meta_device_name` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `meta_attack_tool` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `meta_attack_intensity` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `meta_mininet_event` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `meta_controller_load` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `meta_backlog_drops` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `schema_version` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `run_id` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `window_start_utc` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `window_end_utc` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `window_seconds` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `device_ip` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `vlan` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `ground_truth` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `metadata_enabled` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `content_enabled` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `history_restarted` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `cardinality_overflows_total` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| site_v3 / `window_complete` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+
+## G11: Reconnaissance evidence
+
+**Preferred method:** Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.
+
+**Current boundary:** Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.
+
+Primary basis: [MITRE ATT&CK network service discovery](https://attack.mitre.org/techniques/T1046/), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html), [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| site_v3 / `g11_null_flag_count` | packets | Count eligible TCP flags exactly zero; correlate with exploration/responses and authorized scans. |
+| site_v3 / `g11_xmas_flag_count` | packets | Count TCP FIN+PSH+URG combinations under an explicit mask; malformed and partial capture are controls. |
+| site_v3 / `g11_fin_no_ack_count` | packets | Count FIN without ACK; distinguish session context and retransmissions before attributing reconnaissance. |
+| site_v3 / `g11_syn_count` | packets | Count SYN without ACK; a new-session attempt metric needs retransmission/tuple deduplication. |
+| site_v3 / `g11_rst_in_count` | packets | Count incoming resets; matched-probe outcomes require five-tuple/sequence correlation, currently absent. |
+| site_v3 / `g11_icmp_port_unreachable_in` | messages | Count IPv4 destination-port-unreachable observations; exact original-probe attribution and IPv6 handling need quoted-header parsing. |
+| site_v3 / `g11_dst_ip_count` | categories | Distinct outgoing peers per device/VLAN/window, with cap evidence and benign discovery controls. |
+| site_v3 / `g11_dst_port_count` | categories | Distinct outgoing destination ports at the same device/window scope, with cap evidence. |
+| site_v3 / `g11_service_edge_count` | categories | Distinct destination/protocol/port edges; distinguish host sweeps, vertical scans and ordinary application fan-out. |
+
+## G12: Header and evasion evidence
+
+**Preferred method:** Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.
+
+**Current boundary:** Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.
+
+Primary basis: [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| site_v3 / `g12_ttl_mean` | IP hop field units | Mean observed outgoing TTL/hop-limit; retain family/protocol/peer/context and actual header sample count. |
+| site_v3 / `g12_ttl_std` | IP hop field units | Sample SD of eligible outgoing TTL/hop-limit observations; not a distance from a known OS identity. |
+| site_v3 / `g12_ttl_residual` | IP hop field units | Current TTL mean minus prior baseline computed before update; declare EWMA decay and routing/OS-change controls. |
+| site_v3 / `g12_tcp_window_mean` | unscaled TCP window units | Mean raw advertised windows with TCP option context; negotiated scaling is required for effective receive-window bytes. |
+| site_v3 / `g12_tcp_window_std` | unscaled TCP window units | Sample SD of eligible raw advertised windows; retain counts/options and benign congestion/zero-window context. |
+| site_v3 / `g12_zero_window_count` | packets | Count eligible TCP advertisements equal to zero; normalize by TCP support only in a separately defined ratio. |
+| site_v3 / `g12_fragment_count` | packets | Count fragment observations per address family; overlap/evasion decisions need bounded reassembly/state. |
+| site_v3 / `g12_tiny_fragment_count` | packets, proxy | Define fragment payload/header size thresholds by family; current captured-frame-below-64 proxy is not semantic reassembly. |
+
+## G13: Long-horizon contacts
+
+**Preferred method:** Use bounded event-time histories with declared expiry/precision; compare 5s, minute and hour scopes. Evaluate actual per-peer contact timing and change-point tests.
+
+**Current boundary:** Current rolling values are minute-bucket approximations; periodicity is contact-window CV, not a packet beacon detector.
+
+Primary basis: [NIST EWMA control charts](https://itl.nist.gov/div898/handbook/pmc/section3/pmc314.htm), [NIST CUSUM control charts](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc323.htm), [Kitsune, NDSS 2018](https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_03A-3_Mirsky_paper.pdf).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| site_v3 / `g13_dst_ips_hour_bucketed` | categories | Union peer sets in retained minute buckets; exact rolling-hour boundaries need event-time expiry or reported bucket uncertainty. |
+| site_v3 / `g13_dst_ports_10m_bucketed` | categories | Union retained port sets over the declared bucket horizon; record caps and boundary approximation. |
+| site_v3 / `g13_out_bytes_hour_bucketed` | captured bytes | Sum outgoing byte counters over retained buckets with exposure/idle gaps and expiry explicit. |
+| site_v3 / `g13_window_contacts_hour_bucketed` | device windows | Count retained windows containing device observations; it is not individual sessions or per-peer contacts. |
+| site_v3 / `g13_pair_interval_cv_mean` | dimensionless | Mean supported per-peer CV of window-contact intervals; packet/session-contact periodicity requires a separate event definition. |
+| site_v3 / `g13_pair_interval_supported_pairs` | pairs | Report how many pair histories support the CV; a support qualifier rather than an independent malicious vote. |
+
+## G14: Service initiation behavior
+
+**Preferred method:** Use deduplicated initiation/outcome evidence, direction/role and application/auth receipts. Test upload/download, games and updates at matched rates.
+
+**Current boundary:** Current SYN/raw byte/payload proxies cannot measure authenticated failures or successful logins.
+
+Primary basis: [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html), [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html), [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| site_v3 / `g14_new_syn_rate` | packets/second, proxy | SYN-without-ACK observations / window exposure; new-session rate requires deduplication and state. |
+| site_v3 / `g14_auth_syn_count` | packets, proxy | SYN attempts toward configured authentication-related ports; outcomes require authentication logs/session joins. |
+| site_v3 / `g14_out_in_bytes_ratio` | dimensionless | Outgoing / incoming captured bytes with explicit denominator; null if no incoming bytes. |
+| site_v3 / `g14_out_payload_bytes` | payload bytes | Sum parsed outgoing transport payload lengths after excluding padding; not confirmed application upload or goodput. |
+
+## G15: DNS metadata
+
+**Preferred method:** Parse supported DNS transactions, normalize names consistently, retain denominator/support and compare length/label/type/response/novelty jointly.
+
+**Current boundary:** Current parser is single-question UDP DNS; no TCP reassembly, DoH/DoT decryption, registrable-domain extraction or exact transaction matching.
+
+Primary basis: [Zeek DNS transaction evidence](https://docs.zeek.org/en/master/reference/logs/dns.html), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| site_v3 / `g15_query_count` | messages | Count supported DNS query messages; transactions require tuple/ID/qname/time correlation and retransmission handling. |
+| site_v3 / `g15_response_count` | messages | Count supported DNS responses; do not equate responses with distinct successful transactions. |
+| site_v3 / `g15_nxdomain_response_ratio` | fraction | NXDOMAIN responses / supported observed DNS responses, retaining denominator and response matching limitations. |
+| site_v3 / `g15_qname_length_mean` | qname bytes | Mean canonical wire/name length per supported query; define labels/trailing dot/IDNA handling. |
+| site_v3 / `g15_qname_entropy_mean` | bits per name distribution | Mean character-distribution entropy of supported qnames; condition on length/label position and legitimate CDN names. |
+| site_v3 / `g15_distinct_qname_hashes` | categories | Count distinct normalized qname hashes; not registrable domains or authenticated destination identities. |
+| site_v3 / `g15_txt_null_query_count` | messages | Count supported TXT/NULL query types; compare with DNS-SD/SPF/DKIM and enterprise discovery controls. |
+
+## G16: TLS and QUIC evidence
+
+**Preferred method:** Reassemble/validate supported handshake evidence and distinguish observed, encrypted, truncated and unsupported. Compare stable fingerprint versions and novelty by context.
+
+**Current boundary:** Current custom first-packet fingerprint is not JA4; TLS 1.3 hides certificate contents after ServerHello and QUIC needs a distinct parser.
+
+Primary basis: [RFC 8446 TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446.html), [RFC 9000 QUIC](https://www.rfc-editor.org/rfc/rfc9000.html), [FoxIO fingerprint definition and scope](https://github.com/FoxIO-LLC/ja4/blob/main/README.md).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| site_v3 / `g16_complete_clienthello_count` | parsed records | Count complete supported ClientHellos; retain separate counters for incomplete, unsupported and reassembly-limited observations. |
+| site_v3 / `g16_no_sni_count` | parsed records | Count missing SNI only among fully parsed supported ClientHellos; absence is not a malicious verdict. |
+| site_v3 / `g16_ech_count` | extension observations | Count observed ECH extension indications, including possible GREASE; not proof that decryption succeeded or a hidden malicious name exists. |
+| site_v3 / `g16_distinct_custom_fingerprints` | categories | Count current custom handshake hashes; standardized JA4 requires exact specification/interoperability qualification. |
+
+## G17: HTTP behavior and lexical evidence
+
+**Preferred method:** Reconstruct HTTP transactions at an authorized plaintext point, preserve raw versus bounded canonical target semantics, and join application/auth outcomes.
+
+**Current boundary:** Current single-packet HTTP/1 lexical metrics cannot prove SQLi, XSS, RCE, authorization abuse or exploit success.
+
+Primary basis: [RFC 9110 HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html), [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| site_v3 / `g17_complete_http_requests` | parsed requests | Count complete supported HTTP/1 headers; request reconstruction across TCP segments and HTTP/2/3 are separate work. |
+| site_v3 / `g17_rare_method_count` | parsed requests | Count methods outside the explicit configured set; protocol-legal methods are not attacks by themselves. |
+| site_v3 / `g17_uri_length_mean` | request-target bytes | Mean length over supported request targets; preserve raw/normalized representation and privacy boundaries. |
+| site_v3 / `g17_uri_entropy_mean` | bits per target distribution | Mean categorical byte entropy of request targets, conditioned on length and route/parameter roles. |
+| site_v3 / `g17_uri_encoded_ratio_mean` | fraction | Mean declared percent-encoding density per supported target; distinguish valid escapes and bounded normalization. |
+| site_v3 / `g17_uri_special_ratio_mean` | fraction | Mean fraction of the explicitly defined character set per target; distinguish legitimate search/encoded content. |
+
+## G18: Resource and state exhaustion
+
+**Preferred method:** Join new/active state, retransmissions, queue/CPU/memory pressure and target progress; measure sustained resource exhaustion with normal busy controls.
+
+**Current boundary:** Planned; no declared new measurements are installed by this research/scoring milestone.
+
+Primary basis: [RFC 9293 TCP state and sequence semantics](https://www.rfc-editor.org/rfc/rfc9293.html), [Zeek connection log](https://docs.zeek.org/en/master/reference/logs/conn.html), [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## G19: Identity conflict and reassignment
+
+**Preferred method:** Join time-valid DHCP/ARP/NDP/switch/AAA identity evidence, competing claims, reassignment and NAT context; abstain on ambiguous identity.
+
+**Current boundary:** Planned beyond the existing manual inventory consistency subset; IP/MAC agreement is not authentication.
+
+Primary basis: [RFC 5227 legitimate IPv4 probes and announcements](https://datatracker.ietf.org/doc/rfc5227/), [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html), [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## G20: Management and SD-WAN control plane
+
+**Preferred method:** Use authenticated SD-WAN/router audit events, adjacency/session churn, configuration revisions and path outcomes, conditioned on planned maintenance.
+
+**Current boundary:** Planned; encrypted control protocols and missing vendor logs must remain unobserved.
+
+Primary basis: [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/), [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## G21: Credential abuse and lateral transitions
+
+**Preferred method:** Correlate identity-bound authentication attempts/results, host-to-service transitions and lateral sequence evidence across windows.
+
+**Current boundary:** Planned; a port counter or response length is not an authentication result.
+
+Primary basis: [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/), [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## G22: Application authorization abuse
+
+**Preferred method:** Evaluate user/tenant/resource/action sequences against application authorization state and independent target receipts.
+
+**Current boundary:** Planned; transport statistics cannot determine business authorization on encrypted APIs.
+
+Primary basis: [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/), [RFC 9110 HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## G23: Command-and-control and exfiltration
+
+**Preferred method:** Combine peer novelty, periodicity/change, DNS/TLS context and unusual egress conditioned on role/scheduled jobs. Validate jittered/slow campaigns and benign backups.
+
+**Current boundary:** Planned comprehensive C2/exfiltration evidence; existing G13/G15/G16 are smaller measurement foundations.
+
+Primary basis: [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/), [Kitsune, NDSS 2018](https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_03A-3_Mirsky_paper.pdf), [Zeek DNS transaction evidence](https://docs.zeek.org/en/master/reference/logs/dns.html).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## G24: Exploitation outcome evidence
+
+**Preferred method:** Correlate reconstructed request, policy decision and independently observed endpoint/application outcome; separate attempted, blocked and successful exploitation.
+
+**Current boundary:** Planned; a suspicious URI or high anomaly score does not establish compromise.
+
+Primary basis: [OWASP application-security evidence and testing](https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/), [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## BASE: Base traffic measurements
+
+**Preferred method:** Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.
+
+**Current boundary:** Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.
+
+Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html), [Pébay, numerically stable one-pass moments](https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `timestamp` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `src_ip` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `dst_ip` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `src_port` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `dst_port` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `protocol` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `flow_duration` | seconds | Last minus first event time for an observed flow, separately retaining window exposure and censoring; no singleton rate inflation. |
+| legacy / `total_packets` | packets | Exact accepted observations with direction/duplication/sampling boundaries; report independently measured drops. |
+| legacy / `total_bytes` | captured bytes | Sum observed captured frame lengths at a stated layer; not application goodput or wire-rate including FCS/preamble. |
+| legacy / `avg_packet_size` | captured bytes | Sum captured sizes / count at the same direction/key, null with zero support. |
+| legacy / `min_packet_size` | captured bytes | Minimum supported observed captured size; retain sample count, byte layer and truncation/offload flags. |
+| legacy / `max_packet_size` | captured bytes | Maximum supported observed captured size; retain sample count, byte layer and MTU/offload/truncation context. |
+| legacy / `packets_per_second` | packets/second | Count / recorded exposure interval for a window rate; flow active-span rate requires a separate name and singleton state. |
+| legacy / `bytes_per_second` | captured bytes/second | Captured bytes / recorded exposure; do not conflate bytes with bits or active span with full window. |
+| legacy / `syn_count` | packets | Count observed packets carrying SYN, with TCP eligibility and retransmission context; flags are not sessions. |
+| legacy / `ack_count` | packets | Count observed packets carrying ACK, with TCP eligibility and retransmission context; flags are not sessions. |
+| legacy / `fin_count` | packets | Count observed packets carrying FIN, with TCP eligibility and retransmission context; flags are not sessions. |
+| legacy / `rst_count` | packets | Count observed packets carrying RST, with TCP eligibility and retransmission context; flags are not sessions. |
+| legacy / `psh_count` | packets | Count observed packets carrying PSH, with TCP eligibility and retransmission context; flags are not sessions. |
+| legacy / `unique_src_ports` | categories | Distinct source ports in a declared source/context/horizon; retain cardinality support and capping/sketch uncertainty. |
+| legacy / `unique_dst_ports` | categories | Distinct destination ports at source/context/horizon scope rather than one fixed-port flow. |
+| site_v3 / `out_packets` | packets | Count locally attributed outgoing observations at the declared IP/VLAN boundary, including explicit omissions. |
+| site_v3 / `in_packets` | packets | Count locally attributed incoming observations at the identical boundary; qualify both directions. |
+| site_v3 / `out_bytes` | captured bytes | Sum outgoing captured frame bytes; distinguish endpoint identity from pre/post-NAT identities. |
+| site_v3 / `in_bytes` | captured bytes | Sum incoming captured frame bytes at the same scope and horizon. |
+| site_v3 / `out_pps` | packets/second | Outgoing observations / actual recorded window exposure; incomplete windows remain ineligible for this scorer. |
+| site_v3 / `out_bytes_per_second` | captured bytes/second | Outgoing captured bytes divided by actual recorded window exposure; retain incomplete-window and byte-layer context. |
+| site_v3 / `packet_size_mean` | captured bytes | Online mean outgoing frame size with explicit sample count, direction and byte layer. |
+
+## DEVICE: Device-relative history
+
+**Preferred method:** Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.
+
+**Current boundary:** Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.
+
+Primary basis: [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html), [NIST outlier diagnostics](https://itl.nist.gov/div898/handbook/eda/section3/eda35h.htm), [NIST EWMA control charts](https://itl.nist.gov/div898/handbook/pmc/section3/pmc314.htm), [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `device_total_flows` | observations | Support count for a defined device identity; use to gate confidence, not as attack identity. |
+| legacy / `device_avg_pkt_rate` | packets/second | Prior-only reviewed baseline rate; if using EWMA declare elapsed-time decay and context. |
+| legacy / `device_pkt_rate_deviation` | standardized residual | Score current rate against a frozen prior device/context baseline; compare robust median/MAD and empirical tails. |
+| legacy / `device_avg_byte_rate` | bytes/second | Prior-only reviewed baseline byte rate at the same byte layer/exposure. |
+| legacy / `device_byte_rate_deviation` | standardized residual | Prior-baseline residual with zero-scale and missingness handling; never return normal merely because variance is zero. |
+| legacy / `device_unique_dst_ips` | categories | Distinct peers within the documented horizon and identity scope, with caps reported. |
+| legacy / `device_unique_dst_ports` | categories | Distinct peer-service contacts within documented horizon; preserve cap and eligibility evidence. |
+| legacy / `device_new_dst_ratio` | fraction | Size(current peers minus retained prior peers) / size(current peers), computed before history update; null for empty support. |
+| legacy / `device_protocol_dist_tcp` | fraction | Eligible prior TCP observations / all declared protocol observations; preserve OTHER and observation weighting. |
+| legacy / `device_protocol_dist_udp` | fraction | Eligible prior UDP observations / all declared protocol observations; preserve OTHER and observation weighting. |
+| legacy / `device_protocol_dist_icmp` | fraction | Eligible prior ICMP observations / all declared protocol observations; preserve OTHER and observation weighting. |
+| legacy / `device_avg_payload_size` | declared bytes | Use true transport payload lengths for a payload metric; current legacy inputs are average packet sizes and require a migration. |
+| legacy / `device_payload_size_deviation` | standardized residual | Compare the same byte-layer metric against its prior baseline with robust/empirical alternatives. |
+| legacy / `is_registered_iot` | inventory indicator | Time-valid independent inventory metadata; qualify leakage/role errors and never treat registration as evidence of benignness. |
+| legacy / `is_gateway` | inventory indicator | Time-valid role/context signal; independently verify topology and avoid memorizing device identities. |
+| legacy / `device_age_seconds` | seconds | Elapsed event-time identity lifetime with restart/reassignment explicit; confidence context, not an attack predictor. |
+| legacy / `is_baseline_mature` | eligibility indicator | Evidence-backed support/workload-coverage gate; twenty flows/180 seconds is a legacy heuristic, not reliability proof. |
+| site_v3 / `device_new_dst_ratio` | fraction | Size(current peers minus retained prior peers) / size(current peers), computed before history update; null for empty support. |
+| site_v3 / `device_macs_observed` | categories | Distinct observed outgoing MAC claims for an IP/VLAN window; use authenticated lease/port context before identity action. |
+| site_v3 / `profile_windows_before` | windows | Prior-history support count, excluded from the new scorer as an age/support field. |
+
+## NETWORK: Network-wide context
+
+**Preferred method:** Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.
+
+**Current boundary:** Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.
+
+Primary basis: [Lakhina/Crovella/Diot feature-distribution research](https://cs-pub.bu.edu/faculty/crovella/anomalies.html), [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/), [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `network_active_flows` | keys | Active keys at a named observation scope, distinct from newly created sessions and actual switch occupancy. |
+| legacy / `network_total_pps` | packets/second | Total accepted packet count / actual network-window exposure; preserve scope and drops. |
+| legacy / `network_total_bps` | bytes/second, legacy name | Total captured bytes / actual window exposure; legacy bps here is bytes, not bits. |
+| legacy / `network_unique_src_ips` | categories | Distinct source identities at the sensor scope/horizon with NAT and address reuse explicit. |
+| legacy / `network_unique_dst_ips` | categories | Distinct destination identities at the declared site/window scope, with visibility, sampling and capping evidence. |
+| legacy / `network_avg_flow_duration` | seconds | Mean observed active spans with singleton/censoring behavior explicit; separate from exposure duration. |
+| legacy / `network_entropy_src_ip` | bits | Entropy of source-frequency categories plus sample size/richness; compare eligible site/context baselines. |
+| legacy / `network_entropy_dst_port` | bits | Shannon entropy of destination-port frequency categories at the declared site/context/horizon scope, retaining sample support. |
+| legacy / `active_snort_alerts` | detector observations | Separate signature-derived evidence from behavior-only model inputs and independent ground truth. |
+| legacy / `distinct_alert_types` | detector categories | Count mapped alert categories with GID/SID/ruleset provenance; avoid circular behavioral evaluation. |
+
+## LABELS: Independent truth and detector labels
+
+**Preferred method:** Assign independent scenario/target truth separately from detector output; retain UNKNOWN and exclude labels from predictors.
+
+**Current boundary:** Legacy normal defaults and Snort/rate-derived labels are not independent benign/malicious truth.
+
+Primary basis: [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp), [Sommer/Paxson, operational NIDS limitations](https://gangw.cs.illinois.edu/class/cs562/papers/Closed_World-IDS-sp10.pdf).
+
+| Schema / column | Units | Recommended measurement |
+| --- | --- | --- |
+| legacy / `label` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `attack_type` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+| legacy / `snort_sid` | audit/categorical | Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs. |
+
+## QUALITY: Observation quality and missingness
+
+**Preferred method:** Measure clock, loss, truncation, parser support, capping, identity and missingness; report coverage and abstention separately from detection.
+
+**Current boundary:** Several capture-quality counters are not repeated in CSV rows. The new offline scorer cannot establish physical visibility from CSV alone.
+
+Primary basis: [RFC 5475 packet selection and measurement interpretation](https://www.rfc-editor.org/info/rfc5475/), [Arp et al., security ML evaluation pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## POLICY: Behavior-to-policy context
+
+**Preferred method:** Join observations to time-valid identity/NAT/session, exact firewall revision, matching rule and independent forwarding outcome.
+
+**Current boundary:** Planned behavior-to-native-policy correlation; current operator-model/shadow rules are not this complete join.
+
+Primary basis: [RFC 5103 bidirectional flow export](https://www.rfc-editor.org/rfc/rfc5103.html), [RFC 8520 intended device communication](https://www.rfc-editor.org/rfc/rfc8520.html), [MITRE detection strategies](https://attack.mitre.org/detectionstrategies/).
+
+No additional source columns are claimed for this category. Establish the required observation/parsing/context and independent fixtures before adding a versioned measurement.
+
+## Select models by measured yield
+
+The installed comparator uses marginal feature deviations and their maxima. It does not learn joint covariance, causal attack chains, service-specific state or time-of-day workload modes. A changed combination of otherwise familiar marginal values can be missed; a harmless new workload can be unusual. Discrete/constant references also limit rank resolution. These are reasons to compare it against qualified joint models and mechanism-specific evidence, not reasons to call every group flag malicious.
+
+Start with the transparent group-rank baseline and the existing RF as separate comparators. Evaluate group-specific autoencoders or lightweight ensembles as candidates; [Kitsune](https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_03A-3_Mirsky_paper.pdf) supports studying efficient multi-scale channels and autoencoder ensembles, not assuming the same accuracy transfers here. Per-group models can also miss cross-group interactions, so evaluate a combined model and mechanism-level corroboration.
+
+Fit preprocessing and any resampling only inside a training split defined by campaign/device/time before rows are generated or mixed. Reserve calibration and later benign/attack tests. Calibrate RF scores on independent data and check reliability as well as discrimination; [scikit-learn calibration](https://scikit-learn.org/stable/modules/calibration) explains why training predictions bias a calibrator. Keep AE reconstruction deviation separate from probability.
+
+Optimize recall at a specified false-alert/action budget, with per-family recall, false alerts per device-day, missed/abstained coverage, precision-recall behavior, detection delay and CPU/drop/memory/storage measurements. Use group removal/retraining, matched-volume benign controls, changed tools/rates/payloads, new devices and later-time/site holdouts. [Security ML pitfalls](https://www.usenix.org/conference/usenixsecurity22/presentation/arp) and [operational NIDS limits](https://gangw.cs.illinois.edu/class/cs562/papers/Closed_World-IDS-sp10.pdf) motivate these controls. Accuracy on detector-generated labels is not independent confirmation.
+
+## Implementation order
+
+1. Use the existing golden/restart checks and real-data pilot to qualify the measurement boundary.
+2. Use this offline reference scorer to inspect supported current measurements. Review all excluded groups, missing support and benign alerts before interpreting yield.
+3. Implement exact session/probe correlation and reported sample support first (G2/G3/G11/G14); add packet-contact long-horizon state and qualified change statistics (G13). Compare EWMA and CUSUM under benign workload transitions, rather than assuming a universal threshold.
+4. Add bounded protocol reassembly and explicit encryption/unsupported outcomes (G15–G17), then independently bound resource/identity/control-plane/application outcomes (G18–G24).
+5. Train/calibrate schema-bound models and evaluate independent campaigns. Wire only qualified evidence into the later durable action lifecycle and vendor adapters, with separate containment/rollback proof.
+
+This advances the P2/P3 research foundations of S01–S07/S10–S11. It does not complete those services, provide online model promotion, prove unknown-attack recall or qualify automatic firewall reconfiguration.

@@ -1,0 +1,104 @@
+---
+title: "Inspect feature-group evidence offline"
+description: "Review measured columns against frozen, separately calibrated reference windows without changing collection or firewall rules."
+---
+
+## When to use this guide
+
+Continue [Stage A of the no-mirror pilot](/deployment/no-mirror-pilot) first. This optional research stage follows successful feature/capture checks and a closed real-data CSV. It is not a prerequisite for your first capture. The method inventory is under **Develop → Understand the design → Feature measurement methods and research**.
+
+The new tool calculates statistical evidence from existing site-v3 measurements. It does not rewrite packet calculations, train/promote RF/AE models, prove traffic benign/malicious or request a firewall change. The current live dashboard does not ingest these offline reports. Open the resulting private JSON to inspect group findings and their leading features.
+
+## 1. Prepare a closed, qualified research interval
+
+Use the pilot's private storage and interpreter variables on the t530. Audit the stopped original collection with the existing [quality procedure](/deployment/pretest-qualification). Keep the original paired evidence, schema/provenance and activity ledger. Do not inspect an actively written CSV.
+
+Choose one bounded site-v3 CSV with enough eligible windows per device. Input limits are 32 MiB and 4,096 rows per file, with at most 16 device/VLAN identities. References retain complete five-second rows, no recorded cardinality overflow and consistent inspection settings. Parser-derived summaries require support; history-dependent features remain unavailable during history warm-up. CSV-local checks do not establish capture completeness, authenticated identity or benign ground truth.
+
+The default split uses 64 fit windows, 128 later calibration windows and at least one subsequent inspection window **per included device**. Even continuous traffic needs over sixteen minutes for that minimum. A 20-minute active endpoint session may provide enough; sparse/idle traffic or quality exclusions can require more. A short smoke session does not establish a representative baseline. Prefer reviewed multi-session/day workload blocks for real evaluation. The present prepare command handles one bounded file; do not merge or relabel unrelated runs to satisfy a count.
+
+```bash
+source "$HOME/apf-pilot/active.env"
+cd "$APF_CODE"
+"$APF_ENV/bin/python" scripts/score_feature_groups.py --help
+read -r -p 'Path to a closed site-v3 research CSV: ' FEATURE_CSV
+FEATURE_STUDY="$APF_RUN/feature-study-01"
+"$APF_ENV/bin/python" scripts/score_feature_groups.py prepare \
+  --csv "$FEATURE_CSV" --output-dir "$FEATURE_STUDY" \
+  --fit-windows 64 --calibration-windows 128
+cat "$FEATURE_STUDY/selection.json"
+```
+
+The output directory must not already exist. A failed write can leave partial preparation files; inspect them and use a new experiment directory. The tool records omitted quality reasons and the SHA-256 of the exact bytes parsed. It checks core integer counters and count/exposure rate consistency, but does not replace the full collection auditor or change ground truth. Every included device needs all three chronological slices; otherwise preparation fails. Excluding a device from a research CSV must be an explicit documented selection, not silent omission.
+
+## 2. Review the reference slices before fitting
+
+Review fit.csv and calibration.csv against the private activity/incident ledger. Exclude known attacks, unexplained incidents, unacceptable capture loss and invalid identities. UNKNOWN in a collector row means unverified; it is not a benign label. The acknowledgment below records an operator choice of reference intervals, not certification of clean traffic. Known non-benign labels are refused.
+
+For a first comparison, start with G1 timing, G6 size dispersion and G11 reconnaissance summaries:
+
+```bash
+"$APF_ENV/bin/python" scripts/score_feature_groups.py fit \
+  --fit-csv "$FEATURE_STUDY/fit.csv" \
+  --calibration-csv "$FEATURE_STUDY/calibration.csv" \
+  --groups G1 G6 G11 --alpha 0.05 --min-samples 64 \
+  --reviewed-reference --output "$FEATURE_STUDY/reference.json"
+```
+
+Add other supported groups only after their observation/denominator conditions are reviewed: BASE, DEVICE, G12, G13, G14, G15, G16, G17. The default group selection excludes optional protocol parsing. Metadata groups need metadata enabled in both reference and inspected data; G17 needs content inspection. A group with insufficient supported calibration is excluded with a reason. A field unsupported in the fit data is listed as unavailable rather than converted to zero. The evidence scope is only the remaining qualified groups/features.
+
+| Current support gate | Minimum for this research tool |
+| --- | --- |
+| G1 interval mean | Two outgoing packets |
+| G1 interval SD/CV | Three outgoing packets; CV also needs a positive interval mean |
+| G6 size SD | Two outgoing packets |
+| G15 qname means / NXDOMAIN ratio | Ten supported queries / ten supported responses respectively |
+| G17 URI means | Ten supported complete requests |
+| G13 pair CV | At least one supported pair; history-dependent fields also require history warm-up complete |
+
+These are computability/engineering gates, not statistical-power or attack-confidence guarantees. The CSV does not include every exact parser/timestamp sample counter; qualify capture/reorder/parser loss separately. A very small positive mean can still be limited by timestamp resolution.
+
+At alpha 0.01, the empirical rank needs at least 99 supported calibration windows; the default 128-window preparation allows that resolution if enough complete group rows remain. This is a resolution floor, not proof of independence, representative workloads or a one-percent operational false-alert rate. Select alert budgets with independent later benign/attack campaigns.
+
+## 3. Inspect later data without updating the reference
+
+```bash
+"$APF_ENV/bin/python" scripts/score_feature_groups.py score \
+  --reference "$FEATURE_STUDY/reference.json" \
+  --csv "$FEATURE_STUDY/later.csv" \
+  --output "$FEATURE_STUDY/report.json"
+"$APF_ENV/bin/python" - "$FEATURE_STUDY/report.json" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding='utf-8') as source:
+    report = json.load(source)
+print(report['verdict_counts'])
+for row in report['rows']:
+    if row['verdict'] != 'WITHIN_REFERENCE':
+        print(row['window_start_utc'], row['verdict'], row.get('reasons', []))
+        for group, finding in row['groups'].items():
+            if finding['status'] != 'WITHIN_REFERENCE':
+                print(group, finding)
+PY
+```
+
+All files remain private: addresses, workload numbers and inspection choices can be sensitive. Outputs are new-only. A method-code change invalidates a loaded reference for this CLI, requiring review/rebuild. Hashes detect byte/configuration drift but do not authenticate a reviewer or make an edited reference trustworthy. The reference does not adapt while scoring.
+
+## Interpret the results
+
+| Result | Meaning | Next step |
+| --- | --- | --- |
+| WITHIN_REFERENCE | Current supported statistics lie within the selected reference-tail criterion | Retain its limited scope; this does not prove traffic benign or rule out an unobserved attack. |
+| REVIEW_ANOMALY | Overall maximum is unusual relative to complete held-out calibration rows | Inspect leading measurements, workload/identity/quality and independent scenario truth. |
+| INSUFFICIENT_EVIDENCE | Identity/settings/time/support/quality or complete global calibration is unavailable | Resolve the recorded reason; do not map this to normal. |
+| Group UNUSUAL while overall is within reference | A local group tail differs; the separately calibrated overall criterion did not flag | Inspect as diagnostic evidence, without counting several correlated columns as independent votes. |
+
+Each group includes its empirical calibration-tail rank, sample count and up to five leading feature values/fit-tail ranks. Median/MAD and a modified Z diagnostic are explanations. A zero MAD produces a null Z diagnostic and an explicit flag; empirical ranks can still expose a change. No result contains malicious probability or automatic apply authority.
+
+This comparator is a marginal reference method, not a joint attack model. It can miss changes in feature combinations and can flag harmless new workload modes. It does not currently condition a device's reference on service or time of day. Separate role/context models, exact session evidence and incident-level calibration require further implementation/evaluation.
+
+## Report yield before selecting production methods
+
+Record requested, qualified and excluded groups; missing/abstained rows; benign unusual findings per device-day; independently labeled attack-family recall; per-window versus incident aggregation; detection delay and runtime resources. Include periodic benign IoT, streaming/gaming, backups, software updates, approved scans and DNS/CDN churn. Then compare removal/retraining of each group and alternate session/multi-horizon/reassembly methods from [the research guide](/architecture/feature-methods).
+
+Return redacted verdict counts, excluded-group reasons and the first unexplained finding after your pilot checkpoints. The next implementation gate is independent campaign evaluation and better session/identity/observation evidence, not automatic blocking from an empirical tail rank.

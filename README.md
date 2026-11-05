@@ -21,6 +21,8 @@ The product goal remains the complete [S01–S70 service scope](docs-site/roadma
 
 [Feature rationale](docs-site/architecture/feature-rationale.mdx) records the actual semantics, benign lookalikes, missingness and scientific tests. [Design lineage](docs-site/architecture/feature-lineage.mdx) preserves earlier proposed measurements not yet implemented. The machine-readable catalog covers **102 legacy and 71 site columns**, including audit fields excluded from predictors. They are different schemas; the shipped models cannot be treated as qualified site-v3 models.
 
+The [primary-source measurement guide](docs-site/architecture/feature-methods.mdx) now covers every current column plus planned groups. The optional [offline group-evidence workflow](docs-site/deployment/feature-evidence.mdx) compares qualified later measurements with frozen fit/calibration references, explains unusual features and preserves insufficient-evidence outcomes. It follows capture checks and adds no automatic firewall action or live model promotion.
+
 ## Start here
 
 1. Read [placement and visibility](docs-site/deployment/placement.mdx). A normal router LAN port does not mirror household Wi-Fi/unicast traffic.

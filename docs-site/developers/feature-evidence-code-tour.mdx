@@ -1,0 +1,49 @@
+---
+title: "Feature-group evidence: code and rationale"
+---
+
+This P2/P3 research foundation relates to S01–S07/S10–S11 without completing calibrated classification or automatic actions. Packet extractors, legacy artifact contracts and native firewall integrations are unchanged. The active entry is scripts/score_feature_groups.py; the independent mathematical core is Controller/behavioral_evidence.py. Neither imports Ryu, RF/AE inference or a firewall actuator.
+
+## The measurement layer stays explicit
+
+reference/feature-methods.json supplies an authored recommendation for all 173 schema-qualified column occurrences and seven future groups. It is a research inventory, not a new runtime parser definition. check_feature_catalog.validate_methods joins it to feature-groups.json, verifies unique schema/name/group membership, source IDs, substantive method/qualification fields and page coverage. Mathematical correctness and experimental discrimination require independent review/tests; a source URL or word-count check cannot prove them.
+
+The group catalog now assigns the already measured site interval mean/SD/CV to G1 and outgoing size SD to G6. This corrects the grouping, leaving the legacy 102 columns, site 71 columns, actual formulas and field order intact. G18–G24 remain planned.
+
+## Core functions and why they exist
+
+| Function | Responsibility | Failure prevented |
+| --- | --- | --- |
+| strict_json | Bound file size; reject duplicate keys and nonfinite constants | Ambiguous configuration and invalid numeric evidence |
+| catalog_groups | Derive supported site group columns from the maintained map and exclude history age as a predictor | Metadata/label leakage or drift between docs and analysis |
+| number / timestamp / row_identity | Bounded finite numbers, explicit UTC and canonical IP/VLAN join key | NaN/overflow, ambiguous event time and mistaken address formatting |
+| row_issues | Require complete five-second metadata, supported schema, finite integer core counts, consistent count/exposure rates and no recorded cardinality overflow | Comparing incompatible exposure, corrupt rates or capped counts as though exact |
+| supported_value | Keep missing/invalid values missing; gate sample support, optional inspection and history-dependent warm-up | False confidence from one sample, disabled parsers or immature history |
+| read_dataset | Parse a bounded byte snapshot with exactly the site header; hash those same bytes | Source hash referring to different contents than the parsed data |
+| chronological | Bound identities/rows and reject overlapping reference windows | Duplicate leakage and unbounded training input |
+| tail_rank | Inclusive upper tail with +1 numerator/denominator | Zero p-values and anti-conservative treatment of tied discrete counts |
+| feature_score | Rank absolute deviation from a frozen fit median | Incomparable raw units and zero-variance changes being hidden |
+| group_score | Take the maximum over fixed supported features; abstain if one is unavailable | Summing correlated feature votes or silently changing the score mask |
+| fit_reference | Separate fit/calibration, identity/settings checks, per-group and global calibration, explicit exclusions | Leakage, impossible rank resolution and unreported unsupported groups |
+| validate_reference | Validate imported shape, vectors, group contract, authority and digest | Malformed profiles and accidental action claims; not cryptographic authenticity |
+| score_row | Read frozen references, require later compatible windows, report group and global findings | Silent online poisoning or treating unsupported evidence as benign |
+
+## Mathematical choices
+
+Fit data define each median and absolute-deviation distribution. Fit-tail ranks turn different numeric units into a common bounded rank scale. The group statistic is the maximum transformed rank; calibration is applied to that entire statistic on later data. Thus five correlated timing measurements do not add up to five independent attack votes. The overall maximum is calibrated directly on complete rows across the qualified groups, rather than summing calibrated findings or multiplying dependent p-values.
+
+All ties use >=. The smallest calibration-tail rank is 1/(n+1), so the requested alpha must be attainable with the supported calibration count. Modified Z is a diagnostic, not the decision threshold; zero MAD remains explicit. Calibration does not automatically establish exchangeability, independence, drift stability or a repeated-testing false-action budget. Profiles store evidence, not a malicious-probability claim.
+
+The maximum over marginal ranks does not learn joint covariance or service/time-of-day modes. Evaluate joint-model and mechanism-specific alternatives for attacks that change combinations while preserving each marginal range. Constant/discrete reference values can make benign small changes look unusual; empirical false-alert results, not a universal Z threshold, decide suitability.
+
+Warm-up is feature-specific: current-window rhythm/counts can be measured before an hour of history; long-horizon/novelty/TTL-residual features cannot. Small parser sample counts and an absent byte denominator remain unsupported. Exact TTL/TCP sample counts, reply/session matching, capture losses and parser omissions still need richer collection evidence; CSV-local eligibility must not be confused with physical qualification.
+
+## CLI stages
+
+prepare writes new fit/calibration/later CSV slices plus a selection receipt with omissions and input hash. It does not assign benign labels or certify references. fit requires operator acknowledgment, rejects known non-benign reference labels and preserves UNKNOWN; it writes a new profile with input/catalog/method fingerprints. score validates the profile and current method hash, writes a new private report and never updates the reference. Existing output paths are refused. See [the operator procedure](/deployment/feature-evidence) for commands and bounds.
+
+The prepare split is a chronological research convenience inside a bounded capture, not independent attack/site validation. Selection counts cannot replace diversity/workload coverage. Each profile binds IP/VLAN and inspection settings; independently authenticated identity and capture context remain required before future action eligibility.
+
+## Verification
+
+tests/test_behavioral_evidence.py checks hand-derived rank/tie arithmetic, median/MAD values, zero-scale change, correlated maximum behavior, frozen scoring, leakage/overlap/resolution refusal, missingness, optional parser and context/warm-up boundaries, malformed input/profile handling and actual CLI files without overwrite. Existing independent packet/golden tests remain the check on extraction. Method inventory tests reject missing/misgrouped/unsourced recommendations. Add separately labeled campaigns and matched benign controls to measure whether a candidate technique improves yield before connecting it to production decisions.

@@ -1,5 +1,15 @@
 # Validation
 
+## Primary-source feature methods and offline group evidence · 2026-11-05
+
+Reviewed 26 primary standards, official analyzer/statistics documentation and research sources. The new authored method inventory covers all 173 schema-qualified column occurrences and G18–G24 future requirements; the guard verifies mapping/source/status/page coverage, not source endorsement, mathematical correctness or detection yield. Existing site timing columns are recataloged into G1 and size SD into G6. Git diff confirms no changes to either packet extractor, RF/AE inference, model/weight artifact or rebuilding script. Both 102/71-column contracts and planned-service statuses remain intact.
+
+The complete Python suite passed 132 tests, including 15 new offline evidence tests and two new inventory cases. Independent expected ranks/ties, median/MAD, zero-scale changes, correlated maxima, frozen scoring, reference review/leakage/time/resolution, context/missingness/parser/warm-up conditions, inconsistent rates/fractional core counts, malformed profiles and actual prepare/fit/score outputs were checked. Existing output/reference bytes are preserved on repeated CLI attempts. Synthetic feature vectors are not packet-level attack evidence or measured detection performance. Five Node launcher tests and Python compilation passed.
+
+All three staged guards passed with 144 tracked paths, 83 fingerprints, 30 feature categories and 173 method recommendations; final regeneration/guard checks accompany the change. Mintlify validation/build, broken links and accessibility passed; 49 MDX pages retained the existing accent AA/AAA advisory. Local HTTP checks returned 200 with expected content for all three new pages. Navigation places research under Develop, the optional operator stage under Collect data and function rationale among code tours. The handbook/coverage map/changelog and source guard were updated in the same change.
+
+The installed tool provides bounded offline marginal/group rank diagnostics only. Capture/identity qualification, service/time conditioning, joint attack models, exact session/probe/reassembly techniques, representative references, real benign/attack discrimination, repeated-testing false-alert budgets, native firewall integration and online promotion remain unqualified or planned. No live dashboard findings or automatic actions were added. Window count/support and a reference-tail rank are not proof of maliciousness or a production false-alarm guarantee.
+
 ## Task-based documentation navigation · 2026-11-05
 
 Replaced the combined deployment/development sidebar with five tabs and smaller task groups. A before/after navigation comparison preserved all 41 existing page routes exactly once and the same three OpenAPI sources exactly once; every target exists. No MDX route, runtime source, contract content, behavioral feature or service status changed. The homepage provides setup-specific reading sequences and the docs README/coverage notes describe ownership of each section.

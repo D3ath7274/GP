@@ -52,7 +52,8 @@
             "pages": [
               "deployment/home-pilot-step-by-step",
               "deployment/home-collection",
-              "security/shadow-policy"
+              "security/shadow-policy",
+              "deployment/feature-evidence"
             ]
           },
           {
@@ -99,6 +100,7 @@
             "pages": [
               "architecture/data-flow",
               "architecture/feature-rationale",
+              "architecture/feature-methods",
               "architecture/feature-lineage",
               "developers/repository-scope"
             ]
@@ -116,7 +118,8 @@
             "pages": [
               "developers/policy-workbench-code-tour",
               "developers/qualification-code-tour",
-              "developers/policy-change-code-tour"
+              "developers/policy-change-code-tour",
+              "developers/feature-evidence-code-tour"
             ]
           }
         ]

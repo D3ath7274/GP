@@ -209,6 +209,14 @@ These are source-review findings/qualification needs, not all reproduced bugs:
 
 Do not fix all of these opportunistically during a small unrelated task. Select a scoped next milestone with evidence, relevant tests, documentation and reversible deployment.
 
+## Research methods and offline feature-group evidence
+
+Controller/behavioral_evidence.py and scripts/score_feature_groups.py form a separate offline research lane. The CLI prepares bounded closed-CSV chronological slices, fits explicitly operator-reviewed references and scores later compatible site-v3 windows without updating them. It does not import an actuator or inference model, write through the dashboard or perform online adaptation.
+
+Feature-specific fit medians and absolute-deviation empirical ranks feed max statistics within groups. Later calibration ranks each group and directly calibrates an overall maximum on complete rows. Inclusive ties and +1 smoothing preserve finite sample resolution; zero MAD remains explicit. Tail ranks are not malicious probabilities and no exchangeability/time-series/repeated-alert guarantee is claimed. Missing support, inspection mismatch, unknown identity, incomplete/overlapping/earlier windows and insufficient calibration retain refusal/abstention states. History warm-up gates only history-dependent measurements. References bind IP/VLAN and settings, not authenticated identity or proven physical capture quality.
+
+Current schemas/formulas and model artifacts remain unchanged. Existing site interval mean/SD/CV are recataloged from BASE to G1, and site size SD to G6. docs-site/reference/feature-methods.json plus architecture/feature-methods.mdx cover 173 schema-qualified occurrences and seven planned G18–G24 groups with 26 primary references. check_feature_catalog now validates this companion coverage; the arithmetic/experimental correctness still needs review. The operator procedure is deployment/feature-evidence.mdx and function-level rationale is developers/feature-evidence-code-tour.mdx. Independent packet expectations and benign/attack campaigns remain separate gates. Source fingerprints, input hashes and profile digest detect drift, not reviewer authenticity; new-only outputs remain private.
+
 ## Testing and scientific evidence
 
 The Python suite covers extraction, quality/restart/failure behavior, shadow review, policy-model/store/API semantics, bounded symbolic oracles, campaign metrics and mocked nftables. Separate Node tests cover the documentation launcher. They are not a live end-to-end attack qualification.

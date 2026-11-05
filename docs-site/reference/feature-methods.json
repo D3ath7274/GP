@@ -1,0 +1,2711 @@
+{
+  "version": "feature-methods-v1",
+  "research_date": "2026-11-05",
+  "page": "docs-site/architecture/feature-methods.mdx",
+  "sources": {
+    "moments": {
+      "title": "Pébay, numerically stable one-pass moments",
+      "url": "https://www.sandia.gov/research/publications/details/formulas-for-robust-parallel-computation-of-arbitrary-order-arbitrary-varia-2015-02-01/"
+    },
+    "cv": {
+      "title": "NIST coefficient of variation",
+      "url": "https://itl.nist.gov/div898/software/dataplot/refman2/auxillar/coefvari.htm"
+    },
+    "mad": {
+      "title": "NIST outlier diagnostics",
+      "url": "https://itl.nist.gov/div898/handbook/eda/section3/eda35h.htm"
+    },
+    "ewma": {
+      "title": "NIST EWMA control charts",
+      "url": "https://itl.nist.gov/div898/handbook/pmc/section3/pmc314.htm"
+    },
+    "cusum": {
+      "title": "NIST CUSUM control charts",
+      "url": "https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc323.htm"
+    },
+    "biflow": {
+      "title": "RFC 5103 bidirectional flow export",
+      "url": "https://www.rfc-editor.org/rfc/rfc5103.html"
+    },
+    "tcp": {
+      "title": "RFC 9293 TCP state and sequence semantics",
+      "url": "https://www.rfc-editor.org/rfc/rfc9293.html"
+    },
+    "zeek": {
+      "title": "Zeek connection log",
+      "url": "https://docs.zeek.org/en/master/reference/logs/conn.html"
+    },
+    "arp": {
+      "title": "RFC 5227 legitimate IPv4 probes and announcements",
+      "url": "https://datatracker.ietf.org/doc/rfc5227/"
+    },
+    "sampling": {
+      "title": "RFC 5475 packet selection and measurement interpretation",
+      "url": "https://www.rfc-editor.org/info/rfc5475/"
+    },
+    "entropy": {
+      "title": "Lakhina/Crovella/Diot feature-distribution research",
+      "url": "https://cs-pub.bu.edu/faculty/crovella/anomalies.html"
+    },
+    "kitsune": {
+      "title": "Kitsune, NDSS 2018",
+      "url": "https://www.ndss-symposium.org/wp-content/uploads/2018/02/ndss2018_03A-3_Mirsky_paper.pdf"
+    },
+    "dns": {
+      "title": "Zeek DNS transaction evidence",
+      "url": "https://docs.zeek.org/en/master/reference/logs/dns.html"
+    },
+    "tls": {
+      "title": "RFC 8446 TLS 1.3",
+      "url": "https://www.rfc-editor.org/rfc/rfc8446.html"
+    },
+    "quic": {
+      "title": "RFC 9000 QUIC",
+      "url": "https://www.rfc-editor.org/rfc/rfc9000.html"
+    },
+    "ja4": {
+      "title": "FoxIO fingerprint definition and scope",
+      "url": "https://github.com/FoxIO-LLC/ja4/blob/main/README.md"
+    },
+    "http": {
+      "title": "RFC 9110 HTTP semantics",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110.html"
+    },
+    "owasp": {
+      "title": "OWASP application-security evidence and testing",
+      "url": "https://owasp.github.io/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/00-Introduction_and_Objectives/"
+    },
+    "mud": {
+      "title": "RFC 8520 intended device communication",
+      "url": "https://www.rfc-editor.org/rfc/rfc8520.html"
+    },
+    "recon": {
+      "title": "MITRE ATT&CK network service discovery",
+      "url": "https://attack.mitre.org/techniques/T1046/"
+    },
+    "attack": {
+      "title": "MITRE detection strategies",
+      "url": "https://attack.mitre.org/detectionstrategies/"
+    },
+    "ranks": {
+      "title": "Bates et al., testing outliers with conformal p-values",
+      "url": "https://doi.org/10.1214/22-AOS2244"
+    },
+    "dependence": {
+      "title": "Split conformal prediction and non-exchangeable data",
+      "url": "https://jmlr.org/papers/v25/23-1553.html"
+    },
+    "calibration": {
+      "title": "scikit-learn probability calibration",
+      "url": "https://scikit-learn.org/stable/modules/calibration"
+    },
+    "evaluation": {
+      "title": "Arp et al., security ML evaluation pitfalls",
+      "url": "https://www.usenix.org/conference/usenixsecurity22/presentation/arp"
+    },
+    "closedworld": {
+      "title": "Sommer/Paxson, operational NIDS limitations",
+      "url": "https://gangw.cs.illinois.edu/class/cs562/papers/Closed_World-IDS-sp10.pdf"
+    }
+  },
+  "features": [
+    {
+      "schema": "legacy",
+      "name": "inter_arrival_mean",
+      "group": "G1",
+      "units": "seconds",
+      "recommended_measurement": "Mean of consecutive event-time gaps in a declared direction/key; retain interval count and timestamp resolution.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "inter_arrival_std",
+      "group": "G1",
+      "units": "seconds",
+      "recommended_measurement": "Sample SD of consecutive event-time gaps using stable online moments; at least two valid intervals.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "inter_arrival_cv",
+      "group": "G1",
+      "units": "dimensionless",
+      "recommended_measurement": "Sample SD / positive mean of gaps; report interval count, ties/reorders and timestamp resolution.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "inter_arrival_min",
+      "group": "G1",
+      "units": "seconds",
+      "recommended_measurement": "Minimum genuine adjacent event-time gap; distinguish quantized timestamps and duplicate observations.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "inter_arrival_max",
+      "group": "G1",
+      "units": "seconds",
+      "recommended_measurement": "Maximum adjacent gap, with idle/window censoring recorded rather than invented connection termination.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "burst_count",
+      "group": "G1",
+      "units": "episodes",
+      "recommended_measurement": "Count disjoint over-threshold subwindow episodes using a threshold frozen from reference data; qualify timescale.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "burst_duration_avg",
+      "group": "G1",
+      "units": "seconds, new contract",
+      "recommended_measurement": "Mean duration of defined episodes; legacy emits milliseconds and needs an explicit versioned conversion.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "inter_arrival_mean",
+      "group": "G1",
+      "units": "seconds",
+      "recommended_measurement": "Mean of consecutive event-time gaps in a declared direction/key; retain interval count and timestamp resolution.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "inter_arrival_std",
+      "group": "G1",
+      "units": "seconds",
+      "recommended_measurement": "Sample SD of consecutive event-time gaps using stable online moments; at least two valid intervals.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "inter_arrival_cv",
+      "group": "G1",
+      "units": "dimensionless",
+      "recommended_measurement": "Sample SD / positive mean of gaps; report interval count, ties/reorders and timestamp resolution.",
+      "current_limit": "Legacy timestamp subsampling above 2,000 observations changes adjacent gaps; burst durations are milliseconds. Site only exports mean/SD/CV, not extrema or episodes.",
+      "qualification": "Use adjacent event times, stable moments and explicit support. Compare per peer/service and multiple horizons; low CV also describes ordinary IoT telemetry.",
+      "references": [
+        "moments",
+        "cv",
+        "sampling",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "fwd_packet_count",
+      "group": "G2",
+      "units": "packets",
+      "recommended_measurement": "Count originator packets in an identity/context-bound canonical bidirectional session or declared device window.",
+      "current_limit": "Legacy reverse aggregates are IP-pair/protocol, not full sessions; +1 ratio smoothing and raw reply ratio are not success probabilities.",
+      "qualification": "Use canonical biflow identity, declared originator/responder direction and matching exposure/byte layer. Preserve no-reply and unseen-reply as distinct states.",
+      "references": [
+        "biflow",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "bwd_packet_count",
+      "group": "G2",
+      "units": "packets",
+      "recommended_measurement": "Count matched responder packets for that same canonical session/context; report observation coverage.",
+      "current_limit": "Legacy reverse aggregates are IP-pair/protocol, not full sessions; +1 ratio smoothing and raw reply ratio are not success probabilities.",
+      "qualification": "Use canonical biflow identity, declared originator/responder direction and matching exposure/byte layer. Preserve no-reply and unseen-reply as distinct states.",
+      "references": [
+        "biflow",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "fwd_bwd_packet_ratio",
+      "group": "G2",
+      "units": "dimensionless",
+      "recommended_measurement": "Forward / reverse packet count with explicit denominator and undefined/no-reply state; smoothing must be declared.",
+      "current_limit": "Legacy reverse aggregates are IP-pair/protocol, not full sessions; +1 ratio smoothing and raw reply ratio are not success probabilities.",
+      "qualification": "Use canonical biflow identity, declared originator/responder direction and matching exposure/byte layer. Preserve no-reply and unseen-reply as distinct states.",
+      "references": [
+        "biflow",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "fwd_bwd_bytes_ratio",
+      "group": "G2",
+      "units": "dimensionless",
+      "recommended_measurement": "Forward / reverse bytes at the same layer; preserve zero-denominator state and optional declared log-ratio.",
+      "current_limit": "Legacy reverse aggregates are IP-pair/protocol, not full sessions; +1 ratio smoothing and raw reply ratio are not success probabilities.",
+      "qualification": "Use canonical biflow identity, declared originator/responder direction and matching exposure/byte layer. Preserve no-reply and unseen-reply as distinct states.",
+      "references": [
+        "biflow",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "fwd_avg_packet_size",
+      "group": "G2",
+      "units": "captured bytes",
+      "recommended_measurement": "Forward captured bytes / forward packets; null with no forward support.",
+      "current_limit": "Legacy reverse aggregates are IP-pair/protocol, not full sessions; +1 ratio smoothing and raw reply ratio are not success probabilities.",
+      "qualification": "Use canonical biflow identity, declared originator/responder direction and matching exposure/byte layer. Preserve no-reply and unseen-reply as distinct states.",
+      "references": [
+        "biflow",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "bwd_avg_packet_size",
+      "group": "G2",
+      "units": "captured bytes",
+      "recommended_measurement": "Reverse captured bytes / reverse packets; null with no reverse support.",
+      "current_limit": "Legacy reverse aggregates are IP-pair/protocol, not full sessions; +1 ratio smoothing and raw reply ratio are not success probabilities.",
+      "qualification": "Use canonical biflow identity, declared originator/responder direction and matching exposure/byte layer. Preserve no-reply and unseen-reply as distinct states.",
+      "references": [
+        "biflow",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "reply_rate",
+      "group": "G2",
+      "units": "fraction or named packet ratio",
+      "recommended_measurement": "Use matched request-response successes / eligible requests for true responsiveness; raw reverse/forward counts are a different metric.",
+      "current_limit": "Legacy reverse aggregates are IP-pair/protocol, not full sessions; +1 ratio smoothing and raw reply ratio are not success probabilities.",
+      "qualification": "Use canonical biflow identity, declared originator/responder direction and matching exposure/byte layer. Preserve no-reply and unseen-reply as distinct states.",
+      "references": [
+        "biflow",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "syn_ack_ratio",
+      "group": "G3",
+      "units": "dimensionless",
+      "recommended_measurement": "Separate initial SYN attempts from retransmissions; compare eligible handshakes with matching SYN-ACK/ACK progression.",
+      "current_limit": "Legacy completed_sessions is a 0/1 window proxy and incomplete_ratio uses +1 smoothing. Exact session state is planned.",
+      "qualification": "Use bounded persistent sequence-aware TCP state, deduplicated attempts, explicit timeout/censoring and matched completion outcomes.",
+      "references": [
+        "tcp",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "completed_sessions",
+      "group": "G3",
+      "units": "sessions",
+      "recommended_measurement": "Count sequence-consistent established sessions in a bounded persistent five-tuple state machine, not a window-level Boolean.",
+      "current_limit": "Legacy completed_sessions is a 0/1 window proxy and incomplete_ratio uses +1 smoothing. Exact session state is planned.",
+      "qualification": "Use bounded persistent sequence-aware TCP state, deduplicated attempts, explicit timeout/censoring and matched completion outcomes.",
+      "references": [
+        "tcp",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "incomplete_ratio",
+      "group": "G3",
+      "units": "fraction",
+      "recommended_measurement": "Uncompleted eligible attempts / eligible attempts after an explicit timeout; distinguish pending, censored and unobserved.",
+      "current_limit": "Legacy completed_sessions is a 0/1 window proxy and incomplete_ratio uses +1 smoothing. Exact session state is planned.",
+      "qualification": "Use bounded persistent sequence-aware TCP state, deduplicated attempts, explicit timeout/censoring and matched completion outcomes.",
+      "references": [
+        "tcp",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "avg_session_duration",
+      "group": "G3",
+      "units": "seconds",
+      "recommended_measurement": "Mean actual completed-session lifetime by declared start/end criteria; unfinished sessions are censored.",
+      "current_limit": "Legacy completed_sessions is a 0/1 window proxy and incomplete_ratio uses +1 smoothing. Exact session state is planned.",
+      "qualification": "Use bounded persistent sequence-aware TCP state, deduplicated attempts, explicit timeout/censoring and matched completion outcomes.",
+      "references": [
+        "tcp",
+        "zeek"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "payload_size_entropy",
+      "group": "G4",
+      "units": "bits",
+      "recommended_measurement": "Shannon entropy of the declared length categories; captured-frame size and payload length must have different names/contracts.",
+      "current_limit": "Legacy size entropy is captured-frame size, not application payload. Entropy needs sample/context controls; high or low alone is not malicious.",
+      "qualification": "Use categorical frequencies, Shannon H=-sum(p*log2(p)), count, richness and top share together. Test bias/normalization and distribution divergence under matched support.",
+      "references": [
+        "entropy",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "src_port_entropy",
+      "group": "G4",
+      "units": "bits",
+      "recommended_measurement": "Shannon entropy of source-port frequencies at a source/context/horizon scope; report sample count and category richness.",
+      "current_limit": "Legacy size entropy is captured-frame size, not application payload. Entropy needs sample/context controls; high or low alone is not malicious.",
+      "qualification": "Use categorical frequencies, Shannon H=-sum(p*log2(p)), count, richness and top share together. Test bias/normalization and distribution divergence under matched support.",
+      "references": [
+        "entropy",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "icmp_type_entropy",
+      "group": "G4",
+      "units": "bits",
+      "recommended_measurement": "Shannon entropy of observed ICMP family/type/code categories; separate IPv4/IPv6 and diagnostic traffic.",
+      "current_limit": "Legacy size entropy is captured-frame size, not application payload. Entropy needs sample/context controls; high or low alone is not malicious.",
+      "qualification": "Use categorical frequencies, Shannon H=-sum(p*log2(p)), count, richness and top share together. Test bias/normalization and distribution divergence under matched support.",
+      "references": [
+        "entropy",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "arp_reply_rate",
+      "group": "G5",
+      "units": "messages/second",
+      "recommended_measurement": "Observed ARP replies / actual elapsed observation interval; retain count and packet loss context.",
+      "current_limit": "Legacy unsolicited/binding heuristics are not exact request matching. ARP does not cover IPv6 NDP and first-seen bindings can be poisoned.",
+      "qualification": "Use chronological ARP request/reply and time-valid authenticated lease/port/binding context. Retain gratuitous/probe/failover controls.",
+      "references": [
+        "arp",
+        "mud"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "arp_request_rate",
+      "group": "G5",
+      "units": "messages/second",
+      "recommended_measurement": "Observed ARP requests / actual elapsed interval; classify legitimate probes/announcements separately.",
+      "current_limit": "Legacy unsolicited/binding heuristics are not exact request matching. ARP does not cover IPv6 NDP and first-seen bindings can be poisoned.",
+      "qualification": "Use chronological ARP request/reply and time-valid authenticated lease/port/binding context. Retain gratuitous/probe/failover controls.",
+      "references": [
+        "arp",
+        "mud"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "arp_reply_request_ratio",
+      "group": "G5",
+      "units": "dimensionless",
+      "recommended_measurement": "Replies / requests with explicit zero state; exact request/reply correlation is preferable for unsolicited claims.",
+      "current_limit": "Legacy unsolicited/binding heuristics are not exact request matching. ARP does not cover IPv6 NDP and first-seen bindings can be poisoned.",
+      "qualification": "Use chronological ARP request/reply and time-valid authenticated lease/port/binding context. Retain gratuitous/probe/failover controls.",
+      "references": [
+        "arp",
+        "mud"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "arp_gratuitous_count",
+      "group": "G5",
+      "units": "messages",
+      "recommended_measurement": "Count defined ARP announcement forms without equating legitimate announcements with poisoning.",
+      "current_limit": "Legacy unsolicited/binding heuristics are not exact request matching. ARP does not cover IPv6 NDP and first-seen bindings can be poisoned.",
+      "qualification": "Use chronological ARP request/reply and time-valid authenticated lease/port/binding context. Retain gratuitous/probe/failover controls.",
+      "references": [
+        "arp",
+        "mud"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "arp_unsolicited_count",
+      "group": "G5",
+      "units": "messages",
+      "recommended_measurement": "Time-correlate replies with outstanding requests and verified binding evidence; record expired/missing request visibility.",
+      "current_limit": "Legacy unsolicited/binding heuristics are not exact request matching. ARP does not cover IPv6 NDP and first-seen bindings can be poisoned.",
+      "qualification": "Use chronological ARP request/reply and time-valid authenticated lease/port/binding context. Retain gratuitous/probe/failover controls.",
+      "references": [
+        "arp",
+        "mud"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "mac_ip_binding_changes",
+      "group": "G5",
+      "units": "binding events",
+      "recommended_measurement": "Count changes against time-valid MAC-to-IP sets/leases, allowing legitimate multi-address ownership.",
+      "current_limit": "Legacy unsolicited/binding heuristics are not exact request matching. ARP does not cover IPv6 NDP and first-seen bindings can be poisoned.",
+      "qualification": "Use chronological ARP request/reply and time-valid authenticated lease/port/binding context. Retain gratuitous/probe/failover controls.",
+      "references": [
+        "arp",
+        "mud"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "ip_mac_binding_changes",
+      "group": "G5",
+      "units": "binding events",
+      "recommended_measurement": "Count conflicting IP-to-MAC claims against verified leases/ports/time; separate DHCP reuse/failover.",
+      "current_limit": "Legacy unsolicited/binding heuristics are not exact request matching. ARP does not cover IPv6 NDP and first-seen bindings can be poisoned.",
+      "qualification": "Use chronological ARP request/reply and time-valid authenticated lease/port/binding context. Retain gratuitous/probe/failover controls.",
+      "references": [
+        "arp",
+        "mud"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "pkt_size_std",
+      "group": "G6",
+      "units": "captured bytes",
+      "recommended_measurement": "Sample SD of explicitly defined captured sizes using online moments; keep n and compare protocol/role context.",
+      "current_limit": "Legacy small-packet boundary is below 64 captured bytes; site currently exports the outgoing size SD and BASE mean only.",
+      "qualification": "Use stable sample moments plus declared size-band proportions. Retain support, frame layer/MTU/offloads and matched-volume benign controls.",
+      "references": [
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "pkt_size_variance",
+      "group": "G6",
+      "units": "captured bytes squared",
+      "recommended_measurement": "Sample variance M2/(n-1); ablate against SD because the two encode the same scalar information.",
+      "current_limit": "Legacy small-packet boundary is below 64 captured bytes; site currently exports the outgoing size SD and BASE mean only.",
+      "qualification": "Use stable sample moments plus declared size-band proportions. Retain support, frame layer/MTU/offloads and matched-volume benign controls.",
+      "references": [
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "small_pkt_ratio",
+      "group": "G6",
+      "units": "fraction",
+      "recommended_measurement": "Count sizes below a declared byte boundary / observed packets; boundary and encapsulation are part of the schema.",
+      "current_limit": "Legacy small-packet boundary is below 64 captured bytes; site currently exports the outgoing size SD and BASE mean only.",
+      "qualification": "Use stable sample moments plus declared size-band proportions. Retain support, frame layer/MTU/offloads and matched-volume benign controls.",
+      "references": [
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "large_pkt_ratio",
+      "group": "G6",
+      "units": "fraction",
+      "recommended_measurement": "Count sizes above a declared boundary / observed packets; qualify MTU/offload effects and sample support.",
+      "current_limit": "Legacy small-packet boundary is below 64 captured bytes; site currently exports the outgoing size SD and BASE mean only.",
+      "qualification": "Use stable sample moments plus declared size-band proportions. Retain support, frame layer/MTU/offloads and matched-volume benign controls.",
+      "references": [
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "packet_size_std",
+      "group": "G6",
+      "units": "captured bytes",
+      "recommended_measurement": "Online sample SD of outgoing sizes, null below two observations.",
+      "current_limit": "Legacy small-packet boundary is below 64 captured bytes; site currently exports the outgoing size SD and BASE mean only.",
+      "qualification": "Use stable sample moments plus declared size-band proportions. Retain support, frame layer/MTU/offloads and matched-volume benign controls.",
+      "references": [
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "top_dst_port",
+      "group": "G7",
+      "units": "categorical identifier",
+      "recommended_measurement": "Mode destination-port category; use service semantics/categorical encoding, not numeric distance.",
+      "current_limit": "Legacy sequential score sorts a set, so it is density, not scan order; its ephemeral predicate excludes boundary 49152.",
+      "qualification": "Use categorical port concentration, service edges and arrival-ordered probe patterns; compare a role/service baseline rather than numeric port distances.",
+      "references": [
+        "recon",
+        "biflow"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "top_dst_port_ratio",
+      "group": "G7",
+      "units": "fraction",
+      "recommended_measurement": "Packets to the modal destination port / eligible transport packets at a declared source/horizon scope.",
+      "current_limit": "Legacy sequential score sorts a set, so it is density, not scan order; its ephemeral predicate excludes boundary 49152.",
+      "qualification": "Use categorical port concentration, service edges and arrival-ordered probe patterns; compare a role/service baseline rather than numeric port distances.",
+      "references": [
+        "recon",
+        "biflow"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "dst_port_std",
+      "group": "G7",
+      "units": "port-number units, heuristic",
+      "recommended_measurement": "Prefer categorical concentration/entropy and service classes; integer port-number SD is only a legacy heuristic.",
+      "current_limit": "Legacy sequential score sorts a set, so it is density, not scan order; its ephemeral predicate excludes boundary 49152.",
+      "qualification": "Use categorical port concentration, service edges and arrival-ordered probe patterns; compare a role/service baseline rather than numeric port distances.",
+      "references": [
+        "recon",
+        "biflow"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "well_known_port_ratio",
+      "group": "G7",
+      "units": "fraction",
+      "recommended_measurement": "Eligible contacts or packets to ports 0–1023 / corresponding eligible total; state which weighting is used.",
+      "current_limit": "Legacy sequential score sorts a set, so it is density, not scan order; its ephemeral predicate excludes boundary 49152.",
+      "qualification": "Use categorical port concentration, service edges and arrival-ordered probe patterns; compare a role/service baseline rather than numeric port distances.",
+      "references": [
+        "recon",
+        "biflow"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "ephemeral_port_ratio",
+      "group": "G7",
+      "units": "fraction",
+      "recommended_measurement": "Eligible contacts or packets to ports 49152–65535 inclusive / eligible total; qualify OS-specific client behavior.",
+      "current_limit": "Legacy sequential score sorts a set, so it is density, not scan order; its ephemeral predicate excludes boundary 49152.",
+      "qualification": "Use categorical port concentration, service edges and arrival-ordered probe patterns; compare a role/service baseline rather than numeric port distances.",
+      "references": [
+        "recon",
+        "biflow"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "sequential_port_score",
+      "group": "G7",
+      "units": "fraction",
+      "recommended_measurement": "Compute adjacency from actual arrival-ordered probes for an order metric; sorted-set density must remain separately named.",
+      "current_limit": "Legacy sequential score sorts a set, so it is density, not scan order; its ephemeral predicate excludes boundary 49152.",
+      "qualification": "Use categorical port concentration, service edges and arrival-ordered probe patterns; compare a role/service baseline rather than numeric port distances.",
+      "references": [
+        "recon",
+        "biflow"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "is_broadcast_dst",
+      "group": "G8",
+      "units": "indicator",
+      "recommended_measurement": "Ethernet destination broadcast indicator, with VLAN/scope and IP broadcast interpretation explicitly distinguished.",
+      "current_limit": "Current site does not reproduce the complete legacy network-ratio set; high broadcast share is not an automatic benign exemption.",
+      "qualification": "Use separate Ethernet broadcast/multicast and ARP denominator counts with VLAN/site context. Preserve legitimate discovery and malicious storms.",
+      "references": [
+        "arp",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "broadcast_ratio",
+      "group": "G8",
+      "units": "fraction",
+      "recommended_measurement": "Broadcast frames / all frames at the identical observation boundary and horizon.",
+      "current_limit": "Current site does not reproduce the complete legacy network-ratio set; high broadcast share is not an automatic benign exemption.",
+      "qualification": "Use separate Ethernet broadcast/multicast and ARP denominator counts with VLAN/site context. Preserve legitimate discovery and malicious storms.",
+      "references": [
+        "arp",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "multicast_ratio",
+      "group": "G8",
+      "units": "fraction",
+      "recommended_measurement": "Multicast frames / all observed frames; distinguish multicast from Ethernet broadcast in the implementation.",
+      "current_limit": "Current site does not reproduce the complete legacy network-ratio set; high broadcast share is not an automatic benign exemption.",
+      "qualification": "Use separate Ethernet broadcast/multicast and ARP denominator counts with VLAN/site context. Preserve legitimate discovery and malicious storms.",
+      "references": [
+        "arp",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "arp_broadcast_ratio",
+      "group": "G8",
+      "units": "fraction",
+      "recommended_measurement": "Broadcast ARP messages / observed ARP messages; retain support and legitimate address-resolution controls.",
+      "current_limit": "Current site does not reproduce the complete legacy network-ratio set; high broadcast share is not an automatic benign exemption.",
+      "qualification": "Use separate Ethernet broadcast/multicast and ARP denominator counts with VLAN/site context. Preserve legitimate discovery and malicious storms.",
+      "references": [
+        "arp",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "flows_per_window",
+      "group": "G9",
+      "units": "new keys/window",
+      "recommended_measurement": "Count new canonical connection/flow keys with LRU/time bounds; separate new arrivals from active entries and sessions.",
+      "current_limit": "Legacy flows_per_window counts its four-field keys and an overflow aggregation cap, not switch-table occupancy or established sessions.",
+      "qualification": "Count new canonical keys, active sessions and actual resource occupancy separately; measure exposure and state eviction.",
+      "references": [
+        "biflow",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "meta_window_id",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "meta_src_mac_oui",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "meta_device_name",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "meta_attack_tool",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "meta_attack_intensity",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "meta_mininet_event",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "meta_controller_load",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "meta_backlog_drops",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "schema_version",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "run_id",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "window_start_utc",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "window_end_utc",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "window_seconds",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "device_ip",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "vlan",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "ground_truth",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "metadata_enabled",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "content_enabled",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "history_restarted",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "cardinality_overflows_total",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "window_complete",
+      "group": "G10",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Audit values, tool names, window identifiers and truth fields must not become attacker predictors.",
+      "qualification": "Preserve audit/provenance and independent labels outside predictive inputs; use them for eligibility, splitting and diagnosis.",
+      "references": [
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_null_flag_count",
+      "group": "G11",
+      "units": "packets",
+      "recommended_measurement": "Count eligible TCP flags exactly zero; correlate with exploration/responses and authorized scans.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_xmas_flag_count",
+      "group": "G11",
+      "units": "packets",
+      "recommended_measurement": "Count TCP FIN+PSH+URG combinations under an explicit mask; malformed and partial capture are controls.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_fin_no_ack_count",
+      "group": "G11",
+      "units": "packets",
+      "recommended_measurement": "Count FIN without ACK; distinguish session context and retransmissions before attributing reconnaissance.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_syn_count",
+      "group": "G11",
+      "units": "packets",
+      "recommended_measurement": "Count SYN without ACK; a new-session attempt metric needs retransmission/tuple deduplication.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_rst_in_count",
+      "group": "G11",
+      "units": "packets",
+      "recommended_measurement": "Count incoming resets; matched-probe outcomes require five-tuple/sequence correlation, currently absent.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_icmp_port_unreachable_in",
+      "group": "G11",
+      "units": "messages",
+      "recommended_measurement": "Count IPv4 destination-port-unreachable observations; exact original-probe attribution and IPv6 handling need quoted-header parsing.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_dst_ip_count",
+      "group": "G11",
+      "units": "categories",
+      "recommended_measurement": "Distinct outgoing peers per device/VLAN/window, with cap evidence and benign discovery controls.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_dst_port_count",
+      "group": "G11",
+      "units": "categories",
+      "recommended_measurement": "Distinct outgoing destination ports at the same device/window scope, with cap evidence.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g11_service_edge_count",
+      "group": "G11",
+      "units": "categories",
+      "recommended_measurement": "Distinct destination/protocol/port edges; distinguish host sweeps, vertical scans and ordinary application fan-out.",
+      "current_limit": "Existing counters/sets are device-window summaries and response proxies; exact probe matching, deduplication and session support remain work.",
+      "qualification": "Combine exploration across hosts/services, sparse flag context and matched response outcomes. Measure per source/target/subnet with several horizons.",
+      "references": [
+        "recon",
+        "zeek",
+        "tcp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g12_ttl_mean",
+      "group": "G12",
+      "units": "IP hop field units",
+      "recommended_measurement": "Mean observed outgoing TTL/hop-limit; retain family/protocol/peer/context and actual header sample count.",
+      "current_limit": "Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.",
+      "qualification": "Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.",
+      "references": [
+        "tcp",
+        "zeek",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g12_ttl_std",
+      "group": "G12",
+      "units": "IP hop field units",
+      "recommended_measurement": "Sample SD of eligible outgoing TTL/hop-limit observations; not a distance from a known OS identity.",
+      "current_limit": "Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.",
+      "qualification": "Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.",
+      "references": [
+        "tcp",
+        "zeek",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g12_ttl_residual",
+      "group": "G12",
+      "units": "IP hop field units",
+      "recommended_measurement": "Current TTL mean minus prior baseline computed before update; declare EWMA decay and routing/OS-change controls.",
+      "current_limit": "Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.",
+      "qualification": "Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.",
+      "references": [
+        "tcp",
+        "zeek",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g12_tcp_window_mean",
+      "group": "G12",
+      "units": "unscaled TCP window units",
+      "recommended_measurement": "Mean raw advertised windows with TCP option context; negotiated scaling is required for effective receive-window bytes.",
+      "current_limit": "Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.",
+      "qualification": "Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.",
+      "references": [
+        "tcp",
+        "zeek",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g12_tcp_window_std",
+      "group": "G12",
+      "units": "unscaled TCP window units",
+      "recommended_measurement": "Sample SD of eligible raw advertised windows; retain counts/options and benign congestion/zero-window context.",
+      "current_limit": "Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.",
+      "qualification": "Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.",
+      "references": [
+        "tcp",
+        "zeek",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g12_zero_window_count",
+      "group": "G12",
+      "units": "packets",
+      "recommended_measurement": "Count eligible TCP advertisements equal to zero; normalize by TCP support only in a separately defined ratio.",
+      "current_limit": "Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.",
+      "qualification": "Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.",
+      "references": [
+        "tcp",
+        "zeek",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g12_fragment_count",
+      "group": "G12",
+      "units": "packets",
+      "recommended_measurement": "Count fragment observations per address family; overlap/evasion decisions need bounded reassembly/state.",
+      "current_limit": "Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.",
+      "qualification": "Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.",
+      "references": [
+        "tcp",
+        "zeek",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g12_tiny_fragment_count",
+      "group": "G12",
+      "units": "packets, proxy",
+      "recommended_measurement": "Define fragment payload/header size thresholds by family; current captured-frame-below-64 proxy is not semantic reassembly.",
+      "current_limit": "Current mean/SD/residual and fragment counters are measurements, not spoofing proof; effective scaled TCP windows and overlap detection are absent.",
+      "qualification": "Condition header distributions on family, role, peer and state. Treat routing/OS updates and congestion as hard negatives; require reassembly for evasion claims.",
+      "references": [
+        "tcp",
+        "zeek",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g13_dst_ips_hour_bucketed",
+      "group": "G13",
+      "units": "categories",
+      "recommended_measurement": "Union peer sets in retained minute buckets; exact rolling-hour boundaries need event-time expiry or reported bucket uncertainty.",
+      "current_limit": "Current rolling values are minute-bucket approximations; periodicity is contact-window CV, not a packet beacon detector.",
+      "qualification": "Use bounded event-time histories with declared expiry/precision; compare 5s, minute and hour scopes. Evaluate actual per-peer contact timing and change-point tests.",
+      "references": [
+        "ewma",
+        "cusum",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g13_dst_ports_10m_bucketed",
+      "group": "G13",
+      "units": "categories",
+      "recommended_measurement": "Union retained port sets over the declared bucket horizon; record caps and boundary approximation.",
+      "current_limit": "Current rolling values are minute-bucket approximations; periodicity is contact-window CV, not a packet beacon detector.",
+      "qualification": "Use bounded event-time histories with declared expiry/precision; compare 5s, minute and hour scopes. Evaluate actual per-peer contact timing and change-point tests.",
+      "references": [
+        "ewma",
+        "cusum",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g13_out_bytes_hour_bucketed",
+      "group": "G13",
+      "units": "captured bytes",
+      "recommended_measurement": "Sum outgoing byte counters over retained buckets with exposure/idle gaps and expiry explicit.",
+      "current_limit": "Current rolling values are minute-bucket approximations; periodicity is contact-window CV, not a packet beacon detector.",
+      "qualification": "Use bounded event-time histories with declared expiry/precision; compare 5s, minute and hour scopes. Evaluate actual per-peer contact timing and change-point tests.",
+      "references": [
+        "ewma",
+        "cusum",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g13_window_contacts_hour_bucketed",
+      "group": "G13",
+      "units": "device windows",
+      "recommended_measurement": "Count retained windows containing device observations; it is not individual sessions or per-peer contacts.",
+      "current_limit": "Current rolling values are minute-bucket approximations; periodicity is contact-window CV, not a packet beacon detector.",
+      "qualification": "Use bounded event-time histories with declared expiry/precision; compare 5s, minute and hour scopes. Evaluate actual per-peer contact timing and change-point tests.",
+      "references": [
+        "ewma",
+        "cusum",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g13_pair_interval_cv_mean",
+      "group": "G13",
+      "units": "dimensionless",
+      "recommended_measurement": "Mean supported per-peer CV of window-contact intervals; packet/session-contact periodicity requires a separate event definition.",
+      "current_limit": "Current rolling values are minute-bucket approximations; periodicity is contact-window CV, not a packet beacon detector.",
+      "qualification": "Use bounded event-time histories with declared expiry/precision; compare 5s, minute and hour scopes. Evaluate actual per-peer contact timing and change-point tests.",
+      "references": [
+        "ewma",
+        "cusum",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g13_pair_interval_supported_pairs",
+      "group": "G13",
+      "units": "pairs",
+      "recommended_measurement": "Report how many pair histories support the CV; a support qualifier rather than an independent malicious vote.",
+      "current_limit": "Current rolling values are minute-bucket approximations; periodicity is contact-window CV, not a packet beacon detector.",
+      "qualification": "Use bounded event-time histories with declared expiry/precision; compare 5s, minute and hour scopes. Evaluate actual per-peer contact timing and change-point tests.",
+      "references": [
+        "ewma",
+        "cusum",
+        "kitsune"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g14_new_syn_rate",
+      "group": "G14",
+      "units": "packets/second, proxy",
+      "recommended_measurement": "SYN-without-ACK observations / window exposure; new-session rate requires deduplication and state.",
+      "current_limit": "Current SYN/raw byte/payload proxies cannot measure authenticated failures or successful logins.",
+      "qualification": "Use deduplicated initiation/outcome evidence, direction/role and application/auth receipts. Test upload/download, games and updates at matched rates.",
+      "references": [
+        "zeek",
+        "tcp",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g14_auth_syn_count",
+      "group": "G14",
+      "units": "packets, proxy",
+      "recommended_measurement": "SYN attempts toward configured authentication-related ports; outcomes require authentication logs/session joins.",
+      "current_limit": "Current SYN/raw byte/payload proxies cannot measure authenticated failures or successful logins.",
+      "qualification": "Use deduplicated initiation/outcome evidence, direction/role and application/auth receipts. Test upload/download, games and updates at matched rates.",
+      "references": [
+        "zeek",
+        "tcp",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g14_out_in_bytes_ratio",
+      "group": "G14",
+      "units": "dimensionless",
+      "recommended_measurement": "Outgoing / incoming captured bytes with explicit denominator; null if no incoming bytes.",
+      "current_limit": "Current SYN/raw byte/payload proxies cannot measure authenticated failures or successful logins.",
+      "qualification": "Use deduplicated initiation/outcome evidence, direction/role and application/auth receipts. Test upload/download, games and updates at matched rates.",
+      "references": [
+        "zeek",
+        "tcp",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g14_out_payload_bytes",
+      "group": "G14",
+      "units": "payload bytes",
+      "recommended_measurement": "Sum parsed outgoing transport payload lengths after excluding padding; not confirmed application upload or goodput.",
+      "current_limit": "Current SYN/raw byte/payload proxies cannot measure authenticated failures or successful logins.",
+      "qualification": "Use deduplicated initiation/outcome evidence, direction/role and application/auth receipts. Test upload/download, games and updates at matched rates.",
+      "references": [
+        "zeek",
+        "tcp",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g15_query_count",
+      "group": "G15",
+      "units": "messages",
+      "recommended_measurement": "Count supported DNS query messages; transactions require tuple/ID/qname/time correlation and retransmission handling.",
+      "current_limit": "Current parser is single-question UDP DNS; no TCP reassembly, DoH/DoT decryption, registrable-domain extraction or exact transaction matching.",
+      "qualification": "Parse supported DNS transactions, normalize names consistently, retain denominator/support and compare length/label/type/response/novelty jointly.",
+      "references": [
+        "dns",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g15_response_count",
+      "group": "G15",
+      "units": "messages",
+      "recommended_measurement": "Count supported DNS responses; do not equate responses with distinct successful transactions.",
+      "current_limit": "Current parser is single-question UDP DNS; no TCP reassembly, DoH/DoT decryption, registrable-domain extraction or exact transaction matching.",
+      "qualification": "Parse supported DNS transactions, normalize names consistently, retain denominator/support and compare length/label/type/response/novelty jointly.",
+      "references": [
+        "dns",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g15_nxdomain_response_ratio",
+      "group": "G15",
+      "units": "fraction",
+      "recommended_measurement": "NXDOMAIN responses / supported observed DNS responses, retaining denominator and response matching limitations.",
+      "current_limit": "Current parser is single-question UDP DNS; no TCP reassembly, DoH/DoT decryption, registrable-domain extraction or exact transaction matching.",
+      "qualification": "Parse supported DNS transactions, normalize names consistently, retain denominator/support and compare length/label/type/response/novelty jointly.",
+      "references": [
+        "dns",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g15_qname_length_mean",
+      "group": "G15",
+      "units": "qname bytes",
+      "recommended_measurement": "Mean canonical wire/name length per supported query; define labels/trailing dot/IDNA handling.",
+      "current_limit": "Current parser is single-question UDP DNS; no TCP reassembly, DoH/DoT decryption, registrable-domain extraction or exact transaction matching.",
+      "qualification": "Parse supported DNS transactions, normalize names consistently, retain denominator/support and compare length/label/type/response/novelty jointly.",
+      "references": [
+        "dns",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g15_qname_entropy_mean",
+      "group": "G15",
+      "units": "bits per name distribution",
+      "recommended_measurement": "Mean character-distribution entropy of supported qnames; condition on length/label position and legitimate CDN names.",
+      "current_limit": "Current parser is single-question UDP DNS; no TCP reassembly, DoH/DoT decryption, registrable-domain extraction or exact transaction matching.",
+      "qualification": "Parse supported DNS transactions, normalize names consistently, retain denominator/support and compare length/label/type/response/novelty jointly.",
+      "references": [
+        "dns",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g15_distinct_qname_hashes",
+      "group": "G15",
+      "units": "categories",
+      "recommended_measurement": "Count distinct normalized qname hashes; not registrable domains or authenticated destination identities.",
+      "current_limit": "Current parser is single-question UDP DNS; no TCP reassembly, DoH/DoT decryption, registrable-domain extraction or exact transaction matching.",
+      "qualification": "Parse supported DNS transactions, normalize names consistently, retain denominator/support and compare length/label/type/response/novelty jointly.",
+      "references": [
+        "dns",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g15_txt_null_query_count",
+      "group": "G15",
+      "units": "messages",
+      "recommended_measurement": "Count supported TXT/NULL query types; compare with DNS-SD/SPF/DKIM and enterprise discovery controls.",
+      "current_limit": "Current parser is single-question UDP DNS; no TCP reassembly, DoH/DoT decryption, registrable-domain extraction or exact transaction matching.",
+      "qualification": "Parse supported DNS transactions, normalize names consistently, retain denominator/support and compare length/label/type/response/novelty jointly.",
+      "references": [
+        "dns",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g16_complete_clienthello_count",
+      "group": "G16",
+      "units": "parsed records",
+      "recommended_measurement": "Count complete supported ClientHellos; retain separate counters for incomplete, unsupported and reassembly-limited observations.",
+      "current_limit": "Current custom first-packet fingerprint is not JA4; TLS 1.3 hides certificate contents after ServerHello and QUIC needs a distinct parser.",
+      "qualification": "Reassemble/validate supported handshake evidence and distinguish observed, encrypted, truncated and unsupported. Compare stable fingerprint versions and novelty by context.",
+      "references": [
+        "tls",
+        "quic",
+        "ja4"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g16_no_sni_count",
+      "group": "G16",
+      "units": "parsed records",
+      "recommended_measurement": "Count missing SNI only among fully parsed supported ClientHellos; absence is not a malicious verdict.",
+      "current_limit": "Current custom first-packet fingerprint is not JA4; TLS 1.3 hides certificate contents after ServerHello and QUIC needs a distinct parser.",
+      "qualification": "Reassemble/validate supported handshake evidence and distinguish observed, encrypted, truncated and unsupported. Compare stable fingerprint versions and novelty by context.",
+      "references": [
+        "tls",
+        "quic",
+        "ja4"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g16_ech_count",
+      "group": "G16",
+      "units": "extension observations",
+      "recommended_measurement": "Count observed ECH extension indications, including possible GREASE; not proof that decryption succeeded or a hidden malicious name exists.",
+      "current_limit": "Current custom first-packet fingerprint is not JA4; TLS 1.3 hides certificate contents after ServerHello and QUIC needs a distinct parser.",
+      "qualification": "Reassemble/validate supported handshake evidence and distinguish observed, encrypted, truncated and unsupported. Compare stable fingerprint versions and novelty by context.",
+      "references": [
+        "tls",
+        "quic",
+        "ja4"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g16_distinct_custom_fingerprints",
+      "group": "G16",
+      "units": "categories",
+      "recommended_measurement": "Count current custom handshake hashes; standardized JA4 requires exact specification/interoperability qualification.",
+      "current_limit": "Current custom first-packet fingerprint is not JA4; TLS 1.3 hides certificate contents after ServerHello and QUIC needs a distinct parser.",
+      "qualification": "Reassemble/validate supported handshake evidence and distinguish observed, encrypted, truncated and unsupported. Compare stable fingerprint versions and novelty by context.",
+      "references": [
+        "tls",
+        "quic",
+        "ja4"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g17_complete_http_requests",
+      "group": "G17",
+      "units": "parsed requests",
+      "recommended_measurement": "Count complete supported HTTP/1 headers; request reconstruction across TCP segments and HTTP/2/3 are separate work.",
+      "current_limit": "Current single-packet HTTP/1 lexical metrics cannot prove SQLi, XSS, RCE, authorization abuse or exploit success.",
+      "qualification": "Reconstruct HTTP transactions at an authorized plaintext point, preserve raw versus bounded canonical target semantics, and join application/auth outcomes.",
+      "references": [
+        "http",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g17_rare_method_count",
+      "group": "G17",
+      "units": "parsed requests",
+      "recommended_measurement": "Count methods outside the explicit configured set; protocol-legal methods are not attacks by themselves.",
+      "current_limit": "Current single-packet HTTP/1 lexical metrics cannot prove SQLi, XSS, RCE, authorization abuse or exploit success.",
+      "qualification": "Reconstruct HTTP transactions at an authorized plaintext point, preserve raw versus bounded canonical target semantics, and join application/auth outcomes.",
+      "references": [
+        "http",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g17_uri_length_mean",
+      "group": "G17",
+      "units": "request-target bytes",
+      "recommended_measurement": "Mean length over supported request targets; preserve raw/normalized representation and privacy boundaries.",
+      "current_limit": "Current single-packet HTTP/1 lexical metrics cannot prove SQLi, XSS, RCE, authorization abuse or exploit success.",
+      "qualification": "Reconstruct HTTP transactions at an authorized plaintext point, preserve raw versus bounded canonical target semantics, and join application/auth outcomes.",
+      "references": [
+        "http",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g17_uri_entropy_mean",
+      "group": "G17",
+      "units": "bits per target distribution",
+      "recommended_measurement": "Mean categorical byte entropy of request targets, conditioned on length and route/parameter roles.",
+      "current_limit": "Current single-packet HTTP/1 lexical metrics cannot prove SQLi, XSS, RCE, authorization abuse or exploit success.",
+      "qualification": "Reconstruct HTTP transactions at an authorized plaintext point, preserve raw versus bounded canonical target semantics, and join application/auth outcomes.",
+      "references": [
+        "http",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g17_uri_encoded_ratio_mean",
+      "group": "G17",
+      "units": "fraction",
+      "recommended_measurement": "Mean declared percent-encoding density per supported target; distinguish valid escapes and bounded normalization.",
+      "current_limit": "Current single-packet HTTP/1 lexical metrics cannot prove SQLi, XSS, RCE, authorization abuse or exploit success.",
+      "qualification": "Reconstruct HTTP transactions at an authorized plaintext point, preserve raw versus bounded canonical target semantics, and join application/auth outcomes.",
+      "references": [
+        "http",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "g17_uri_special_ratio_mean",
+      "group": "G17",
+      "units": "fraction",
+      "recommended_measurement": "Mean fraction of the explicitly defined character set per target; distinguish legitimate search/encoded content.",
+      "current_limit": "Current single-packet HTTP/1 lexical metrics cannot prove SQLi, XSS, RCE, authorization abuse or exploit success.",
+      "qualification": "Reconstruct HTTP transactions at an authorized plaintext point, preserve raw versus bounded canonical target semantics, and join application/auth outcomes.",
+      "references": [
+        "http",
+        "owasp"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "timestamp",
+      "group": "BASE",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "src_ip",
+      "group": "BASE",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "dst_ip",
+      "group": "BASE",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "src_port",
+      "group": "BASE",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "dst_port",
+      "group": "BASE",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "protocol",
+      "group": "BASE",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "flow_duration",
+      "group": "BASE",
+      "units": "seconds",
+      "recommended_measurement": "Last minus first event time for an observed flow, separately retaining window exposure and censoring; no singleton rate inflation.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "total_packets",
+      "group": "BASE",
+      "units": "packets",
+      "recommended_measurement": "Exact accepted observations with direction/duplication/sampling boundaries; report independently measured drops.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "total_bytes",
+      "group": "BASE",
+      "units": "captured bytes",
+      "recommended_measurement": "Sum observed captured frame lengths at a stated layer; not application goodput or wire-rate including FCS/preamble.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "avg_packet_size",
+      "group": "BASE",
+      "units": "captured bytes",
+      "recommended_measurement": "Sum captured sizes / count at the same direction/key, null with zero support.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "min_packet_size",
+      "group": "BASE",
+      "units": "captured bytes",
+      "recommended_measurement": "Minimum supported observed captured size; retain sample count, byte layer and truncation/offload flags.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "max_packet_size",
+      "group": "BASE",
+      "units": "captured bytes",
+      "recommended_measurement": "Maximum supported observed captured size; retain sample count, byte layer and MTU/offload/truncation context.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "packets_per_second",
+      "group": "BASE",
+      "units": "packets/second",
+      "recommended_measurement": "Count / recorded exposure interval for a window rate; flow active-span rate requires a separate name and singleton state.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "bytes_per_second",
+      "group": "BASE",
+      "units": "captured bytes/second",
+      "recommended_measurement": "Captured bytes / recorded exposure; do not conflate bytes with bits or active span with full window.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "syn_count",
+      "group": "BASE",
+      "units": "packets",
+      "recommended_measurement": "Count observed packets carrying SYN, with TCP eligibility and retransmission context; flags are not sessions.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "ack_count",
+      "group": "BASE",
+      "units": "packets",
+      "recommended_measurement": "Count observed packets carrying ACK, with TCP eligibility and retransmission context; flags are not sessions.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "fin_count",
+      "group": "BASE",
+      "units": "packets",
+      "recommended_measurement": "Count observed packets carrying FIN, with TCP eligibility and retransmission context; flags are not sessions.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "rst_count",
+      "group": "BASE",
+      "units": "packets",
+      "recommended_measurement": "Count observed packets carrying RST, with TCP eligibility and retransmission context; flags are not sessions.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "psh_count",
+      "group": "BASE",
+      "units": "packets",
+      "recommended_measurement": "Count observed packets carrying PSH, with TCP eligibility and retransmission context; flags are not sessions.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "unique_src_ports",
+      "group": "BASE",
+      "units": "categories",
+      "recommended_measurement": "Distinct source ports in a declared source/context/horizon; retain cardinality support and capping/sketch uncertainty.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "unique_dst_ports",
+      "group": "BASE",
+      "units": "categories",
+      "recommended_measurement": "Distinct destination ports at source/context/horizon scope rather than one fixed-port flow.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "out_packets",
+      "group": "BASE",
+      "units": "packets",
+      "recommended_measurement": "Count locally attributed outgoing observations at the declared IP/VLAN boundary, including explicit omissions.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "in_packets",
+      "group": "BASE",
+      "units": "packets",
+      "recommended_measurement": "Count locally attributed incoming observations at the identical boundary; qualify both directions.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "out_bytes",
+      "group": "BASE",
+      "units": "captured bytes",
+      "recommended_measurement": "Sum outgoing captured frame bytes; distinguish endpoint identity from pre/post-NAT identities.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "in_bytes",
+      "group": "BASE",
+      "units": "captured bytes",
+      "recommended_measurement": "Sum incoming captured frame bytes at the same scope and horizon.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "out_pps",
+      "group": "BASE",
+      "units": "packets/second",
+      "recommended_measurement": "Outgoing observations / actual recorded window exposure; incomplete windows remain ineligible for this scorer.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "out_bytes_per_second",
+      "group": "BASE",
+      "units": "captured bytes/second",
+      "recommended_measurement": "Outgoing captured bytes divided by actual recorded window exposure; retain incomplete-window and byte-layer context.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "packet_size_mean",
+      "group": "BASE",
+      "units": "captured bytes",
+      "recommended_measurement": "Online mean outgoing frame size with explicit sample count, direction and byte layer.",
+      "current_limit": "Legacy active-span rates with a 1ms floor differ from site full-window rates; packet bytes are not payload/goodput.",
+      "qualification": "Measure counts, rates/exposure and sizes at a fixed observation layer; separate identifiers from numeric behavior and preserve unsupported states.",
+      "references": [
+        "biflow",
+        "moments",
+        "sampling"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_total_flows",
+      "group": "DEVICE",
+      "units": "observations",
+      "recommended_measurement": "Support count for a defined device identity; use to gate confidence, not as attack identity.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_avg_pkt_rate",
+      "group": "DEVICE",
+      "units": "packets/second",
+      "recommended_measurement": "Prior-only reviewed baseline rate; if using EWMA declare elapsed-time decay and context.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_pkt_rate_deviation",
+      "group": "DEVICE",
+      "units": "standardized residual",
+      "recommended_measurement": "Score current rate against a frozen prior device/context baseline; compare robust median/MAD and empirical tails.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_avg_byte_rate",
+      "group": "DEVICE",
+      "units": "bytes/second",
+      "recommended_measurement": "Prior-only reviewed baseline byte rate at the same byte layer/exposure.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_byte_rate_deviation",
+      "group": "DEVICE",
+      "units": "standardized residual",
+      "recommended_measurement": "Prior-baseline residual with zero-scale and missingness handling; never return normal merely because variance is zero.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_unique_dst_ips",
+      "group": "DEVICE",
+      "units": "categories",
+      "recommended_measurement": "Distinct peers within the documented horizon and identity scope, with caps reported.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_unique_dst_ports",
+      "group": "DEVICE",
+      "units": "categories",
+      "recommended_measurement": "Distinct peer-service contacts within documented horizon; preserve cap and eligibility evidence.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_new_dst_ratio",
+      "group": "DEVICE",
+      "units": "fraction",
+      "recommended_measurement": "Size(current peers minus retained prior peers) / size(current peers), computed before history update; null for empty support.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_protocol_dist_tcp",
+      "group": "DEVICE",
+      "units": "fraction",
+      "recommended_measurement": "Eligible prior TCP observations / all declared protocol observations; preserve OTHER and observation weighting.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_protocol_dist_udp",
+      "group": "DEVICE",
+      "units": "fraction",
+      "recommended_measurement": "Eligible prior UDP observations / all declared protocol observations; preserve OTHER and observation weighting.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_protocol_dist_icmp",
+      "group": "DEVICE",
+      "units": "fraction",
+      "recommended_measurement": "Eligible prior ICMP observations / all declared protocol observations; preserve OTHER and observation weighting.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_avg_payload_size",
+      "group": "DEVICE",
+      "units": "declared bytes",
+      "recommended_measurement": "Use true transport payload lengths for a payload metric; current legacy inputs are average packet sizes and require a migration.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_payload_size_deviation",
+      "group": "DEVICE",
+      "units": "standardized residual",
+      "recommended_measurement": "Compare the same byte-layer metric against its prior baseline with robust/empirical alternatives.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "is_registered_iot",
+      "group": "DEVICE",
+      "units": "inventory indicator",
+      "recommended_measurement": "Time-valid independent inventory metadata; qualify leakage/role errors and never treat registration as evidence of benignness.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "is_gateway",
+      "group": "DEVICE",
+      "units": "inventory indicator",
+      "recommended_measurement": "Time-valid role/context signal; independently verify topology and avoid memorizing device identities.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "device_age_seconds",
+      "group": "DEVICE",
+      "units": "seconds",
+      "recommended_measurement": "Elapsed event-time identity lifetime with restart/reassignment explicit; confidence context, not an attack predictor.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "is_baseline_mature",
+      "group": "DEVICE",
+      "units": "eligibility indicator",
+      "recommended_measurement": "Evidence-backed support/workload-coverage gate; twenty flows/180 seconds is a legacy heuristic, not reliability proof.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "device_new_dst_ratio",
+      "group": "DEVICE",
+      "units": "fraction",
+      "recommended_measurement": "Size(current peers minus retained prior peers) / size(current peers), computed before history update; null for empty support.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "device_macs_observed",
+      "group": "DEVICE",
+      "units": "categories",
+      "recommended_measurement": "Distinct observed outgoing MAC claims for an IP/VLAN window; use authenticated lease/port context before identity action.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "site_v3",
+      "name": "profile_windows_before",
+      "group": "DEVICE",
+      "units": "windows",
+      "recommended_measurement": "Prior-history support count, excluded from the new scorer as an age/support field.",
+      "current_limit": "Current empirical histories and manual descriptive profiles are not calibrated ML baselines; legacy destination novelty remains a known formula defect.",
+      "qualification": "Use frozen prior device/role/context references and score-before-update. Keep cold start, identity change, workload support and poisoning controls explicit.",
+      "references": [
+        "mud",
+        "mad",
+        "ewma",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "network_active_flows",
+      "group": "NETWORK",
+      "units": "keys",
+      "recommended_measurement": "Active keys at a named observation scope, distinct from newly created sessions and actual switch occupancy.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "network_total_pps",
+      "group": "NETWORK",
+      "units": "packets/second",
+      "recommended_measurement": "Total accepted packet count / actual network-window exposure; preserve scope and drops.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "network_total_bps",
+      "group": "NETWORK",
+      "units": "bytes/second, legacy name",
+      "recommended_measurement": "Total captured bytes / actual window exposure; legacy bps here is bytes, not bits.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "network_unique_src_ips",
+      "group": "NETWORK",
+      "units": "categories",
+      "recommended_measurement": "Distinct source identities at the sensor scope/horizon with NAT and address reuse explicit.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "network_unique_dst_ips",
+      "group": "NETWORK",
+      "units": "categories",
+      "recommended_measurement": "Distinct destination identities at the declared site/window scope, with visibility, sampling and capping evidence.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "network_avg_flow_duration",
+      "group": "NETWORK",
+      "units": "seconds",
+      "recommended_measurement": "Mean observed active spans with singleton/censoring behavior explicit; separate from exposure duration.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "network_entropy_src_ip",
+      "group": "NETWORK",
+      "units": "bits",
+      "recommended_measurement": "Entropy of source-frequency categories plus sample size/richness; compare eligible site/context baselines.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "network_entropy_dst_port",
+      "group": "NETWORK",
+      "units": "bits",
+      "recommended_measurement": "Shannon entropy of destination-port frequency categories at the declared site/context/horizon scope, retaining sample support.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "active_snort_alerts",
+      "group": "NETWORK",
+      "units": "detector observations",
+      "recommended_measurement": "Separate signature-derived evidence from behavior-only model inputs and independent ground truth.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "distinct_alert_types",
+      "group": "NETWORK",
+      "units": "detector categories",
+      "recommended_measurement": "Count mapped alert categories with GID/SID/ruleset provenance; avoid circular behavioral evaluation.",
+      "current_limit": "Equivalent complete site-wide inference is not implemented; signature-derived context can leak labels into behavior-only evaluation.",
+      "qualification": "Use source/site/cohort distributions with declared coverage, independent sampling/loss evidence and matched rollout/failover controls.",
+      "references": [
+        "entropy",
+        "sampling",
+        "evaluation"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "label",
+      "group": "LABELS",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy normal defaults and Snort/rate-derived labels are not independent benign/malicious truth.",
+      "qualification": "Assign independent scenario/target truth separately from detector output; retain UNKNOWN and exclude labels from predictors.",
+      "references": [
+        "evaluation",
+        "closedworld"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "attack_type",
+      "group": "LABELS",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy normal defaults and Snort/rate-derived labels are not independent benign/malicious truth.",
+      "qualification": "Assign independent scenario/target truth separately from detector output; retain UNKNOWN and exclude labels from predictors.",
+      "references": [
+        "evaluation",
+        "closedworld"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    },
+    {
+      "schema": "legacy",
+      "name": "snort_sid",
+      "group": "LABELS",
+      "units": "audit/categorical",
+      "recommended_measurement": "Preserve the typed value for provenance, identity joins or independent truth; exclude raw identifier/label leakage from portable anomaly inputs.",
+      "current_limit": "Legacy normal defaults and Snort/rate-derived labels are not independent benign/malicious truth.",
+      "qualification": "Assign independent scenario/target truth separately from detector output; retain UNKNOWN and exclude labels from predictors.",
+      "references": [
+        "evaluation",
+        "closedworld"
+      ],
+      "recommendation_status": "existing_measurement_requires_qualification_or_versioned_future_work"
+    }
+  ],
+  "future_groups": [
+    {
+      "id": "G18",
+      "recommended_method": "Join new/active state, retransmissions, queue/CPU/memory pressure and target progress; measure sustained resource exhaustion with normal busy controls.",
+      "current_limit": "Planned; no declared new measurements are installed by this research/scoring milestone.",
+      "references": [
+        "tcp",
+        "zeek",
+        "attack"
+      ]
+    },
+    {
+      "id": "G19",
+      "recommended_method": "Join time-valid DHCP/ARP/NDP/switch/AAA identity evidence, competing claims, reassignment and NAT context; abstain on ambiguous identity.",
+      "current_limit": "Planned beyond the existing manual inventory consistency subset; IP/MAC agreement is not authentication.",
+      "references": [
+        "arp",
+        "mud",
+        "attack"
+      ]
+    },
+    {
+      "id": "G20",
+      "recommended_method": "Use authenticated SD-WAN/router audit events, adjacency/session churn, configuration revisions and path outcomes, conditioned on planned maintenance.",
+      "current_limit": "Planned; encrypted control protocols and missing vendor logs must remain unobserved.",
+      "references": [
+        "attack",
+        "mud"
+      ]
+    },
+    {
+      "id": "G21",
+      "recommended_method": "Correlate identity-bound authentication attempts/results, host-to-service transitions and lateral sequence evidence across windows.",
+      "current_limit": "Planned; a port counter or response length is not an authentication result.",
+      "references": [
+        "attack",
+        "owasp"
+      ]
+    },
+    {
+      "id": "G22",
+      "recommended_method": "Evaluate user/tenant/resource/action sequences against application authorization state and independent target receipts.",
+      "current_limit": "Planned; transport statistics cannot determine business authorization on encrypted APIs.",
+      "references": [
+        "owasp",
+        "http"
+      ]
+    },
+    {
+      "id": "G23",
+      "recommended_method": "Combine peer novelty, periodicity/change, DNS/TLS context and unusual egress conditioned on role/scheduled jobs. Validate jittered/slow campaigns and benign backups.",
+      "current_limit": "Planned comprehensive C2/exfiltration evidence; existing G13/G15/G16 are smaller measurement foundations.",
+      "references": [
+        "attack",
+        "kitsune",
+        "dns"
+      ]
+    },
+    {
+      "id": "G24",
+      "recommended_method": "Correlate reconstructed request, policy decision and independently observed endpoint/application outcome; separate attempted, blocked and successful exploitation.",
+      "current_limit": "Planned; a suspicious URI or high anomaly score does not establish compromise.",
+      "references": [
+        "owasp",
+        "attack"
+      ]
+    }
+  ]
+}

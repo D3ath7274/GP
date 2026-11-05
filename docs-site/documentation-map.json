@@ -6,6 +6,18 @@
   "rules": [
     {
       "sources": [
+        "Controller/behavioral_evidence.py",
+        "scripts/score_feature_groups.py",
+        "docs-site/reference/feature-methods.json"
+      ],
+      "pages": [
+        "docs-site/architecture/feature-methods.mdx",
+        "docs-site/deployment/feature-evidence.mdx",
+        "docs-site/developers/feature-evidence-code-tour.mdx"
+      ]
+    },
+    {
+      "sources": [
         "Controller/http_dashboard.py"
       ],
       "pages": [
