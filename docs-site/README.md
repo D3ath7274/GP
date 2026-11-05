@@ -14,6 +14,20 @@ Install the tested CLI with `npm install --global mint@4.2.1195` if it is absent
 
 [Mintlify CLI](https://www.mintlify.com/docs/cli/install) · [Local preview](https://www.mintlify.com/library/how-to-turn-markdown-files-into-a-docs-website)
 
+## Find the right guide
+
+The website uses five task tabs instead of one combined deploy/develop sidebar:
+
+| Tab | Use it for |
+| --- | --- |
+| Start here | Environment, first test, docs access, product scope/phases and changes |
+| Collect data | Visibility/readiness, no-mirror or mirrored pilots, collection, shadow review and operations |
+| Audit firewalls | Policy import/audit, offline change review and controlled response/campaign tests |
+| Develop | Architecture, behavioral feature rationale/lineage, learning, maintenance and code tours |
+| Reference | Current API guides/contracts and the retained original lab implementation |
+
+The homepage gives recommended reading sequences. Existing MDX paths and API contracts are unchanged, so bookmarks and code-to-doc mappings remain valid. Future pages belong to the task they help complete, rather than a generic deployment/development catch-all.
+
 ## Keep documentation synchronized
 
 Run this once from the repository root to opt in to the versioned local hook.

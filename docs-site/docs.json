@@ -8,89 +8,154 @@
     "dark": "#087F73"
   },
   "navigation": {
-    "groups": [
+    "tabs": [
       {
-        "group": "Start",
-        "pages": [
-          "index",
-          "getting-started/install",
-          "getting-started/quickstart"
+        "tab": "Start here",
+        "groups": [
+          {
+            "group": "First steps",
+            "pages": [
+              "index",
+              "getting-started/install",
+              "getting-started/quickstart",
+              "deployment/documentation-access"
+            ]
+          },
+          {
+            "group": "Product direction",
+            "pages": [
+              "roadmap/final-service-scope",
+              "roadmap/delivery-phases"
+            ]
+          },
+          {
+            "group": "What changed",
+            "pages": [
+              "reference/change-log"
+            ]
+          }
         ]
       },
       {
-        "group": "Operate",
-        "pages": [
-          "operations/dashboard",
-          "troubleshooting/verification",
-          "operations/incident-response"
+        "tab": "Collect data",
+        "groups": [
+          {
+            "group": "1. Check visibility and readiness",
+            "pages": [
+              "deployment/placement",
+              "deployment/pretest-qualification",
+              "deployment/no-mirror-pilot"
+            ]
+          },
+          {
+            "group": "2. Collect and review",
+            "pages": [
+              "deployment/home-pilot-step-by-step",
+              "deployment/home-collection",
+              "security/shadow-policy"
+            ]
+          },
+          {
+            "group": "3. Monitor and recover",
+            "pages": [
+              "security/configuration",
+              "operations/dashboard",
+              "troubleshooting/verification",
+              "operations/incident-response"
+            ]
+          }
         ]
       },
       {
-        "group": "Deploy and develop",
-        "pages": [
-          "architecture/data-flow",
-          "deployment/placement",
-          "security/configuration",
-          "security/shadow-policy",
-          "architecture/feature-rationale",
-          "architecture/feature-lineage",
-          "developers/maintenance",
-          "developers/repository-scope",
-          "developers/study-roadmap",
-          "developers/ai-handoff",
-          "deployment/nftables-lab",
-          "deployment/home-collection",
-          "deployment/documentation-access",
-          "deployment/policy-workbench",
-          "deployment/home-pilot-step-by-step",
-          "deployment/no-mirror-pilot",
-          "deployment/pretest-qualification",
-          "deployment/security-campaigns",
-          "deployment/policy-audit",
-          "deployment/offline-policy-changes",
-          "developers/policy-change-code-tour",
-          "developers/qualification-code-tour",
-          "developers/policy-workbench-code-tour"
+        "tab": "Audit firewalls",
+        "groups": [
+          {
+            "group": "1. Import and inspect policy",
+            "pages": [
+              "deployment/policy-workbench",
+              "deployment/policy-audit"
+            ]
+          },
+          {
+            "group": "2. Review proposed changes",
+            "pages": [
+              "deployment/offline-policy-changes"
+            ]
+          },
+          {
+            "group": "3. Run controlled tests",
+            "pages": [
+              "deployment/nftables-lab",
+              "deployment/security-campaigns"
+            ]
+          }
         ]
       },
       {
-        "group": "Product goals and roadmap",
-        "pages": [
-          "roadmap/final-service-scope",
-          "roadmap/delivery-phases"
+        "tab": "Develop",
+        "groups": [
+          {
+            "group": "Understand the design",
+            "pages": [
+              "architecture/data-flow",
+              "architecture/feature-rationale",
+              "architecture/feature-lineage",
+              "developers/repository-scope"
+            ]
+          },
+          {
+            "group": "Learn and contribute",
+            "pages": [
+              "developers/study-roadmap",
+              "developers/ai-handoff",
+              "developers/maintenance"
+            ]
+          },
+          {
+            "group": "Read the implementation",
+            "pages": [
+              "developers/policy-workbench-code-tour",
+              "developers/qualification-code-tour",
+              "developers/policy-change-code-tour"
+            ]
+          }
         ]
       },
       {
-        "group": "API",
-        "pages": [
-          "api-reference/overview",
-          "api-reference/collection",
-          "api-reference/policy-workbench",
-          "reference/change-log"
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Current API guides",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/collection",
+              "api-reference/policy-workbench"
+            ]
+          },
+          {
+            "group": "Policy workbench endpoints",
+            "openapi": "/policy-openapi.json"
+          },
+          {
+            "group": "Collection endpoints",
+            "openapi": "/collection-openapi.json"
+          },
+          {
+            "group": "Original lab implementation",
+            "pages": [
+              "deployment/passive-sensor",
+              "architecture/detection",
+              "integrations/snort",
+              "operations/modes",
+              "operations/collection",
+              "reference/control-protocol"
+            ]
+          },
+          {
+            "group": "Legacy Ryu endpoints",
+            "openapi": "/openapi.json"
+          }
         ]
-      },
-      {
-        "group": "Legacy behavioral reference",
-        "pages": [
-          "deployment/passive-sensor",
-          "architecture/detection",
-          "integrations/snort",
-          "operations/modes",
-          "operations/collection",
-          "reference/control-protocol"
-        ]
-      },
-      {
-        "group": "Legacy Ryu lab endpoints",
-        "openapi": "/openapi.json"
-      },
-      {
-        "group": "Current policy workbench endpoints",
-        "openapi": "/policy-openapi.json"
-      },
-      {
-        "group": "Current collection endpoints",
-        "openapi": "/collection-openapi.json"
       }
     ]
   },

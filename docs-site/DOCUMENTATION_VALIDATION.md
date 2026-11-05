@@ -1,5 +1,11 @@
 # Validation
 
+## Task-based documentation navigation · 2026-11-05
+
+Replaced the combined deployment/development sidebar with five tabs and smaller task groups. A before/after navigation comparison preserved all 41 existing page routes exactly once and the same three OpenAPI sources exactly once; every target exists. No MDX route, runtime source, contract content, behavioral feature or service status changed. The homepage provides setup-specific reading sequences and the docs README/coverage notes describe ownership of each section.
+
+Browser verification on the running localhost preview confirmed all five tabs, the shortened Start sidebar, numbered collection and audit groups, the Develop architecture/learning/code-tour groups and separate API/legacy references. A screenshot of Develop confirmed the rendered tab bar and readable sidebar grouping. Mintlify validation/build, broken-link and accessibility checks passed; accessibility covered 46 MDX pages with the existing AA/AAA accent advisory. All three staged documentation/feature/handbook guards and staged whitespace checks passed. The handbook/snapshot were regenerated for the navigation-config fingerprint. Runtime tests were not rerun for this documentation-only change; the preceding implementation qualification remains separately recorded below.
+
 ## Auto-audit scope consolidation and behavioral preservation · 2026-11-05
 
 Removed 31 tracked obsolete helpers, duplicate plans/runbooks and superseded assessment documents. The annotated pre-auto-audit-cleanup-2026-11-05 tag points to ce9a21878025bde98331d32e6cf6716411d25f1c before cleanup. The scope ledger lists exact paths/replacements; private/untracked datasets, ignored thesis inputs and Backup were not selected. Both feature extractors, both inference loaders, three model/weight artifacts and two rebuilding scripts retain their original Git blob hashes. The feature-groups.json contents are unchanged. Source catalog validation still covers 30 categories (G1–G24 plus supporting groups), 102 legacy columns and 71 site columns. All 67 backtick-delimited design tokens in the old proposal's measurement section remain in feature-lineage.mdx; this token check proves preservation, not feature implementation or mathematical validity.

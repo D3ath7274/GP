@@ -1,6 +1,6 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "ce9a21878025bde98331d32e6cf6716411d25f1c",
+  "reference_base_commit": "034df70c237dad4e84600be6b0da426171084fd3",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
   "context_sha256": "0496f8718513071ebd6276e825fdc7f2c6d7fffb68aad46ad372d6368a3f8646",
   "files": [
@@ -2334,8 +2334,8 @@
     {
       "path": "docs-site/docs.json",
       "purpose": "Mintlify branding/navigation selects authored pages and separate legacy-Ryu versus policy-workbench API groups.",
-      "sha256": "b946a9f7bacf12f75cb23732470cb18181f6d6b6cac9c17bd4bfcc482d75d8a0",
-      "canonical_bytes": 2715
+      "sha256": "95355075edf010a06ba63776730385018f00b99bc4e1e8c2b41f51f7e7a039d7",
+      "canonical_bytes": 4308
     },
     {
       "path": "docs-site/documentation-map.json",

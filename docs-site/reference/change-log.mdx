@@ -2,6 +2,10 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-05 · Task-based documentation navigation
+
+Replaced the crowded combined deployment/development sidebar with five task tabs: Start here, Collect data, Audit firewalls, Develop and Reference. Smaller numbered collection/audit groups give an execution order; architecture, code tours and original lab references have separate homes. The homepage now routes readers by their actual setup, including the no-mirror path, rather than presenting fifteen equally weighted entry cards. All existing page paths and three OpenAPI sources remain assigned exactly once; no runtime, feature, model, service status or API behavior changes. Operator impact: switch the top tab to see its focused sidebar. Verification is recorded in DOCUMENTATION_VALIDATION.md, including navigation coverage, browser checks, staged guards and Mintlify validation/link/accessibility results.
+
 ## 2026-11-05 · Consolidate auto-audit scope without discarding behavioral features
 
 Removed 31 superseded tracked helpers/runbooks/assessments, including alternate Snort relays, the launcher for an absent Ryu app and topology-specific deployment instructions. The annotated pre-auto-audit-cleanup-2026-11-05 tag preserves the prior committed tree. The [scope ledger](/developers/repository-scope) lists every removal/replacement; private datasets, ignored thesis inputs and Backup are outside cleanup. Current collection/policy/no-mirror qualification guides and S01–S70/P0–P13 remain canonical. Retained Ryu/DAI, TrafficCapture, RF/AE artifacts/builders and Snort sources are explicitly lab/reference code, not new production service evidence.

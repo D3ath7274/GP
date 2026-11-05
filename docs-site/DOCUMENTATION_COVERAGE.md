@@ -45,3 +45,7 @@ Superseded root runbooks are removed. Current qualification/deployment pages and
 | http_dashboard.py and import isolation / actual HTTP / legacy extraction tests | Dashboard; Home collection; Repository scope; Develop and verify changes |
 | Removed alternate relays/helpers and duplicate runbooks; retained Ryu/DAI reference | Repository scope and preservation ledger; Legacy behavioral reference and replay; Snort signature evidence |
 | Original proposed G11–G17 tables and current/planned G1–G24 status | Feature preservation and design lineage; Why each behavioral feature group exists |
+
+## Task navigation
+
+The site groups pages into Start here, Collect data, Audit firewalls, Develop and Reference. This changes only how readers find the existing routes; source-to-content mappings remain the same. The homepage supplies reading sequences and the docs README records tab ownership. Keep every authored page and each current/legacy API contract reachable when editing docs.json.

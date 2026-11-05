@@ -1,27 +1,36 @@
 ---
 title: "Adaptive IPS framework"
+description: "Choose the guide for your next task: collect traffic, audit a policy, or develop the framework."
 ---
 
-Adaptive IPS framework combines behavioral traffic/device analysis with a planned multi-vendor firewall-policy management layer. Its final goal includes qualified automatic containment, policy auditing, optimization, compliance evidence, application context and verified change workflows. The [final service scope](/roadmap/final-service-scope) maps all 70 capabilities from the supplied product specification to current evidence and delivery phases.
+Adaptive IPS framework combines behavioral traffic/device analysis with a developing firewall-policy audit layer. Use the tabs above to choose a task; each tab has a smaller sidebar. Current observations and policy analysis are separate from planned automatic production firewall changes.
 
-The retained research Ryu deployment observes traffic crossing managed Open vSwitch and can request drop flows. The separate home collector writes site-v3.0 observations and shadow policy evidence with UNKNOWN ground truth. The nftables reference adapter is operator-run. These entry points have different detection and enforcement behavior; commercial firewall-policy collection and the enterprise services remain planned.
+## Where should I go?
 
 <CardGroup cols={2}>
-<Card title="Study and rebuild" href="/developers/study-roadmap">Learn the prerequisites through source-linked exercises and competency checks.</Card>
-<Card title="AI continuation context" href="/developers/ai-handoff">Understand runtime lanes, file relationships, known limits and freshness checks.</Card>
-<Card title="First test" href="/getting-started/quickstart">Choose qualified offline, policy or capture tests.</Card>
-<Card title="Operator dashboard" href="/operations/dashboard">Interpret alerts and verify enforcement.</Card>
-<Card title="Final product services" href="/roadmap/final-service-scope">See current foundations, missing services and acceptance criteria.</Card>
-<Card title="Delivery phases" href="/roadmap/delivery-phases">Follow the path from qualified home collection to multi-vendor policy management.</Card>
-<Card title="Policy workbench" href="/deployment/policy-workbench">Test operator-described snapshots, ordered header queries and revision diffs.</Card>
-<Card title="Home visibility first" href="/deployment/home-pilot-step-by-step">Check the actual PC/phone observation path before a two-week baseline.</Card>
-<Card title="Pre-test qualification" href="/deployment/pretest-qualification">Check prerequisites, golden features, recovery and daily evidence quality.</Card>
-<Card title="Policy audit" href="/deployment/policy-audit">Inspect scoped shadow/overlap findings with concrete traffic witnesses.</Card>
-<Card title="Offline change testing" href="/deployment/offline-policy-changes">Preview exact-base model changes and inspect effective impact without a live firewall.</Card>
-<Card title="Feature rationale" href="/architecture/feature-rationale">Understand current and planned G1–G24, benign controls and qualification needs.</Card>
-<Card title="Start without a mirror" href="/deployment/no-mirror-pilot">Follow t530 checks, real endpoint captures and an isolated firewall lab; return a structured results handoff.</Card>
-<Card title="Repository scope" href="/developers/repository-scope">See active paths, removed helpers and preservation of the thesis features.</Card>
-<Card title="Feature lineage" href="/architecture/feature-lineage">Retain proposed measurements without confusing them with implemented columns.</Card>
+<Card title="Start here" href="/getting-started/quickstart">Prepare the environment, choose a first test and find the roadmap.</Card>
+<Card title="Collect data" href="/deployment/placement">Check traffic visibility, qualify collection, then collect and review evidence.</Card>
+<Card title="Audit firewalls" href="/deployment/policy-workbench">Import a policy model, inspect audit findings and preview changes offline.</Card>
+<Card title="Develop" href="/architecture/data-flow">Understand the architecture and feature groups, then follow the study plan and code tours.</Card>
+<Card title="Reference" href="/api-reference/overview">Look up current API contracts or the original Ryu/Snort/model lab implementation.</Card>
 </CardGroup>
 
-The legacy Ryu runtime has four detection tiers. A limited G11–G17 measurement subset is implemented in the separate home collector. Full application inspection, calibrated site-v3 models and multi-vendor policy automation require further development and qualification. Existing APF command names, paths, API routes and schema identifiers are retained for compatibility.
+## Follow the path that matches your setup
+
+| Your next task | Read in this order | When to move on |
+| --- | --- | --- |
+| No traffic mirror yet | [Pre-test qualification](/deployment/pretest-qualification) → [No-mirror pilot](/deployment/no-mirror-pilot) | Follow the bounded endpoint capture/replay and results steps; this is not whole-home visibility. |
+| A mirror or TAP is available | [Placement](/deployment/placement) → [Pre-test qualification](/deployment/pretest-qualification) → [Timed home pilot](/deployment/home-pilot-step-by-step) → [Collection](/deployment/home-collection) | Prove the intended traffic directions and measurement quality before a long capture. |
+| Test policy audit without hardware | [Workbench](/deployment/policy-workbench) → [Policy audit](/deployment/policy-audit) → [Offline changes](/deployment/offline-policy-changes) | Use the supported operator-model fixtures; native vendor semantics and live deployment are not implied. |
+| Study or change the code | [Architecture](/architecture/data-flow) → [Feature rationale](/architecture/feature-rationale) → [Study roadmap](/developers/study-roadmap) → [Maintenance](/developers/maintenance) | Read the relevant code tour and tests before editing. |
+
+For your current unresolved mirror setup, start with **Collect data → 1. Check visibility and readiness → Start testing without a traffic mirror**. You can work through **Audit firewalls** independently.
+
+## Know which capability you are using
+
+- **Site collection:** bounded site-v3 observations and shadow profiles, UNKNOWN ground truth, no site-model inference or automatic firewall writes.
+- **Policy workbench:** read-only operator-described policy models, audit witnesses and hypothetical change review.
+- **Controlled response tests:** a separately operated nftables reference adapter and independent security-campaign evidence.
+- **Original lab reference:** Ryu, Snort, rate/DAI, RF and AE remain under **Reference**. Their models and enforcement assumptions are separate from the current site collector.
+
+All old/new behavioral feature groups remain documented, including [G1–G24 rationale](/architecture/feature-rationale) and [preserved design proposals](/architecture/feature-lineage). The [70-service scope](/roadmap/final-service-scope) and [delivery phases](/roadmap/delivery-phases) distinguish delivered foundations from future services. See [the changelog](/reference/change-log) for updates.
