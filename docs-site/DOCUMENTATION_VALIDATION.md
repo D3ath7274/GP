@@ -10,6 +10,8 @@ The builder checks every tracked purpose and normalized source/raw-binary finger
 
 The staged documentation, feature and handoff guards passed with 164 file roles, 45 Python modules and 87 fingerprinted code/configuration/fixture/model inputs. The conditional RFPreprocessor class is indexed. Both new live documentation pages returned HTTP 200. Mintlify build/validation, broken-link and accessibility checks passed for 44 MDX pages, retaining the existing primary-color AA-versus-AAA advisory. CommonJS implementation classification was added with a focused regression; native controller/firewall/hardware claims remain unchanged.
 
+For implementation commit b4d6d42, [remote run 42038290924](https://github.com/D3ath7274/GP/actions/runs/42038290924) completed successfully: Ubuntu 22.04/Python 3.10 offline tests and handoff check, committed documentation/feature/handoff guards, Node 22 launcher tests and Mintlify validation/link/accessibility all passed. These are tooling/offline software results; real t530 capture and industrial firewall qualification remain separate.
+
 ## No-mirror step-by-step pilot · 2026-11-04
 
 Added matching standalone Markdown/MDX walkthroughs and an editable Markdown results template. The procedure separates t530 software qualification, real PC endpoint capture, address-scoped replay, operator-run namespaced firewall evidence and a seven-day workload schedule. Current CLI arguments and schemas were cross-checked against home_sensor.py, audit_home_data.py, both qualifiers and nft_quarantine.py. The current mirror backend's outgoing-copy skip is explicitly why endpoint/router observations use independent bidirectional capture plus replay. No runtime, model, REST contract or installed ruleset artifact changed.
