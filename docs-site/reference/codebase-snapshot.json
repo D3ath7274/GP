@@ -1,6 +1,6 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "e7f337d5f6387c45417ea4c543e05894c0c5d467",
+  "reference_base_commit": "405991e672149e89142b6945c1963a7d0b69befd",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
   "context_sha256": "c4d2a8afb649775c682c7b49ccc356f7b171e72badf283b6fa3df1c413078cf0",
   "files": [
@@ -2402,7 +2402,7 @@
     },
     {
       "path": "docs-site/assets/adaptive-ips-feature-group-comparisons.pptx",
-      "purpose": "Editable thirty-five-slide teaching presentation compares G1–G24 with alternatives, benign controls, implementation limits and sourced speaker notes."
+      "purpose": "Editable forty-three-slide teaching presentation: a changes-since-thesis section, then G1–G24 comparisons with alternatives, benign controls, implementation limits and sourced speaker notes."
     },
     {
       "path": "docs-site/collection-openapi.json",
@@ -2577,8 +2577,8 @@
     {
       "path": "docs-site/reference/file-purposes.json",
       "purpose": "Authored exact tracked-path roles and local-only exclusions drive complete handbook coverage without ingesting private data.",
-      "sha256": "90f78e0735d90f5f7087822d3d86717173f50d002abf48fa70aa923f24ae8cac",
-      "canonical_bytes": 29203
+      "sha256": "7b3d426fc0bf419451bc0c3a7344527d70e04fc4a912521f3fb2ed51ace952ca",
+      "canonical_bytes": 29244
     },
     {
       "path": "docs-site/roadmap/delivery-phases.mdx",

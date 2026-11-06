@@ -2,6 +2,12 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-06 · Changes since the thesis in the feature presentation
+
+Added an eight-slide section after the title of the [feature-group presentation](/architecture/feature-group-comparison), which now has 43 slides. It summarizes the July 2026 thesis and the current repository: commit timeline, thesis-versus-now comparison, the read-only policy audit track, repository counts, claims stated more narrowly, and the current pilot position with next workstreams. Two dark dividers separate the new section from the original comparison. Page numbers were renumbered, and the title slide subtitle and notes now describe both parts. Every new slide carries speaker notes with commit, file and service-scope sources. The companion page adds a short thesis-versus-now table.
+
+Operator impact: the deck can brief new team members or examiners on post-thesis changes without implying new runtime capability. No executable source, feature schema or catalog, model artifact, API contract or S01–S70 status changed. Package validation, PowerPoint rendering of the changed slides, text checks, guards and Mintlify results are recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-06 · Rationale and alternatives for each feature field
 
 Expanded the [feature measurement reference](/architecture/feature-methods) with individual entries for 102 legacy and 71 site-v3 columns. Each entry documents current behavior, purpose, recommended calculation, an alternative with its trade-off, advantages and a verification check. Operators can now distinguish fields with the same name across schemas and inspect limitations such as key-pinned destination-port concentration, pooled reverse counts and capture-dependent parser support. G18–G24 have separate planned measurement candidates. The [group comparison](/architecture/feature-group-comparison) links to the detailed entries. This documentation work preserves the existing source schemas, measurement inventory and scoring behavior. Coverage and build checks are recorded in DOCUMENTATION_VALIDATION.md.

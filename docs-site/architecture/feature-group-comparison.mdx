@@ -7,6 +7,20 @@ This note explains where each behavioral feature group can add more useful evide
 
 [Download the presentation](/assets/adaptive-ips-feature-group-comparisons.pptx)
 
+## Changes since the thesis
+
+Slides 2–9 of the 43-slide deck summarize how the project moved after the July 2026 thesis. Slide 10 onward is the original feature-group comparison. The section covers a commit timeline, a thesis-versus-now table, the read-only firewall-policy audit track, repository counts, claims stated more narrowly, and the current position with the next workstreams.
+
+| Area | Thesis (July 2026) | Repository (November 2026) |
+| --- | --- | --- |
+| Observation | Inline Ryu controller in an emulated SD-WAN testbed | Passive sensor fed by a mirror port or endpoint captures; Ryu kept as a lab reference |
+| Features | 102 columns, 60 model inputs, G1–G10 | Plus a separate 71-column site schema; G11–G17 measured, G18–G24 planned |
+| Detection | Snort 3, rate/ARP, RF and AE decide live | Same tiers retained as lab references until retrained on qualified site data |
+| Response | Automatic OpenFlow DROP | Operator-run temporary nftables quarantine with read-back, not called by detection |
+| Evaluation | Testbed metrics, cross-validated macro-F1 0.9349 | [Independent campaigns](/deployment/security-campaigns) with false alerts per device-day and containment proof |
+
+The testbed measurements are unchanged. What changed is the claim they support: real-site detection, site-trained models and automatic response remain unqualified. Slide counts come from the repository on 6 November 2026: 173 cataloged columns, 24 groups, 70 services (27 partial, 4 lab reference, 39 planned) and 132 offline unit tests. These counts describe scope and software checks, not detection quality.
+
 ## Current scope
 
 The legacy reference retains 102 columns and the separate site collector has 71 columns. Both counts include identifiers and audit fields. G18–G24 remain planned. For each field's current calculation, rationale, alternative method, advantages, limitations and verification check, open the [field-by-field reference](/architecture/feature-methods). Shared benign controls and qualification needs are in the [group rationale](/architecture/feature-rationale).

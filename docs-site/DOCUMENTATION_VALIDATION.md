@@ -1,5 +1,13 @@
 # Validation
 
+## Changes-since-thesis presentation section · 2026-11-06
+
+Added eight slides to the existing deck with python-pptx, cloning the deck's own title, subtitle, table and page-number shapes so fonts and colours match. New slides were moved after the title slide, and every page-number shape was renumbered to its slide index. The package validator passed against the previous deck as the baseline. The slide-text dump showed 43 slides, populated notes and no placeholder text. Microsoft PowerPoint exported slides 1–11 and samples later in the deck at 1280×720. Each new slide was inspected, and layout fixes for word splits, crowding and empty space were re-rendered. The committed file matches the validated output by SHA256.
+
+Facts on the new slides were checked against git history, the July 2026 thesis text, README.md, final-service-scope.mdx (27 partial, 4 lab, 39 planned), the feature catalog guard (102 + 71 columns) and a local `python -m unittest discover tests` run (132 tests passed). Native editing in Google Slides was not tested.
+
+The staged documentation sync, feature catalog, AI handbook and whitespace checks passed, with 146 tracked paths, 83 fingerprints and 173 method recommendations. The unit suite passed again. Mintlify build/validation, broken links and accessibility passed on 50 MDX pages. Runtime qualification was not repeated because only explanatory documentation changed.
+
 ## Field-by-field feature rationale · 2026-11-06
 
 Reviewed current field semantics in `Controller/traffic_capture.py`, `Controller/site_features.py` and `Controller/home_sensor.py`. The expanded reference compares techniques and gives a verification check for each schema field. An independent coverage check matched all 173 schema-qualified headings to the method inventory and their assigned groups, with all six parts present per entry. It also counted 15 proposed measurements across the seven planned groups. Packet and workload checks described in the entries are qualification procedures for future experiments.
