@@ -1,5 +1,11 @@
 # Validation
 
+## First t530 no-mirror pilot · 2026-11-07
+
+Stages A–C ran on the t530 from a fresh checkout of commit 8a24d8b. The operator typed every SSH and sudo password. Stage scripts followed runbook A1–C9, with Stage C's HTTP target and captures running as background processes in one session. Outcomes came from the t530 console output and the private run directory. Stage A: unittest reported 132 tests OK; qualification.json reported PASS with 142 checks and no failures; runtime-qualification.json reported PASS with 4,000 rows. Stage B: dumpcap reported 7,467 received and 0 dropped. The SHA-256 matched on Windows and the t530. The audit reported REVIEW with empty integrity_issues, and tshark confirmed both directions and the offload effects. Stage C: nft_quarantine.py read-back JSON, curl exit codes, the target HTTP log and a stdlib PCAP count of the blocked interval matched the expected outcomes. tcpdump statistics showed 0 kernel drops and a 12-packet unwritten tail in each capture. Teardown left no apf-* namespaces, and host address and route listings were identical before and after. Raw captures and manifests stayed private; the redacted handoff uses aliases.
+
+The C8 wait is a documentation change and was not re-executed on the t530. Staged documentation sync, feature catalog, AI handbook and whitespace checks passed. The local unit suite (132 tests) and Mintlify validation, broken-link and accessibility checks on 50 MDX pages passed.
+
 ## Changes-since-thesis presentation section · 2026-11-06
 
 Added eight slides to the existing deck with python-pptx, cloning the deck's own title, subtitle, table and page-number shapes so fonts and colours match. New slides were moved after the title slide, and every page-number shape was renumbered to its slide index. The package validator passed against the previous deck as the baseline. The slide-text dump showed 43 slides, populated notes and no placeholder text. Microsoft PowerPoint exported slides 1–11 and samples later in the deck at 1280×720. Each new slide was inspected, and layout fixes for word splits, crowding and empty space were re-rendered. The committed file matches the validated output by SHA256.

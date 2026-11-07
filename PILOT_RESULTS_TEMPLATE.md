@@ -5,7 +5,7 @@ Use PASS / FAIL / REVIEW / NOT_RUN / UNMEASURED. Unperformed tests are not PASS.
 
 ## Session and scope
 
-- Guide version: 2026-11-04
+- Guide version: 2026-11-07
 - Code commit:
 - UTC time range:
 - OS / Python / kernel:
@@ -75,8 +75,8 @@ Explain REVIEW conditions instead of replacing them with PASS.
 - HTTP target ready:
 - Both client baselines succeeded:
 - Bounded recon outcome / approximate duration:
-- Firewall PCAP drops:
-- Independent target PCAP drops:
+- Firewall PCAP captured / received by filter / dropped by kernel:
+- Independent target PCAP captured / received by filter / dropped by kernel:
 - Quarantine provisioning / read-back:
 - Selected-client membership active during blocked probe:
 - Selected-client curl exit:

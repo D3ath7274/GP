@@ -3,7 +3,7 @@ title: "Start testing without a traffic mirror"
 description: "Qualify the t530, capture real PC workloads, test a namespaced firewall and return a structured results handoff."
 ---
 
-Version: 2026-11-04. Project: **Adaptive IPS framework**.
+Version: 2026-11-07. Project: **Adaptive IPS framework**.
 
 ## Start here
 
@@ -26,6 +26,25 @@ These are planning allowances, not measured t530 benchmarks. Work in order. Stop
 The live collector skips locally outgoing packet copies because it was designed for mirror input. Here we capture both directions with Dumpcap/tcpdump and replay the saved PCAP. Do not substitute live collection on an ordinary endpoint/router interface and assume equivalent directional coverage.
 
 Keep actual addresses, manifests, logs and PCAPs private. Raw captures can contain payloads even though the derived CSV contains reduced features. Return a redacted results file initially.
+
+## Recorded run · 2026-11-07
+
+Stages A–C ran on the t530 at commit 8a24d8b with Ubuntu 22.04.4, Python 3.10.12 and kernel 5.15.0-186. Stage D has not started. The private handoff uses the aliases PC-1, CLIENT-1, GOOD-1 and TARGET-1.
+
+| Stage | Outcome | Evidence and limits |
+| --- | --- | --- |
+| A. Software qualification | PASS | 132 tests OK; golden PASS with 142 comparisons; restart check PASS with 4,000 rows, two run IDs, 30.2 s, 4.2 MB and about 49 MiB sampled peak RSS |
+| B. First PC capture | REVIEW (expected for replay) | 600 s wired capture, 7,467 frames, 0 capture drops, matching SHA-256 on both hosts. Replay: 121 rows × 71 columns, UNKNOWN labels, PC-1 as the only device, both directions present, no integrity issues. IPv6 was unobserved because PC-1 had only a link-local address. |
+| C. Isolated firewall lab | PASS with one REVIEW item | Read-back membership, blocked-client timeout (curl 28), innocent-client success, manual removal, 15-second expiry, two refused negative tests and clean teardown with unchanged host addresses and routes. Blocked interval: 2 selected-client packets at the firewall capture and 0 at the target capture. |
+
+Review items from this run:
+
+- Endpoint offloading: every PC-1-sent frame showed a transmit-offload checksum, and 34 outgoing frames exceeded 1,514 bytes (up to 39,389) from large-send offload. These are capture-point effects, not attacks.
+- A 1-per-second ICMP echo to one public host ran for the whole session. It is a useful benign control for periodic-contact features.
+- The replay counted 24 `pair_history_evictions` in ten minutes. Compare the cap with longer Stage D sessions.
+- Each lab capture wrote 12 fewer packets than it received by filter. The captures were stopped 1–2 s after the final recovered-expiry request, so that exchange was still buffered. The target HTTP log shows the request, and the blocked interval occurred earlier. C8 now waits five seconds and records captured versus received counts.
+
+These results qualify software behavior, one endpoint session and operator-run namespace containment. They do not establish whole-home visibility, workload coverage, trained site decisions or automatic response.
 
 ## A1. Prepare the t530
 
@@ -553,7 +572,7 @@ Retain scope/protection checks even if they prevent a requested test action.
 
 ## C8. Close captures and extract lab features
 
-Press Ctrl+C once in terminals C and D. Wait for final capture statistics and record each kernel-drop count. Stop the HTTP server with Ctrl+C in terminal B.
+Wait at least five seconds after the last C7 command so both captures can write the final exchange. Then press Ctrl+C once in terminals C and D. Wait for the final statistics and record three numbers for each capture: packets captured, packets received by filter and packets dropped by kernel. Captured lower than received by filter means packets were still buffered when the capture stopped and were never written. Record the difference and treat traffic after the last written packet as unobserved; do not use it as blocking evidence. Stop the HTTP server with Ctrl+C in terminal B.
 
 In terminal A:
 

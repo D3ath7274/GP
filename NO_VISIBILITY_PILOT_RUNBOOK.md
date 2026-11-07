@@ -1,6 +1,6 @@
 # Adaptive IPS framework — step-by-step pilot without a traffic mirror
 
-Version: 2026-11-04. Project: **Adaptive IPS framework**.
+Version: 2026-11-07. Project: **Adaptive IPS framework**.
 
 ## Start here
 
@@ -550,7 +550,7 @@ Retain scope/protection checks even if they prevent a requested test action.
 
 ## C8. Close captures and extract lab features
 
-Press Ctrl+C once in terminals C and D. Wait for final capture statistics and record each kernel-drop count. Stop the HTTP server with Ctrl+C in terminal B.
+Wait at least five seconds after the last C7 command so both captures can write the final exchange. Then press Ctrl+C once in terminals C and D. Wait for the final statistics and record three numbers for each capture: packets captured, packets received by filter and packets dropped by kernel. Captured lower than received by filter means packets were still buffered when the capture stopped and were never written. Record the difference and treat traffic after the last written packet as unobserved; do not use it as blocking evidence. Stop the HTTP server with Ctrl+C in terminal B.
 
 In terminal A:
 

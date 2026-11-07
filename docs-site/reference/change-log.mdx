@@ -2,6 +2,12 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-07 · First t530 no-mirror pilot results and capture-stop fix
+
+Recorded the first t530 execution of the [no-mirror pilot](/deployment/no-mirror-pilot) at commit 8a24d8b. Stage A passed: 132 tests, 142 golden comparisons and the accelerated restart check. Stage B replayed one 10-minute PC-1 endpoint session with expected REVIEW conditions and no integrity issues. Stage C confirmed operator-run namespace containment, innocent-client continuity, manual removal, native expiry, refused negative tests and clean teardown. Stage D has not started. The [delivery phases](/roadmap/delivery-phases) cite this as supporting evidence for S01, S55 and S58 without changing their Partial status.
+
+Each lab capture wrote 12 fewer packets than it received by filter because the captures were stopped 1–2 s after the final request. C8 in the runbook and the website page now waits five seconds before stopping the captures. Operators record captured, received-by-filter and kernel-drop counts and treat unwritten traffic as unobserved. The results template has matching fields, and the guide version is now 2026-11-07. Operator impact: repeat C8 with the wait; the blocked-interval evidence from this run is unaffected. No executable source, schema, model artifact, API contract or service classification changed. Verification is recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-06 · Changes since the thesis in the feature presentation
 
 Added an eight-slide section after the title of the [feature-group presentation](/architecture/feature-group-comparison), which now has 43 slides. It summarizes the July 2026 thesis and the current repository: commit timeline, thesis-versus-now comparison, the read-only policy audit track, repository counts, claims stated more narrowly, and the current pilot position with next workstreams. Two dark dividers separate the new section from the original comparison. Page numbers were renumbered, and the title slide subtitle and notes now describe both parts. Every new slide carries speaker notes with commit, file and service-scope sources. The companion page adds a short thesis-versus-now table.
