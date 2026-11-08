@@ -1,6 +1,6 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "eb1c58a64e9ea1a0294c6dbff1323196e4bc8ff5",
+  "reference_base_commit": "9fffa9e61c215ed9b0fd7e37531c1ec24661395b",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
   "context_sha256": "6c2f0587688764d820ff17c3bb85ea6f2aed9dcbb14525ceec3636792036fcd0",
   "files": [
@@ -2475,6 +2475,10 @@
       "purpose": "Authored documentation page: Develop and verify changes. Operator/reference explanation with claims scoped by the associated source and qualified evidence."
     },
     {
+      "path": "docs-site/developers/pilot-explained.mdx",
+      "purpose": "Authored documentation page: Understand the no-mirror pilot. Why PC-1 traffic is recorded, why the t530 replays it, how independent packet analysis checks the sensor, the offload reconciliation worked example and self-check questions."
+    },
+    {
       "path": "docs-site/developers/policy-change-code-tour.mdx",
       "purpose": "Authored documentation page: Policy changes and feature rationale: code tour. Understand symbolic impact, hypothetical proposals, reproducibility receipts and source-to-rationale guards."
     },
@@ -2497,8 +2501,8 @@
     {
       "path": "docs-site/docs.json",
       "purpose": "Mintlify branding/navigation selects authored pages and separate legacy-Ryu versus policy-workbench API groups.",
-      "sha256": "8a72482eb0b1712c1a4527720950be3d23077e63a78e7832b16dfb3ac2ef39e7",
-      "canonical_bytes": 4509
+      "sha256": "5a22d0a2ec7cc5e85cc56ab3821b6236fd1a1071f7759e63c3055b822a155b77",
+      "canonical_bytes": 4553
     },
     {
       "path": "docs-site/documentation-map.json",
@@ -2577,8 +2581,8 @@
     {
       "path": "docs-site/reference/file-purposes.json",
       "purpose": "Authored exact tracked-path roles and local-only exclusions drive complete handbook coverage without ingesting private data.",
-      "sha256": "7b3d426fc0bf419451bc0c3a7344527d70e04fc4a912521f3fb2ed51ace952ca",
-      "canonical_bytes": 29244
+      "sha256": "d52e05d1c25b7effc46f6edc5509cfcf9e3bac19a9546bd86a030345da2909cc",
+      "canonical_bytes": 29529
     },
     {
       "path": "docs-site/roadmap/delivery-phases.mdx",

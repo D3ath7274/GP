@@ -30,7 +30,7 @@
 | policy_audit.py, audit CLI/API/button and audit-reference.json | Audit the supported firewall-policy subset; Policy workbench read API; Qualification and audit: code and rationale |
 | policy_change.py, impact/propose/verify-proposal, preview UI/API and change-reference fixtures | Develop and test while visibility is unresolved; Policy changes and feature rationale: code tour; Policy workbench read API |
 | G1–G24, source-mapped feature-groups.json, check_feature_catalog.py and commit/CI guard | Why each behavioral feature group exists; Develop and verify changes; Policy changes and feature rationale: code tour |
-| NO_VISIBILITY_PILOT_RUNBOOK.md, PILOT_RESULTS_TEMPLATE.md, endpoint PCAP replay and namespaced operator-run firewall exercise | Start testing without a traffic mirror; Collect home traffic for two weeks; Test temporary firewall quarantine |
+| NO_VISIBILITY_PILOT_RUNBOOK.md, PILOT_RESULTS_TEMPLATE.md, endpoint PCAP replay and namespaced operator-run firewall exercise | Start testing without a traffic mirror; Understand the no-mirror pilot; Collect home traffic for two weeks; Test temporary firewall quarantine |
 
 Superseded root runbooks are removed. Current qualification/deployment pages and the no-mirror Markdown guide are canonical; see the scope ledger for recovery.
 

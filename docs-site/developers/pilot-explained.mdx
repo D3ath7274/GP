@@ -1,0 +1,181 @@
+---
+title: "Understand the no-mirror pilot"
+description: "Why the pilot records PC traffic, why the t530 replays it, and how independent packet analysis checks every number the sensor produces."
+---
+
+Version: 2026-11-08. Project: **Adaptive IPS framework**.
+
+The [no-mirror pilot](/deployment/no-mirror-pilot) page lists what to run. This page explains why each step exists, what it can and cannot prove, and how the November 2026 sessions were analysed. Claims point to the current code or to a recorded result. Planned work is marked as planned. Addresses are replaced by aliases: PC-1 is the Windows workstation and T530 is the Ubuntu thin client.
+
+## The goal
+
+The behavioural side of the framework must know what normal looks like for each device before it can call anything abnormal. The site sensor (`Controller/home_sensor.py` with `Controller/site_features.py`) turns packets into one row per local device for every five-second window. A row has 13 provenance columns and 58 measurements, which is the 71-column site-v3 schema. Baselines, a future model and later firewall decisions can only be as good as these rows.
+
+The pilot therefore answers two questions:
+
+1. Does the sensor measure real traffic correctly?
+2. What does ordinary use look like in those measurements?
+
+The measurements fall into groups. Base counts cover packets and bytes in each direction. G1 covers timing, G6 packet-size spread, G11 reconnaissance flags and port diversity, G12 header statistics and G13 long-horizon contact patterns. G14 covers service initiation and payload volume, G15 DNS, G16 TLS ClientHellos and G17 cleartext HTTP. The [feature rationale](/architecture/feature-rationale) explains each group.
+
+## Why the t530 cannot simply listen
+
+A home router or ordinary switch port delivers to a computer only the traffic addressed to it, plus broadcasts. Nothing copies PC-1's games or videos to T530, so T530 cannot see them. Seeing every device needs a mirror (SPAN) port on a managed switch, a network tap or an inline position. None is installed yet, and that hardware choice is still open.
+
+The live collector is also built for mirror input. It skips copies of packets that T530 itself sends (the `outgoing_copies_skipped` counter). Running it on an ordinary interface would produce one-sided rows that look complete but are not.
+
+The pilot works around both limits. It records traffic where the traffic exists, on PC-1, and hands the recording to the sensor.
+
+## How collection works
+
+| Choice | What the pilot does | Why |
+| --- | --- | --- |
+| Capture point | dumpcap with Npcap on PC-1's wired Ethernet adapter | The traffic exists here. Wired Ethernet yields ordinary Ethernet frames (link type EN10MB), which the sensor's decoder expects. |
+| Filter | Frames to or from PC-1's IPv4 address only. From 2026-11-08, T530 traffic is also excluded. | Scope stays on one consenting device, and the SSH session that drives T530 stays out of the workload. |
+| Snap length | Whole frames (`-s 0`) | Parsers need complete headers and the start of each payload. A cut frame would show up as a parser gap. |
+| No promiscuous mode | `-p` | PC-1 records only its own traffic. |
+| Stopping | Manual stop with a ring buffer that starts a new file every hour | A fixed `-a duration:3600` stop left gaps of 132 s and 229 s in the three-hour session. A ring buffer rotates files without a gap. |
+| Manifest | session.json: session ID, activity, address scope, UNKNOWN ground truth, start and finish times, stop reason | A capture without its context cannot be interpreted or reproduced. |
+| Integrity | SHA-256 on PC-1, checked again on T530 | Proves the replayed file is byte-for-byte the recorded one. |
+| Privacy | Raw PCAPs and manifests stay on PC-1 and T530. The git-ignored handoff uses aliases. | Raw packets can carry sensitive payloads. Derived rows hold only reduced features. |
+
+### Why many different workloads
+
+A baseline built from one activity says little about the next one. Stage D records varied ordinary use, so later analysis can tell normal variety from real change. Each workload also serves as a **benign control**: legitimate traffic that resembles some attack signal and must not be flagged.
+
+| Recording | Length | What it adds |
+| --- | --- | --- |
+| Stage B browsing | 10 minutes | First end-to-end check of capture, transfer, replay and audit |
+| League of Legends with browser tabs | 49 minutes | Steady game UDP next to many short browser connections to different destinations |
+| Rainbow Six Siege with Discord voice | 3 hours in three parts | Two kinds of steady real-time UDP, plus 200–300 MB per hour of unexplained inbound TCP |
+| Honkai: Star Rail with anime streaming in a browser | 60 minutes | Video streaming, which earlier sessions lacked. Not yet replayed. |
+
+Still missing: idle time, work, downloads and updates, social use, mixed use and a later repeat of an earlier workload. Repeats matter because they show how much the same activity varies from day to day.
+
+### Why every label is UNKNOWN
+
+The collector never labels a row benign or malicious. You know what you were doing, but not everything PC-1 did: updaters, open tabs, advertising networks and, on ad-heavy streaming sites, possibly malicious advertising. Calling the data clean would plant an unverified assumption in every model trained on it. Labels need independent evidence, such as a controlled attack in an isolated lab.
+
+## Why the recordings are replayed on the t530
+
+1. **Same environment as a live sensor.** T530 runs Ubuntu 22.04, Python 3.10.12 and Scapy 2.8.0 at a recorded commit. A replay exercises the exact decoder, windowing, history caps and file writers that a mirror deployment would run, on the CPU that would run them.
+2. **Repeatable input.** A PCAP never changes. Replaying stored captures after a code change isolates the effect of that change. This is how the 2026-11-08 decoder fix was verified: five unchanged captures, new code, and only the intended counters moved.
+3. **Independence from the checking tools.** PC-1 keeps the raw capture and runs Wireshark's tools. T530 runs the sensor. The two sides share no code, so when they agree, the agreement means something.
+4. **Throughput evidence.** T530 processed roughly 1,050–1,200 packets per second during replay. That is replay speed, not live capacity, but it bounds what Python decoding could sustain on a busy mirror.
+
+### What a replay cannot prove
+
+A replay has no live kernel-loss statistics, its first and last windows are partial, and it is not a live capture. The audit therefore always reports REVIEW (exit 2) for a replay. Baseline review accepts only stopped `live_linux` runs with kernel statistics. A replay qualifies measurement; it never approves a baseline. An endpoint capture also differs from a mirror, because some effects exist only on the sending host (see offload effects below).
+
+## What the sensor writes
+
+Each replay creates a new data directory containing:
+
+- `schema.json`: the collection contract, covering columns, address scope, parser settings and decoder version. Its hash binds the data to those settings. A directory refuses to continue under a different contract.
+- `features-DATE-RUN.csv`: one row per local device per five-second window.
+- `policy-events-DATE-RUN.jsonl`: one shadow-policy evidence record per CSV row.
+- `run-RUN.json`: run state, health counters and source fingerprints.
+
+`scripts/audit_home_data.py` then checks the closed files. **FAIL** (exit 1) means an integrity problem, such as broken rows, mismatched evidence or missing files. **REVIEW** (exit 2) means the files are intact, but at least one quality counter or held window needs a human to look. **PASS** (exit 0) means neither applies. REVIEW is a request for judgement, not a malfunction.
+
+## How the sensor is checked
+
+The rule is simple: do not trust a number the sensor reports until an independent tool reproduces it from the same file.
+
+| Sensor value | Independent check | Result in the 2026-11-08 replays |
+| --- | --- | --- |
+| Outgoing and incoming packets | tshark per-direction IP counts | Equal once the non-IP (ARP) frames, which an IP filter excludes, are added |
+| G15 DNS queries and responses | tshark DNS frames | Queries plus responses equal tshark's DNS frame count |
+| G16 TLS ClientHellos | tshark `tls.handshake.type==1` over TCP | Equal in all five captures after the fix |
+| G17 HTTP requests | tshark `http.request` over TCP | Equal. tshark's larger totals include SSDP requests over UDP, which G17 does not parse. |
+| G14 outgoing payload bytes | Sum of TCP and UDP payload lengths from tshark | Byte-exact in two local replays |
+| `ipv4_zero_length_frames` | A standard-library PCAP reader | Equal in all five captures |
+
+### Worked example: the missing TLS handshakes
+
+This is the most useful lesson from the pilot so far, so here it is step by step.
+
+1. **Symptom.** In the League session the sensor counted 248 complete ClientHellos; tshark showed 516 ClientHello frames.
+2. **First hypothesis, rejected.** Large ClientHellos might be split across TCP segments, which the one-packet parser cannot join. Test: tshark's `tcp.segments` field was 0 for every ClientHello. The hypothesis was wrong, and the handoff records that.
+3. **Split by transport.** 176 ClientHellos were QUIC, which runs over UDP. G16 parses TCP only, so these were excluded by design. That left 340 TCP ClientHellos against 248 counted.
+4. **Split by size.** 87 of the missing ones were in frames larger than 1,514 bytes. On PC-1, Windows large-send offload passes Npcap one large frame and the network card cuts it into segments later. These frames have an IPv4 total-length field of 0. Feeding them through `decode()` showed it trusted the 0 and treated the payload as empty, so their ClientHellos were never parsed and their bytes never reached G14. No counter recorded the loss.
+5. **The last five.** Their payload began with `14 03 03 00 01 01`, a TLS 1.3 compatibility ChangeCipherSpec record, followed by a retried ClientHello. The parser looked only at the first record.
+6. **Exact arithmetic.** 340 − 87 − 5 = 248. The same subtraction matched all four gaming captures exactly. Exactness is what turns a plausible story into an explanation.
+7. **Fix with guards.** The decoder now uses the captured datagram when the IPv4 length is 0. It does not do this when the frame is at the Ethernet minimum size, where padding could be inside it, or when the capture cut the frame short. Every such frame raises `ipv4_zero_length_frames`, which holds learning for that run, because a real cable should never carry one. The parser skips exactly one compatibility record. The collection contract gained a decoder marker, so old and new measurements can never mix in one directory. Four regression tests fail on the old code and pass on the new.
+8. **Verification.** Local replays matched tshark exactly. T530 then re-ran Stage A from a fresh checkout and re-replayed all five captures. G16 rose from 12, 248, 174, 213 and 184 to 17, 340, 214, 271 and 238, each equal to tshark. Nothing else changed.
+9. **The twist.** In the first hour of the Siege session the sensor counted 214 and tshark 213. A frame-by-frame comparison found a real ClientHello sent to TCP port 5222, which tshark decodes as XMPP chat by default. Told to read that port as TLS, tshark also counted 214. Reference tools have blind spots too. A disagreement must be explained frame by frame, not assumed to be the sensor's fault.
+
+What to take from it:
+
+- Reconcile counts exactly. "Roughly similar" hid a loss of up to 27%.
+- Change one variable at a time: transport, then segmentation, then size.
+- A wrong hypothesis is normal. Write it down, test it and record the result.
+- Every fix needs a test that fails without it, and real-data evidence after it.
+
+### Endpoint offload effects
+
+Two network-card features change what a host capture sees:
+
+- **Checksum offload.** Outgoing frames show invalid checksums because the card computes them after the capture point.
+- **Large-send offload.** Outgoing super-segments can be tens of kilobytes, with an IPv4 total length of 0.
+
+Both are effects of where the capture happens, not attacks. The sensor now measures super-segments from their captured length and counts them. A mirror port would show neither effect, because it sees frames as they travel on the cable. See [Wireshark's offloading notes](https://wiki.wireshark.org/capturesetup/offloading).
+
+### Reading the traffic structure
+
+Conversation tables (tshark `-z conv,udp`) show what the rows will contain:
+
+- **Game traffic.** Each match is one UDP flow between PC-1 and a game server at about 87 packets per second. It is steady, two-way and long-lived.
+- **Voice traffic.** A voice-like UDP stream to one relay changed PC-1's source port about every 60 seconds. Current site-v3 features key on destination address and destination port, never on the source port, so this rotation is invisible to them. It would matter only for future five-tuple flow features. What a sensor keys on decides which behaviours it can see.
+- **A benign beacon.** A ping to one public host ran once per second for every session. That peer appears in every five-second window, so G13's per-pair interval variation (CV) is 0, which is the signature of a perfectly regular beacon. A periodicity detector must not flag this harmless software. It is a classic hard negative.
+- **Unexplained volume.** The Siege session carried 200–300 MB per hour of mostly inbound TCP from something other than the game or the voice chat. Unexplained traffic stays unexplained in the records; it is not assigned a label.
+
+### Quality counters you will meet
+
+- `pair_history_evictions`: each device's history remembers at most 32 peers, and more distinct destinations evict the oldest. Counts were 24 in ten minutes of browsing and 1,293 in the League session with browser tabs. Values built on pair history are lower bounds when this is non-zero.
+- `timestamp_reorders`: an outgoing packet stamped earlier than the previous one. Windows capture timestamps can reorder slightly, so review timing features before relying on them.
+- `ipv4_zero_length_frames`: offloaded super-segments. Expected at this capture point and unexpected on a mirror.
+- `tls_parse_errors` and `http_parse_errors`: rare incomplete records, one or two per hour. Not yet investigated.
+
+Any non-zero counter makes the audit REVIEW. That means a human must look, not that something broke.
+
+## How the stages fit together
+
+| Stage | Question it answers |
+| --- | --- |
+| A. Software qualification | Does the code pass its tests, reproduce golden feature values and survive restarts on T530? |
+| B. First real capture | Does a real endpoint session survive capture, transfer, replay and audit end to end? |
+| C. Isolated firewall lab | Can an operator quarantine one client in network namespaces while an innocent client keeps working, then remove the block manually or by expiry? |
+| D. Representative sessions | What does a week of ordinary use look like in the measurements? |
+| E. Results handoff | Is everything recorded in one redacted file someone else can review? |
+
+## What the pilot does not establish
+
+- Whole-home visibility, or phone and IoT baselines. This needs mirror or tap hardware.
+- Detection accuracy of any site-v3 model. Training and evaluation are planned.
+- Automatic firewall decisions. Stage C is operator-run in a lab.
+- Live capture capacity. Replay speed is not live capacity.
+
+## Check your understanding
+
+Try each question before reading the answers below.
+
+1. Why can't T530 record PC-1's game traffic by itself on an ordinary switch port?
+2. Why does the pilot hash each capture on both machines?
+3. Why is a replayed session always REVIEW, even when nothing is wrong?
+4. The decoder recovers a zero-length frame of 61 bytes but not one of exactly 60 bytes. Why?
+5. Why is `ipv4_zero_length_frames` a quality fault that holds learning, even though the sensor now measures those frames correctly?
+6. A once-per-second ping gives G13 a pair interval CV of 0. Why is that a problem for a beacon detector, and what is it called?
+7. Why did the decoder fix add a `decoder` entry to the collection contract?
+8. In the first Siege hour the sensor counted one more ClientHello than tshark. Why was assuming a sensor bug the wrong reflex?
+
+## Answers
+
+1. A switch forwards a frame only to the port of its destination, plus broadcasts. Without a mirror port, a tap or an inline position, PC-1's traffic never reaches T530's port.
+2. The hash proves the file T530 replays is byte-for-byte the file PC-1 recorded. Without that, a replay result could describe a damaged or different file.
+3. A replay has no live kernel-loss statistics and partial first and last windows, and it is not a live run. The audit cannot rule out loss it did not measure, so it asks for review. Baseline approval separately requires a live Linux run.
+4. Ethernet pads frames shorter than 60 bytes (FCS excluded) up to 60, so a 60-byte frame might contain filler bytes. A 61-byte frame was never padded, so every byte after the headers is real payload.
+5. A real cable or mirror port should never carry an IPv4 length of 0, and receiving hosts discard such frames. If the sensor counted data the receiver throws away, it would measure traffic that never took effect, which is an old way of misleading intrusion detection. Holding the run for review keeps that possibility visible.
+6. A regular rhythm is what command-and-control beacons look like, so a naive detector would flag ordinary software. Benign traffic that looks malicious is called a hard negative. Detectors must be tested against it.
+7. Measurements made before and after the fix differ for the same traffic. The marker changes the contract hash, so old directories and old approved profiles refuse the new code. Old and new measurements can never be silently mixed.
+8. The independent tool was wrong. It decoded port 5222 as XMPP by default and missed a real ClientHello. A disagreement says only that one side is wrong; finding which side needs the frame itself.

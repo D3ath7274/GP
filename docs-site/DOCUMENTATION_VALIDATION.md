@@ -1,5 +1,19 @@
 # Validation
 
+## No-mirror pilot explainer · 2026-11-08
+
+Every number on the new page was checked against the recorded pilot results, the private handoff and the 2026-11-08 replay reports. The behavioural statements were checked against the code:
+
+- `outgoing_copies_skipped` in live capture;
+- the 32-peer pair history, and per-window pair contacts in `FeatureHistory`;
+- destination-keyed peers, ports and edges in `DeviceWindow`;
+- the zero-length guards in `decode()`;
+- the baseline-review requirement for stopped `live_linux` runs with kernel statistics.
+
+Writing the page exposed an earlier wrong interpretation: source-port rotation does not affect current site-v3 features. The page and the private handoff now state this.
+
+The local documentation reader (`Controller/local_docs.py`) served the page with HTTP 200, four tables and ten sections. Mintlify validation, broken-link and accessibility checks passed on 51 MDX pages. The staged documentation sync, feature catalog, AI handbook (147 tracked paths) and whitespace checks passed, and the unit suite ran 136 tests OK. Content and navigation changed only.
+
 ## T530 re-qualification after the decoder fix · 2026-11-08
 
 The t530 took a fresh clone of the pushed commit eb1c58a into a new checkout and run directory; the earlier ones were left untouched. The operator typed the SSH password. The reused virtual environment held Scapy 2.8.0, Markdown 3.10.3 and psutil 7.2.2 on Python 3.10.12, kernel 5.15.0-186. Stage A reported 136 tests OK, golden PASS with 142 checks, and runtime PASS with 4,000 rows in 29.4 s at 51.8 MB sampled peak RSS.

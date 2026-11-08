@@ -109,6 +109,7 @@
           {
             "group": "Learn and contribute",
             "pages": [
+              "developers/pilot-explained",
               "developers/study-roadmap",
               "developers/ai-handoff",
               "developers/maintenance"

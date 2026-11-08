@@ -2,6 +2,19 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-08 · Explainer for the no-mirror pilot
+
+Added [Understand the no-mirror pilot](/developers/pilot-explained) under Develop → Learn and contribute, and linked it from the pilot page. It explains:
+
+- why the t530 cannot observe PC-1 without a mirror;
+- each capture choice, with Stage D workloads used as benign controls, and why labels stay UNKNOWN;
+- why stored captures are replayed on the t530, and what a replay cannot prove;
+- the files and audit statuses a replay produces, and how each sensor value is checked against tshark or a stdlib reader;
+- the complete offload and ChangeCipherSpec reconciliation as a worked example, including the port-5222 case where tshark was wrong;
+- offload effects, traffic structure, quality counters and eight self-check questions with answers.
+
+The page also corrects an earlier interpretation: source-port rotation in a voice stream is invisible to the current site-v3 features, because they key on destination address and port. Operator impact: study material only. No executable source, schema, model artifact, API contract or S01–S70 status changed. Verification is recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-08 · t530 re-qualification after the decoder fix
 
 Recorded the t530 rerun of the fixed decoder on the [no-mirror pilot page](/deployment/no-mirror-pilot). A fresh checkout of commit eb1c58a passed Stage A: 136 tests, 142 golden comparisons and the 4,000-row runtime check. All five stored endpoint captures were re-replayed into a new run directory. Each audit stayed REVIEW with no integrity issues. G16 now equals tshark's TCP ClientHello count in every capture (17, 340, 214, 271 and 238, up from 12, 248, 174, 213 and 184), and `ipv4_zero_length_frames` equals an independent reader's count. All other counters are unchanged. Operator impact: use the new replay directories for G14 payload and G16 values; the pre-fix directories remain only as history. Documentation-only change: no executable source, schema, model artifact, API contract or S01–S70 status changed. Verification is recorded in DOCUMENTATION_VALIDATION.md.
