@@ -1,6 +1,6 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "9fffa9e61c215ed9b0fd7e37531c1ec24661395b",
+  "reference_base_commit": "39ba63d74f76587ffeab86f85119876a8ab3d500",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
   "context_sha256": "6c2f0587688764d820ff17c3bb85ea6f2aed9dcbb14525ceec3636792036fcd0",
   "files": [
@@ -1641,86 +1641,86 @@
     {
       "path": "Controller/site_features.py",
       "purpose": "Ethernet IPv4/IPv6 decoder, online moments, bounded window state and historical features implement the current site measurement subset.",
-      "sha256": "67e89e33b3cae20fd355cc8e6609cd590044643d3eef44f2b2a0953fdd695b1b",
-      "canonical_bytes": 21234,
+      "sha256": "6cfbabb0a50e7df155f544253b6c352bcbfd34c75bcdf49c4c0b945cf8a867be",
+      "canonical_bytes": 22074,
       "symbols": [
         {
           "name": "entropy",
           "kind": "function",
-          "line": 25,
-          "end_line": 28
+          "line": 32,
+          "end_line": 35
         },
         {
           "name": "Moments",
           "kind": "class",
-          "line": 32,
-          "end_line": 45
+          "line": 39,
+          "end_line": 52
         },
         {
           "name": "Moments.add",
           "kind": "function",
-          "line": 37,
-          "end_line": 41
+          "line": 44,
+          "end_line": 48
         },
         {
           "name": "Moments.summary",
           "kind": "function",
-          "line": 43,
-          "end_line": 45
+          "line": 50,
+          "end_line": 52
         },
         {
           "name": "bounded_add",
           "kind": "function",
-          "line": 48,
-          "end_line": 54
+          "line": 55,
+          "end_line": 61
         },
         {
           "name": "client_hello",
           "kind": "function",
-          "line": 57,
-          "end_line": 125
+          "line": 64,
+          "end_line": 135
         },
         {
           "name": "client_hello.vector",
           "kind": "function",
-          "line": 78,
-          "end_line": 88
+          "line": 88,
+          "end_line": 98
         },
         {
           "name": "decode",
           "kind": "function",
-          "line": 128,
-          "end_line": 225
+          "line": 138,
+          "end_line": 236
         },
         {
           "name": "DeviceWindow",
           "kind": "class",
-          "line": 229,
-          "end_line": 327
+          "line": 240,
+          "end_line": 338
         },
         {
           "name": "DeviceWindow.observe",
           "kind": "function",
-          "line": 266,
-          "end_line": 327
+          "line": 277,
+          "end_line": 338
         },
         {
           "name": "FeatureHistory",
           "kind": "class",
-          "line": 330,
-          "end_line": 431
+          "line": 341,
+          "end_line": 442
         },
         {
           "name": "FeatureHistory.__init__",
           "kind": "function",
-          "line": 331,
-          "end_line": 335
+          "line": 342,
+          "end_line": 346
         },
         {
           "name": "FeatureHistory.features",
           "kind": "function",
-          "line": 337,
-          "end_line": 431
+          "line": 348,
+          "end_line": 442
         }
       ],
       "imports": [
@@ -3725,8 +3725,8 @@
     {
       "path": "tests/test_home_collection.py",
       "purpose": "Tests rates/history/timestamps, IPv4/IPv6, optional parsers, resource limits, corrupt rows and local-doc path rejection.",
-      "sha256": "d0e1d40cf156070cced17e4f853cf7bcfde968aab96602987b64ef99c9dea540",
-      "canonical_bytes": 11680,
+      "sha256": "1c8baeb06db9fd6d5b468a3abaa0af9a80cab467ccf050178e479c091d59c7fb",
+      "canonical_bytes": 13567,
       "symbols": [
         {
           "name": "tls_client_hello",
@@ -3750,7 +3750,7 @@
           "name": "HomeTests",
           "kind": "class",
           "line": 50,
-          "end_line": 235
+          "end_line": 267
         },
         {
           "name": "HomeTests.collector",
@@ -3813,64 +3813,88 @@
           "end_line": 135
         },
         {
-          "name": "HomeTests.test_one_compatibility_ccs_before_retried_clienthello",
+          "name": "HomeTests.test_encrypted_bytes_resembling_tls_are_not_parse_errors",
           "kind": "function",
           "line": 137,
-          "end_line": 143
+          "end_line": 151
+        },
+        {
+          "name": "HomeTests.test_encrypted_bytes_resembling_tls_are_not_parse_errors.segment",
+          "kind": "function",
+          "line": 142,
+          "end_line": 146
+        },
+        {
+          "name": "HomeTests.test_only_plausible_unterminated_requests_are_http_errors",
+          "kind": "function",
+          "line": 153,
+          "end_line": 167
+        },
+        {
+          "name": "HomeTests.test_only_plausible_unterminated_requests_are_http_errors.request",
+          "kind": "function",
+          "line": 154,
+          "end_line": 158
+        },
+        {
+          "name": "HomeTests.test_one_compatibility_ccs_before_retried_clienthello",
+          "kind": "function",
+          "line": 169,
+          "end_line": 175
         },
         {
           "name": "HomeTests.test_ipv4_zero_length_offload_frame_uses_captured_datagram",
           "kind": "function",
-          "line": 145,
-          "end_line": 155
+          "line": 177,
+          "end_line": 187
         },
         {
           "name": "HomeTests.test_ipv4_zero_length_never_counts_padding_or_snap_cut_bytes",
           "kind": "function",
-          "line": 157,
-          "end_line": 169
+          "line": 189,
+          "end_line": 201
         },
         {
           "name": "HomeTests.test_ipv4_zero_length_frames_are_counted_and_hold_learning",
           "kind": "function",
-          "line": 171,
-          "end_line": 181
+          "line": 203,
+          "end_line": 213
         },
         {
           "name": "HomeTests.test_capped_cardinality_is_recorded",
           "kind": "function",
-          "line": 183,
-          "end_line": 189
+          "line": 215,
+          "end_line": 221
         },
         {
           "name": "HomeTests.test_audit_detects_corrupted_rates",
           "kind": "function",
-          "line": 191,
-          "end_line": 206
+          "line": 223,
+          "end_line": 238
         },
         {
           "name": "HomeTests.test_local_docs_route_and_traversal",
           "kind": "function",
-          "line": 208,
-          "end_line": 213
+          "line": 240,
+          "end_line": 245
         },
         {
           "name": "HomeTests.test_pair_periodicity_has_sample_support",
           "kind": "function",
-          "line": 215,
-          "end_line": 222
+          "line": 247,
+          "end_line": 254
         },
         {
           "name": "HomeTests.test_broadcast_does_not_create_a_device_profile",
           "kind": "function",
-          "line": 224,
-          "end_line": 228
+          "line": 256,
+          "end_line": 260
         },
         {
           "name": "HomeTests.test_ethernet_padding_is_not_application_payload",
           "kind": "function",
-          "line": 230,
-          "end_line": 235
+          "line": 262,
+          "end_line": 267
         }
       ],
       "imports": [

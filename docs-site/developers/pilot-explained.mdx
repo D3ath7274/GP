@@ -48,7 +48,7 @@ A baseline built from one activity says little about the next one. Stage D recor
 | Stage B browsing | 10 minutes | First end-to-end check of capture, transfer, replay and audit |
 | League of Legends with browser tabs | 49 minutes | Steady game UDP next to many short browser connections to different destinations |
 | Rainbow Six Siege with Discord voice | 3 hours in three parts | Two kinds of steady real-time UDP, plus 200–300 MB per hour of unexplained inbound TCP |
-| Honkai: Star Rail with anime streaming in a browser | 60 minutes | Video streaming, which earlier sessions lacked. Not yet replayed. |
+| Honkai: Star Rail with anime streaming in a browser | 60 minutes | Video streaming, which earlier sessions lacked. The game is a light, steady UDP flow of about 6 packets per second, while video dominates the bytes. |
 
 Still missing: idle time, work, downloads and updates, social use, mixed use and a later repeat of an earlier workload. Repeats matter because they show how much the same activity varies from day to day.
 
@@ -112,6 +112,16 @@ What to take from it:
 - A wrong hypothesis is normal. Write it down, test it and record the result.
 - Every fix needs a test that fails without it, and real-data evidence after it.
 
+### Second example: false alarms in encrypted data
+
+1. **Symptom.** The first video-streaming replay with the fixed decoder reported 4 `tls_parse_errors`, and the Siege hours had 1–2 `http_parse_errors` each. Parse errors are run-latched quality faults, so one error is enough to keep a live run from becoming a baseline.
+2. **Locate.** A scan listed every frame that raised an error. All 10 across the four captures were incoming segments from TCP port 443, in the middle of encrypted streams. None was a handshake or a request.
+3. **Explain with a base rate.** The ClientHello test checked two bytes: `0x16` first and `0x01` at offset 5. Encrypted data behaves like random bytes, so about 1 segment in 65,536 passes. With roughly 150,000 incoming segments per hour, 2–3 coincidences are expected. Their record-version bytes were random (`ef d1`, `0c 6a`, `69 5d`), never `03 0x`. The HTTP test accepted 3–12 capital letters and a space (`YLG `, `XPT `, `GZB `, `BOJ `, `VYA `), which random bytes match about once in 220,000 segments.
+4. **Fix the test, not the counter.** A TLS candidate now needs a record version from 3.0 to 3.4, which brings the chance down to about one in a billion. An unterminated payload counts as an HTTP error only with request-line evidence. A first draft accepted `*` after any token, and two of the five real samples (`YLG *`, `VYA *`) would still have passed. The asterisk form is now allowed only for `OPTIONS`, as the HTTP specification says. Real ClientHellos and complete requests follow the same path as before, so G16 and G17 cannot change.
+5. **Verify.** Local replays of five captures with the new decoder report 0 TLS and 0 HTTP parse errors. Every feature cell in the three captures with earlier local replays (2,028 rows) is identical, as are the other counters.
+
+The lesson: a test that random data can pass will fire at a rate set by traffic volume, not by faults. Multiply the chance per packet by packets per hour before trusting any "error" count from encrypted traffic.
+
 ### Endpoint offload effects
 
 Two network-card features change what a host capture sees:
@@ -135,7 +145,7 @@ Conversation tables (tshark `-z conv,udp`) show what the rows will contain:
 - `pair_history_evictions`: each device's history remembers at most 32 peers, and more distinct destinations evict the oldest. Counts were 24 in ten minutes of browsing and 1,293 in the League session with browser tabs. Values built on pair history are lower bounds when this is non-zero.
 - `timestamp_reorders`: an outgoing packet stamped earlier than the previous one. Windows capture timestamps can reorder slightly, so review timing features before relying on them.
 - `ipv4_zero_length_frames`: offloaded super-segments. Expected at this capture point and unexpected on a mirror.
-- `tls_parse_errors` and `http_parse_errors`: rare incomplete records, one or two per hour. Not yet investigated.
+- `tls_parse_errors` and `http_parse_errors`: payloads that look like the start of a ClientHello or request but cannot be parsed. Before the second fix above, every one observed in the pilot was a coincidence in encrypted data. They now need a plausible record header or request line.
 
 Any non-zero counter makes the audit REVIEW. That means a human must look, not that something broke.
 

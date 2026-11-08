@@ -1,5 +1,13 @@
 # Validation
 
+## Parse errors from chance matches in encrypted data · 2026-11-08
+
+A frame scanner with the previous decoder (`site_features.py` at eb1c58a, SHA-256 prefix 67e89e33, equal to the t530 runtime fingerprint) listed every frame flagged `tls_error` or `http_error`. It covered the three Siege hours and the video-streaming session. All 5 TLS and 5 HTTP cases were incoming segments from TCP port 443 with 1,400-byte payloads. The TLS cases had random record-version bytes. The HTTP cases began with random capital letters and a space, and two continued with `*`.
+
+With the fix, the local suite ran 138 tests OK (136 before). The two new tests failed against the stashed previous decoder: one error and one failure. Golden qualification passed with 142 checks and the runtime exercise with 4,000 rows. Local replays of the 49-minute session, the three Siege hours and the video session (Python 3.15.2, Scapy 2.8.0) reported REVIEW with no integrity issues and 0 DNS/TLS/HTTP parse errors. The pre-fix counts were 0/0/0, 0/0/2, 0/0/2, 0/1/1 and 0/4/0. Rows, G15/G16/G17 totals, `ipv4_zero_length_frames`, `pair_history_evictions` and `timestamp_reorders` equal the t530 values for every capture. A cell-by-cell comparison of the feature CSVs against the earlier local replays of the 49-minute session, Siege hour 1 and the video session, ignoring run_id, found 0 differing cells across 2,028 rows. Outgoing payload sums remained 21,047,721, 41,772,587 and 12,153,851. The t530 has not replayed with this decoder.
+
+The video session's T530 replay with eb1c58a matched tshark-derived predictions for G16, zero-length frames, G17, DNS and direction totals. A local replay matched the outgoing payload sum. The staged documentation sync, feature catalog, AI handbook (147 paths) and whitespace checks passed. Mintlify validation, broken-link and accessibility checks passed on 51 MDX pages. The local documentation reader served the updated explainer with HTTP 200.
+
 ## No-mirror pilot explainer · 2026-11-08
 
 Every number on the new page was checked against the recorded pilot results, the private handoff and the 2026-11-08 replay reports. The behavioural statements were checked against the code:

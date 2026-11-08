@@ -64,6 +64,8 @@ G14 payload and G16 values from these replays, and from the 2026-11-07 Stage B r
 
 Each audit reported REVIEW with no integrity issues. A stdlib PCAP reader produced the same zero-length counts. The tshark column decodes TCP port 5222 as TLS: by default tshark treats that port as XMPP and misses one ClientHello in hour 1. Rows, direction totals and DNS, HTTP, eviction, reorder and parse-error counters were identical to the pre-fix replays, and the new directories carry the new schema hash. Use these directories, not the pre-fix ones, for G14 payload and G16 values. Endpoint replays report `ipv4_zero_length_frames`, which is expected at this capture point.
 
+A third Stage D workload, one hour of a turn-based game with video streaming in a browser, was the first capture to use the ring buffer and to exclude T530 traffic. It was replayed with the fixed decoder. Its tshark-derived predictions all held exactly: 191 ClientHellos, 877 zero-length frames, 15 HTTP requests, 46 DNS queries and 46 responses, and 12,153,851 outgoing payload bytes in a local replay. Its 4 `tls_parse_errors` turned out to be chance matches in encrypted server data. The decoder now requires a plausible TLS record header or HTTP request line before counting a parse error. Local replays of five captures then reported no parse errors and identical feature values; the [explainer](/developers/pilot-explained) shows the analysis. Earlier replay reports keep their recorded parse-error counts.
+
 ## A1. Prepare the t530
 
 **Ubuntu SSH terminal A.** Use your ordinary account; sudo appears only where needed. Preserve the operating system's python3 executable.

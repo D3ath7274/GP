@@ -134,6 +134,38 @@ class HomeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             client_hello(record[:-1])
 
+    def test_encrypted_bytes_resembling_tls_are_not_parse_errors(self):
+        # Observed in a pilot capture: mid-stream server data starting 0x16 with 0x01 at offset 5.
+        lookalike = bytes([0x16, 0xEF, 0xD1, 0x30, 0xCE, 0x01]) + bytes(range(256)) * 5
+        self.assertIsNone(client_hello(lookalike))
+
+        def segment(payload):
+            frame = (Ether(src="02:00:00:00:00:02", dst="02:00:00:00:00:01")
+                     / IP(src="198.51.100.20", dst="192.0.2.10")
+                     / TCP(sport=443, dport=50000, flags="PA") / payload)
+            return decode(Ether(bytes(frame)), metadata=True)
+
+        result = segment(lookalike)
+        self.assertIsNone(result["tls"])
+        self.assertFalse(result.get("tls_error"))
+        self.assertTrue(segment(tls_client_hello()[:-1])["tls_error"])
+
+    def test_only_plausible_unterminated_requests_are_http_errors(self):
+        def request(payload):
+            frame = (Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+                     / IP(src="192.0.2.10", dst="198.51.100.20")
+                     / TCP(sport=50000, dport=80, flags="PA") / payload)
+            return decode(Ether(bytes(frame)), content=True)
+
+        # Starts of server segments from a pilot capture: encrypted bytes, not requests.
+        for lookalike in (b"QXZ \x93\x11\xfe\x00 binary data", b"YLG *V\xb6^&$q\x10\x1d\xf8\xfc\x17"):
+            self.assertFalse(request(lookalike)["http_error"], lookalike)
+        for start in (b"GET /very/long/path", b"OPTIONS * HTTP/1.1\r\nHost", b"GET http://example.test/",
+                      b"CONNECT example.test:443", b"GET index.html HTTP/1.1\r\nHost: example"):
+            self.assertTrue(request(start)["http_error"], start)
+        complete = request(b"GET index.html HTTP/1.1\r\nHost: example\r\n\r\n")
+        self.assertEqual(complete["http"]["length"], len(b"index.html"))
+
     def test_one_compatibility_ccs_before_retried_clienthello(self):
         ccs = b"\x14\x03\x03\x00\x01\x01"
         record = tls_client_hello()

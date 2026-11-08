@@ -20,6 +20,13 @@ CARDINALITY_LIMIT = 128
 MIN_UNPADDED_FRAME = 60
 # TLS 1.3 middlebox-compatibility ChangeCipherSpec record (RFC 8446 appendix D.4).
 TLS_COMPAT_CHANGE_CIPHER_SPEC = b"\x14\x03\x03\x00\x01\x01"
+HTTP_METHOD_START = re.compile(rb"[A-Z]{3,12} ")
+# Evidence that an unterminated payload really starts an HTTP/1 request: a request
+# target in origin or absolute form (RFC 9112 section 3.2), OPTIONS' asterisk form,
+# CONNECT's authority form, or a complete request line. Random encrypted bytes
+# rarely match; a bare "*" after any token did ("YLG *" in a pilot capture).
+HTTP_REQUEST_EVIDENCE = re.compile(
+    rb"[A-Z]{3,12} (?:/|https?://|[^\r\n]* HTTP/1\.[0-9]\r\n)|OPTIONS \*|CONNECT [^ \r\n/]+:[0-9]")
 
 
 def entropy(values):
@@ -60,11 +67,14 @@ def client_hello(payload):
     A client retrying after a HelloRetryRequest may put its compatibility
     ChangeCipherSpec record in front of the second ClientHello, in the same
     segment. Exactly one such record is skipped; anything else first is not a
-    ClientHello.
+    ClientHello. A candidate also needs a TLS record version (3.0 to 3.4), so
+    encrypted bytes that merely begin with 0x16 are ignored rather than counted
+    as parse errors.
     """
     if payload.startswith(TLS_COMPAT_CHANGE_CIPHER_SPEC):
         payload = payload[len(TLS_COMPAT_CHANGE_CIPHER_SPEC):]
-    if len(payload) < 9 or payload[0] != 22 or payload[5] != 1:
+    if (len(payload) < 9 or payload[0] != 22 or payload[1] != 3 or payload[2] > 4
+            or payload[5] != 1):
         return None
     record_length = int.from_bytes(payload[3:5], "big")
     hello_length = int.from_bytes(payload[6:9], "big")
@@ -211,9 +221,10 @@ def decode(frame, metadata=False, content=False):
             packet["tls_error"] = True
     if content and isinstance(transport, TCP):
         payload = payload[:8192]
-        if re.match(rb"[A-Z]{3,12} ", payload):
+        if HTTP_METHOD_START.match(payload):
             if b"\r\n\r\n" not in payload:
-                packet["http_error"] = True
+                # Unterminated: report a coverage gap only for a plausible request.
+                packet["http_error"] = bool(HTTP_REQUEST_EVIDENCE.match(payload))
             else:
                 request = payload.split(b"\r\n", 1)[0].split(b" ")
                 if len(request) == 3 and request[2].startswith(b"HTTP/1."):

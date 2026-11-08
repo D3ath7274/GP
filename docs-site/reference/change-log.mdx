@@ -2,6 +2,14 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-08 · Parse errors from chance matches in encrypted data
+
+The first replay of a video-streaming session with the fixed decoder reported 4 `tls_parse_errors`. A frame scan of that session and the three Siege hours found that every TLS and HTTP parse error in them was an incoming segment from TCP port 443 in the middle of an encrypted stream. `client_hello()` accepted any payload with `0x16` first and `0x01` at offset 5, which random bytes match about once per 65,536 segments; their record-version bytes were random. The HTTP check flagged any unterminated payload that began with 3–12 capital letters and a space, about once per 220,000 segments. Parse errors are run-latched quality faults. Chance matches would therefore have held almost every long live run from baseline approval for reasons unrelated to measurement quality.
+
+A TLS candidate now needs a record version from 3.0 to 3.4. An unterminated payload counts as an HTTP parse error only with request-line evidence: a target starting with `/` or `http(s)://`, `OPTIONS *`, `CONNECT host:port`, or a complete ` HTTP/1.x` request line. A first draft also accepted `*` after any token; two of the observed encrypted segments began that way, so the asterisk form is limited to OPTIONS. Real ClientHellos and complete requests take the same path as before, so G16 and G17 values are unchanged. For that reason the collection contract and schema hash are unchanged too, and existing directories continue. Truncated real ClientHellos and plausible unterminated requests still count as errors. Two regression tests, built from bytes observed in the pilot, fail on the previous decoder.
+
+Operator impact: replays and live runs no longer accumulate these chance parse errors. Earlier replay reports keep their recorded counts. The [explainer](/developers/pilot-explained) adds this as a second worked example, and the [pilot page](/deployment/no-mirror-pilot) records the video-streaming session. Collection and feature-method pages describe the stricter tests. S10 and S68 stay Partial. Verification is recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-08 · Explainer for the no-mirror pilot
 
 Added [Understand the no-mirror pilot](/developers/pilot-explained) under Develop → Learn and contribute, and linked it from the pilot page. It explains:
