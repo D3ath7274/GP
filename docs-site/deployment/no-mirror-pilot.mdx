@@ -52,7 +52,17 @@ Stage D started with two gaming workloads, replayed on the t530 from the commit 
 
 Reconciling parser counts with tshark exposed a decoder gap at this capture point. The large-send super-segments noted above carry an IPv4 total length of 0. The decoder treated their payload as empty, so their ClientHellos and outgoing payload bytes were missing. ClientHellos sent after a TLS 1.3 compatibility ChangeCipherSpec record were also skipped. Together these hid 18–27% of TCP ClientHellos. The counts reconcile exactly: in the 49-minute session, 340 TCP ClientHellos − 87 offloaded − 5 retries = 248 counted. The [changelog](/reference/change-log) describes the fix. With the fixed decoder, a local replay of the same capture counted 340 ClientHellos, 752 zero-length frames and an outgoing payload sum equal to tshark's.
 
-G14 payload and G16 values from these replays, and from the 2026-11-07 Stage B replay, predate the fix. Re-replay the stored captures into new data directories before using those fields. Endpoint replays now also report `ipv4_zero_length_frames`, which is expected here.
+G14 payload and G16 values from these replays, and from the 2026-11-07 Stage B replay, predate the fix. The t530 then re-ran Stage A from a fresh checkout of the fixed commit eb1c58a, with 136 tests OK, golden PASS (142 checks) and runtime PASS (4,000 rows). It re-replayed all five stored captures into a new run directory.
+
+| Capture | Rows | G16 before → after | tshark TCP ClientHellos | `ipv4_zero_length_frames` |
+| --- | --- | --- | --- | --- |
+| Stage B browsing, 10 min | 121 | 12 → 17 | 17 | 36 |
+| Gaming, 49 min | 586 | 248 → 340 | 340 | 752 |
+| Gaming, hour 1 | 721 | 174 → 214 | 214 | 2,810 |
+| Gaming, hour 2 | 721 | 213 → 271 | 271 | 2,415 |
+| Gaming, hour 3 | 721 | 184 → 238 | 238 | 2,218 |
+
+Each audit reported REVIEW with no integrity issues. A stdlib PCAP reader produced the same zero-length counts. The tshark column decodes TCP port 5222 as TLS: by default tshark treats that port as XMPP and misses one ClientHello in hour 1. Rows, direction totals and DNS, HTTP, eviction, reorder and parse-error counters were identical to the pre-fix replays, and the new directories carry the new schema hash. Use these directories, not the pre-fix ones, for G14 payload and G16 values. Endpoint replays report `ipv4_zero_length_frames`, which is expected at this capture point.
 
 ## A1. Prepare the t530
 

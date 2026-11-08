@@ -1,6 +1,6 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "d4f6611790ced79648af45784db1ef8b907a5538",
+  "reference_base_commit": "eb1c58a64e9ea1a0294c6dbff1323196e4bc8ff5",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
   "context_sha256": "6c2f0587688764d820ff17c3bb85ea6f2aed9dcbb14525ceec3636792036fcd0",
   "files": [

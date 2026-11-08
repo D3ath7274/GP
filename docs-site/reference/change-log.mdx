@@ -2,6 +2,10 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-08 · t530 re-qualification after the decoder fix
+
+Recorded the t530 rerun of the fixed decoder on the [no-mirror pilot page](/deployment/no-mirror-pilot). A fresh checkout of commit eb1c58a passed Stage A: 136 tests, 142 golden comparisons and the 4,000-row runtime check. All five stored endpoint captures were re-replayed into a new run directory. Each audit stayed REVIEW with no integrity issues. G16 now equals tshark's TCP ClientHello count in every capture (17, 340, 214, 271 and 238, up from 12, 248, 174, 213 and 184), and `ipv4_zero_length_frames` equals an independent reader's count. All other counters are unchanged. Operator impact: use the new replay directories for G14 payload and G16 values; the pre-fix directories remain only as history. Documentation-only change: no executable source, schema, model artifact, API contract or S01–S70 status changed. Verification is recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-08 · Offloaded IPv4 frames and retried ClientHellos in the site decoder
 
 Stage D endpoint replays exposed two silent measurement gaps in `Controller/site_features.py`. Both were found by reconciling sensor counts with tshark for four gaming captures. First, Windows large-send offload hands the capture point outgoing super-segments whose IPv4 total length is 0. `decode()` trusted that 0 and treated the payload as empty, so those frames added nothing to `g14_out_payload_bytes` and their ClientHellos never reached G16. These were the large ClientHellos, consistent with post-quantum key shares, and no counter recorded the loss. Second, `client_hello()` checked only the first TLS record, so it skipped a ClientHello sent after a TLS 1.3 compatibility ChangeCipherSpec record, which is how a HelloRetryRequest retry is sent. Together the two gaps hid 18–27% of TCP ClientHellos in the [pilot sessions](/deployment/no-mirror-pilot).
