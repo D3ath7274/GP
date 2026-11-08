@@ -106,7 +106,7 @@ home_sensor.main → collection_lease → HomeCollection → collect → site_fe
 - Missing values, unsupported parsers, first/final incomplete windows, late packets, cap losses, reboot/warm-up and storage refusal remain evidence conditions.
 - Novelty compares current peers with retained prior history before updating it. Caps/evictions limit cardinality/history meanings.
 - Current extraction includes a bounded G11–G17 subset: recon/header signals, longer-horizon contacts, service-initiation evidence, opt-in DNS/TLS metadata and opt-in limited cleartext HTTP lexical features.
-- DNS is limited supported UDP/53 parsing; TLS needs a complete supported ClientHello in one TCP packet; HTTP needs a supported complete cleartext HTTP/1 header in one packet. No full TCP reassembly, HTTPS payload decryption, QUIC application coverage or complete authorization/exploit-outcome analysis exists.
+- DNS is limited supported UDP/53 parsing; TLS needs a complete supported ClientHello in one TCP packet (one leading TLS 1.3 compatibility ChangeCipherSpec record is skipped); HTTP needs a supported complete cleartext HTTP/1 header in one packet. No full TCP reassembly, HTTPS payload decryption, QUIC application coverage or complete authorization/exploit-outcome analysis exists.
 - G18–G24 and advanced feature commitments remain planned; use feature-rationale.mdx and feature-groups.json for exact current ownership/limits.
 - Storage defaults stop at configured directory/free-space budgets; inbox captures and other tools' outputs are outside that budget.
 

@@ -5,7 +5,7 @@ Use PASS / FAIL / REVIEW / NOT_RUN / UNMEASURED. Unperformed tests are not PASS.
 
 ## Session and scope
 
-- Guide version: 2026-11-07
+- Guide version: 2026-11-08
 - Code commit:
 - UTC time range:
 - OS / Python / kernel:

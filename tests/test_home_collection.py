@@ -16,8 +16,28 @@ from scapy.layers.inet6 import IPv6
 from scapy.layers.l2 import Ether
 from home_sensor import HomeCollection, StorageLimitError
 from site_features import DeviceWindow, FeatureHistory, client_hello, decode
+from site_policy import QUALITY_FAILURES
 from audit_home_data import audit
 from local_docs import document
+
+
+def tls_client_hello(name=b"example.test", padding=0):
+    """One TLS ClientHello record; padding uses the padding extension (21)."""
+    names = b"\0" + len(name).to_bytes(2, "big") + name
+    sni = len(names).to_bytes(2, "big") + names
+    extensions = struct.pack("!HH", 0, len(sni)) + sni
+    if padding:
+        extensions += struct.pack("!HH", 21, padding) + bytes(padding)
+    hello = b"\3\3" + bytes(32) + b"\0\0\2\x13\x01\1\0" + len(extensions).to_bytes(2, "big") + extensions
+    handshake = b"\1" + len(hello).to_bytes(3, "big") + hello
+    return b"\x16\3\1" + len(handshake).to_bytes(2, "big") + handshake
+
+
+def offload_frame(payload, ip_length=0):
+    """An outbound IPv4 frame as a host capture sees large-send offload: total length 0."""
+    return bytes(Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+                 / IP(src="192.0.2.10", dst="198.51.100.20", len=ip_length)
+                 / TCP(sport=50000, dport=443, flags="PA") / payload)
 
 
 def observation(dst="192.0.2.20", timestamp=1, ipv6=False, payload=b""):
@@ -107,18 +127,58 @@ class HomeTests(unittest.TestCase):
         self.assertTrue(decode(partial, content=True)["http_error"])
 
     def test_complete_tls_and_incomplete_tls(self):
-        name = b"example.test"
-        names = b"\0" + len(name).to_bytes(2, "big") + name
-        sni = len(names).to_bytes(2, "big") + names
-        extensions = struct.pack("!HH", 0, len(sni)) + sni
-        hello = b"\3\3" + bytes(32) + b"\0\0\2\x13\x01\1\0" + len(extensions).to_bytes(2, "big") + extensions
-        handshake = b"\1" + len(hello).to_bytes(3, "big") + hello
-        record = b"\x16\3\1" + len(handshake).to_bytes(2, "big") + handshake
+        record = tls_client_hello()
         parsed = client_hello(record)
         self.assertTrue(parsed["sni_present"])
         self.assertNotIn("example.test", json.dumps(parsed))
         with self.assertRaises(ValueError):
             client_hello(record[:-1])
+
+    def test_one_compatibility_ccs_before_retried_clienthello(self):
+        ccs = b"\x14\x03\x03\x00\x01\x01"
+        record = tls_client_hello()
+        self.assertEqual(client_hello(ccs + record), client_hello(record))
+        self.assertIsNone(client_hello(ccs))
+        self.assertIsNone(client_hello(ccs + ccs + record))
+        self.assertIsNone(client_hello(b"\x14\x03\x03\x00\x02\x01\x01" + record))
+
+    def test_ipv4_zero_length_offload_frame_uses_captured_datagram(self):
+        record = tls_client_hello(padding=1600)
+        result = decode(Ether(offload_frame(record)), metadata=True)
+        self.assertTrue(result["ipv4_zero_length"])
+        self.assertFalse(result["capture_truncated"])
+        self.assertEqual(result["payload_length"], len(record))
+        self.assertTrue(result["tls"]["sni_present"])
+        normal = decode(Ether(offload_frame(record, ip_length=None)), metadata=True)
+        self.assertNotIn("ipv4_zero_length", normal)
+        self.assertEqual(normal["payload_length"], result["payload_length"])
+        self.assertEqual(normal["tls"], result["tls"])
+
+    def test_ipv4_zero_length_never_counts_padding_or_snap_cut_bytes(self):
+        syn = bytes(Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+                    / IP(src="192.0.2.10", dst="198.51.100.20", len=0) / TCP(flags="S"))
+        padded = decode(Ether(syn + bytes(60 - len(syn))))
+        self.assertTrue(padded["ipv4_zero_length"])
+        self.assertEqual(padded["payload_length"], 0)
+        raw = offload_frame(tls_client_hello(padding=1600))
+        cut = Ether(raw[:200])
+        cut.wirelen = len(raw)
+        result = decode(cut, metadata=True)
+        self.assertTrue(result["capture_truncated"])
+        self.assertEqual(result["payload_length"], 0)
+        self.assertIsNone(result["tls"])
+
+    def test_ipv4_zero_length_frames_are_counted_and_hold_learning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            collector = self.collector(tmp, metadata=True)
+            frame = Ether(offload_frame(tls_client_hello(padding=1600)))
+            collector.record(decode(frame, metadata=True) | {"timestamp": 1})
+            collector.advance(6)
+            collector.checkpoint(force=True)
+            result = audit(tmp)
+            self.assertEqual(result["quality_counters"]["ipv4_zero_length_frames"], 1)
+            self.assertEqual(result["counts"]["g16_complete_clienthello_count"], 1)
+        self.assertIn("ipv4_zero_length_frames", QUALITY_FAILURES)
 
     def test_capped_cardinality_is_recorded(self):
         window = DeviceWindow()

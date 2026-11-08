@@ -44,6 +44,8 @@ The first P7 workbench slice advances S13–S17/S44 with operator-described file
 
 The [qualification tools and code rationale](/developers/qualification-code-tour) cover shared collection leases, pure contract construction, source-bound run manifests, independent PCAP expectations, bounded synthetic restart/resource measurements, stopped daily quality reports, independent campaign scoring and the first P8 symbolic audit. Run tests/test_collection_readiness.py, tests/test_security_campaign.py and tests/test_policy_audit.py along with the full suite. Golden expectations must be derived from packet bytes/math rather than updated to mirror actual output. The audit's independent exhaustive oracle guards precedence, unions, logging and witness correctness. These checks leave live Linux capture, long soak, site calibration and native vendor qualification as explicit hardware/data gates.
 
+tests/test_home_collection.py also guards two capture-point decoder cases found in the 2026-11-08 pilot reconciliation. An offloaded IPv4 super-segment with total length 0 must decode to the same payload and TLS result as the same frame with a valid length. Padding at the Ethernet minimum and snap-length cuts must never become payload, and the frame must raise `ipv4_zero_length_frames`, a run-latched quality fault. Exactly one TLS 1.3 compatibility ChangeCipherSpec record may precede a ClientHello. These tests fail on the earlier decoder. Real-data equivalence is checked separately by replaying a private endpoint capture and comparing G14/G16 sums with tshark; that comparison is not repeated in CI.
+
 
 ## Scope consolidation and neutral HTTP transport
 

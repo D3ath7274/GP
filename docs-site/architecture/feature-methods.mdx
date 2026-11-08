@@ -1000,12 +1000,12 @@ Primary basis: [Zeek connection log](https://docs.zeek.org/en/master/reference/l
 
 ### site_v3 / `g14_out_payload_bytes`
 
-- **Current behavior.** Sums the visible parsed outgoing TCP and UDP payload lengths after length bounds exclude trailing padding.
+- **Current behavior.** Sums the visible parsed outgoing TCP and UDP payload lengths after length bounds exclude trailing padding. An IPv4 total length of 0 (a host large-send super-segment) uses the captured datagram when no padding or snap-length cut is possible, and raises `ipv4_zero_length_frames`.
 - **Rationale.** Describes data-bearing transport volume beyond frame/header overhead.
 - **Recommended method.** Sum parsed outgoing transport payload lengths after excluding padding. Not confirmed application upload or goodput. **Unit or type.** payload bytes.
 - **Alternative and trade-off.** Total frame bytes include headers. Application upload and unique goodput require higher-layer parsing or retransmission-aware accounting.
 - **Advantage.** Useful even when payload contents are encrypted and never retained.
-- **Limitation and verification.** Retransmissions and encrypted overhead contribute, and unsupported fragments can omit bytes. Test padded frames, retransmits and truncated captures.
+- **Limitation and verification.** Retransmissions and encrypted overhead contribute, and unsupported fragments can omit bytes. Test padded frames, retransmits, truncated captures and offloaded super-segments against an independent per-direction payload sum.
 
 ## G15: DNS metadata
 
@@ -1088,7 +1088,7 @@ Primary basis: [RFC 8446 TLS 1.3](https://www.rfc-editor.org/rfc/rfc8446.html), 
 
 ### site_v3 / `g16_complete_clienthello_count`
 
-- **Current behavior.** Counts outgoing ClientHellos accepted from a complete supported TLS record available in one decoded TCP payload.
+- **Current behavior.** Counts outgoing ClientHellos accepted from a complete supported TLS record available in one decoded TCP payload, optionally after one TLS 1.3 compatibility ChangeCipherSpec record. A HelloRetryRequest retry therefore counts as a second message. QUIC Initial ClientHellos are not counted.
 - **Rationale.** Provides evidence of visible handshake attempts and the denominator behind TLS feature interpretation.
 - **Recommended method.** Count complete supported ClientHellos. Retain separate counters for incomplete, unsupported and reassembly-limited observations. **Unit or type.** parsed records.
 - **Alternative and trade-off.** A port-443 connection count combines TLS, other traffic and encrypted transports. Reassembled parsing covers split records at greater cost.

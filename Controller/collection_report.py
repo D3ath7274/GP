@@ -16,7 +16,7 @@ from site_policy import digest, PROFILE_FIELDS
 
 QUALITY_COUNTERS = ("kernel_drops", "late_packets", "source_window_omissions", "cardinality_overflows",
     "decoder_failures", "history_evictions", "destination_history_evictions", "pair_history_evictions",
-    "timestamp_reorders", "truncated_packets", "unsupported_jumbograms", "socket_truncated_frames",
+    "timestamp_reorders", "truncated_packets", "unsupported_jumbograms", "ipv4_zero_length_frames", "socket_truncated_frames",
     "missing_kernel_timestamps", "invalid_timestamps", "dns_parse_errors", "tls_parse_errors", "http_parse_errors")
 TEXT_FIELDS = {"schema_version", "run_id", "window_start_utc", "window_end_utc", "device_ip", "vlan", "ground_truth"}
 

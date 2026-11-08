@@ -1,6 +1,6 @@
 # Adaptive IPS framework — step-by-step pilot without a traffic mirror
 
-Version: 2026-11-07. Project: **Adaptive IPS framework**.
+Version: 2026-11-08. Project: **Adaptive IPS framework**.
 
 ## Start here
 
@@ -193,7 +193,7 @@ During capture, browse normally and make a small download. Avoid a large through
 
 Open the closed file in Wireshark. Confirm PC-originated packets and replies using its addresses as filters. Inspect timestamps and lengths. Record any available driver/capture-drop count; absent statistics mean UNMEASURED. An early size stop means a shorter session.
 
-Endpoint NIC offloading can create apparent checksum errors or large segments. Record these effects. Do not classify them as attacks or blindly disable NIC features. A configuration change requires a separately documented session.
+Endpoint NIC offloading can create apparent checksum errors or large segments. Record these effects. Do not classify them as attacks or blindly disable NIC features. Large-send super-segments carry an IPv4 total length of 0; the replay decodes them from their captured length and counts them as `ipv4_zero_length_frames`, which is expected for this capture point. A configuration change requires a separately documented session.
 
 ## B3. Transfer the closed session to the t530
 

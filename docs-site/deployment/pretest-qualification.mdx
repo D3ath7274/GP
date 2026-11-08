@@ -101,7 +101,7 @@ Inspect the report and resolve errors requiring action. Then resume with sudo sy
 | Report field | Interpretation |
 | --- | --- |
 | integrity_issues | Schema/provenance/hash/count/rate/overlap or malformed data problems. FAIL requires investigation; no automatic repair. |
-| quality_counters | Drops, caps, parse errors, unclosed/replay/unversioned runs, unavailable loss measurement and partial windows. These require review. |
+| quality_counters | Drops, caps, parse errors, IPv4 frames with total length 0 (`ipv4_zero_length_frames`, expected for a host capture with large-send offload), unclosed/replay/unversioned runs, unavailable loss measurement and partial windows. These require review. |
 | capture_totals | Captured/parsed/unsupported byte/frame counters and available kernel statistics across final run manifests. Not proof that an upstream mirror delivered all traffic. |
 | days_utc and devices | Observed rows, partial/held/review-eligible windows, parser counts and per-device observation intervals. Local-to-local frames contribute to both endpoint rows. |
 | unobserved_gap_seconds | Gaps between observed windows, not measured packet loss. Idle/offline devices and bypass paths can cause the same pattern. |

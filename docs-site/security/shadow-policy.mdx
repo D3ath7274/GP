@@ -61,7 +61,7 @@ Only outgoing TCP SYN packets without ACK enter role checks. Established traffic
 | State | Meaning |
 | --- | --- |
 | SUFFICIENT | Complete window, current operator observation attestation, live Linux input, recent available kernel statistics and no known run-latched quality faults. Sufficient for shadow review only. |
-| DEGRADED | Partial window or known loss, truncation, reorder, parse error, tracking omission or eviction. |
+| DEGRADED | Partial window or known loss, truncation, an IPv4 frame with total length 0, reorder, parse error, tracking omission or eviction. |
 | UNAVAILABLE | Missing/expired observation attestation, replay/unmeasured input, unavailable kernel loss counters or stale statistics. |
 
 Kernel statistics are sampled periodically. SUFFICIENT is provisional relative to the latest sample; it does not establish zero loss upstream or exact per-window loss. Offline approval checks the final stopped-run counters, including a final socket-statistics read. Any tracked quality fault anywhere in a run rejects that run for approval. This conservative rule can require a new qualified run after investigation. Unsupported protocol traffic can remain outside the selected parser's coverage without producing a parse error.

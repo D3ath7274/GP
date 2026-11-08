@@ -16,6 +16,10 @@ from scapy.layers.l2 import ARP, Dot1Q, Ether
 
 SCHEMA_VERSION = "site-v3.0"
 CARDINALITY_LIMIT = 128
+# Ethernet pads frames shorter than 60 bytes (FCS excluded); 802.1Q tags add 4 bytes each.
+MIN_UNPADDED_FRAME = 60
+# TLS 1.3 middlebox-compatibility ChangeCipherSpec record (RFC 8446 appendix D.4).
+TLS_COMPAT_CHANGE_CIPHER_SPEC = b"\x14\x03\x03\x00\x01\x01"
 
 
 def entropy(values):
@@ -51,7 +55,15 @@ def bounded_add(values, value, health):
 
 
 def client_hello(payload):
-    """Parse a complete ClientHello contained in the first TCP segment only."""
+    """Parse a complete ClientHello contained in one TCP payload, without reassembly.
+
+    A client retrying after a HelloRetryRequest may put its compatibility
+    ChangeCipherSpec record in front of the second ClientHello, in the same
+    segment. Exactly one such record is skipped; anything else first is not a
+    ClientHello.
+    """
+    if payload.startswith(TLS_COMPAT_CHANGE_CIPHER_SPEC):
+        payload = payload[len(TLS_COMPAT_CHANGE_CIPHER_SPEC):]
     if len(payload) < 9 or payload[0] != 22 or payload[5] != 1:
         return None
     record_length = int.from_bytes(payload[3:5], "big")
@@ -138,7 +150,18 @@ def decode(frame, metadata=False, content=False):
     else:
         return None
     declared_length = layer.len if isinstance(layer, IP) else 40 + layer.plen if layer.plen is not None else None
-    packet["capture_truncated"] = declared_length is not None and len(bytes(layer)) < declared_length
+    snap_truncated = False
+    if isinstance(layer, IP) and layer.len == 0:
+        # A total length of 0 is invalid on a wire. Host large-send offload leaves it
+        # at 0 in super-segments the NIC splits after the capture point. Use the
+        # captured datagram unless snap length cut it or Ethernet padding could be in it.
+        packet["ipv4_zero_length"] = True
+        wire_length = getattr(frame, "wirelen", None)
+        snap_truncated = bool(wire_length and wire_length > len(frame))
+        if not snap_truncated and len(frame) > MIN_UNPADDED_FRAME + 4 * len(vlans):
+            declared_length = len(bytes(layer))
+    packet["capture_truncated"] = snap_truncated or (
+        declared_length is not None and len(bytes(layer)) < declared_length)
     if isinstance(layer, IPv6) and layer.plen == 0 and len(bytes(layer)) > 40:
         packet["unsupported_jumbogram"] = True
         return packet
@@ -152,10 +175,7 @@ def decode(frame, metadata=False, content=False):
         return packet
     if isinstance(transport, (TCP, UDP)):
         captured_transport = len(bytes(transport))
-        network_size = (layer.len if isinstance(layer, IP) else
-                        40 + layer.plen if layer.plen is not None else None)
-        if network_size is None:
-            network_size = len(bytes(layer))
+        network_size = declared_length if declared_length is not None else len(bytes(layer))
         transport_offset = len(bytes(layer)) - captured_transport
         declared_transport = max(0, network_size - transport_offset)
         header_size = (int(transport.dataofs or 5) * 4 if isinstance(transport, TCP) else 8)

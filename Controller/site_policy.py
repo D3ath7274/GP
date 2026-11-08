@@ -18,7 +18,7 @@ PROFILE_FIELDS = ("out_pps", "out_bytes_per_second", "g14_new_syn_rate", "packet
 QUALITY_FAILURES = (
     "kernel_drops", "late_packets", "invalid_timestamps", "truncated_packets",
     "socket_truncated_frames", "missing_kernel_timestamps", "decoder_failures",
-    "unsupported_jumbograms", "source_window_omissions", "cardinality_overflows",
+    "unsupported_jumbograms", "ipv4_zero_length_frames", "source_window_omissions", "cardinality_overflows",
     "timestamp_reorders", "history_evictions", "pair_history_evictions",
     "destination_history_evictions", "dns_parse_errors", "tls_parse_errors", "http_parse_errors",
 )

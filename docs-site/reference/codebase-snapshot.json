@@ -1,8 +1,8 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "8a24d8b41b045d2286bbe4978d09896f1e7e050b",
+  "reference_base_commit": "d4f6611790ced79648af45784db1ef8b907a5538",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
-  "context_sha256": "c4d2a8afb649775c682c7b49ccc356f7b171e72badf283b6fa3df1c413078cf0",
+  "context_sha256": "6c2f0587688764d820ff17c3bb85ea6f2aed9dcbb14525ceec3636792036fcd0",
   "files": [
     {
       "path": ".githooks/pre-commit",
@@ -557,8 +557,8 @@
     {
       "path": "Controller/collection_report.py",
       "purpose": "Stopped-run auditor validates paired rows/evidence/provenance and summarizes integrity, quality and coverage without assigning benign truth.",
-      "sha256": "80e704fb103956488e5e5f5d449f509ad84a7223f2a6e30d7fe31d76f644b540",
-      "canonical_bytes": 13290,
+      "sha256": "5e4f44b409339286ef2c56ceadcc45913956102b2b2b958bc6aa93e2d96f7b37",
+      "canonical_bytes": 13317,
       "symbols": [
         {
           "name": "instant",
@@ -782,8 +782,8 @@
     {
       "path": "Controller/home_sensor.py",
       "purpose": "Site-v3 lease/capture orchestration, paired evidence/checkpoints and shadow profiles; uses neutral HTTP transport without legacy inference imports.",
-      "sha256": "6dfba05e1143f96c77156d0c6a3fd2ad3cf6a5193aa403a0d9c49ce442a8cb39",
-      "canonical_bytes": 22408,
+      "sha256": "c71e9d206b873d5980e29cd3a0ec8c54327be0b11e906faab6091dc6d2807b70",
+      "canonical_bytes": 22783,
       "symbols": [
         {
           "name": "utc",
@@ -795,97 +795,97 @@
           "name": "collection_contract",
           "kind": "function",
           "line": 47,
-          "end_line": 60
+          "end_line": 63
         },
         {
           "name": "atomic_json",
           "kind": "function",
-          "line": 63,
-          "end_line": 69
+          "line": 66,
+          "end_line": 72
         },
         {
           "name": "StorageLimitError",
           "kind": "class",
-          "line": 72,
-          "end_line": 73
+          "line": 75,
+          "end_line": 76
         },
         {
           "name": "HomeCollection",
           "kind": "class",
-          "line": 76,
-          "end_line": 295
+          "line": 79,
+          "end_line": 299
         },
         {
           "name": "HomeCollection.__init__",
           "kind": "function",
-          "line": 77,
-          "end_line": 150
+          "line": 80,
+          "end_line": 153
         },
         {
           "name": "HomeCollection._check_storage",
           "kind": "function",
-          "line": 152,
-          "end_line": 159
+          "line": 155,
+          "end_line": 162
         },
         {
           "name": "HomeCollection.record",
           "kind": "function",
-          "line": 161,
-          "end_line": 199
+          "line": 164,
+          "end_line": 203
         },
         {
           "name": "HomeCollection.advance",
           "kind": "function",
-          "line": 201,
-          "end_line": 206
+          "line": 205,
+          "end_line": 210
         },
         {
           "name": "HomeCollection._flush",
           "kind": "function",
-          "line": 208,
-          "end_line": 238
+          "line": 212,
+          "end_line": 242
         },
         {
           "name": "HomeCollection.snapshot",
           "kind": "function",
-          "line": 240,
-          "end_line": 251
+          "line": 244,
+          "end_line": 255
         },
         {
           "name": "HomeCollection.checkpoint",
           "kind": "function",
-          "line": 253,
-          "end_line": 262
+          "line": 257,
+          "end_line": 266
         },
         {
           "name": "HomeCollection.read",
           "kind": "function",
-          "line": 264,
-          "end_line": 295
+          "line": 268,
+          "end_line": 299
         },
         {
           "name": "collect",
           "kind": "function",
-          "line": 298,
-          "end_line": 365
+          "line": 302,
+          "end_line": 369
         },
         {
           "name": "collect.ingest",
           "kind": "function",
-          "line": 299,
-          "end_line": 305
+          "line": 303,
+          "end_line": 309
         },
         {
           "name": "collect.sample_kernel_statistics",
           "kind": "function",
-          "line": 326,
-          "end_line": 331
+          "line": 330,
+          "end_line": 335
         },
         {
           "name": "main",
           "kind": "function",
-          "line": 368,
-          "end_line": 423
+          "line": 372,
+          "end_line": 427
         }
       ],
       "imports": [
@@ -1641,86 +1641,86 @@
     {
       "path": "Controller/site_features.py",
       "purpose": "Ethernet IPv4/IPv6 decoder, online moments, bounded window state and historical features implement the current site measurement subset.",
-      "sha256": "9c78be06e94a28871b9a52c1da10ce7ead3093493515a395a095eba9b3b287ba",
-      "canonical_bytes": 20059,
+      "sha256": "67e89e33b3cae20fd355cc8e6609cd590044643d3eef44f2b2a0953fdd695b1b",
+      "canonical_bytes": 21234,
       "symbols": [
         {
           "name": "entropy",
           "kind": "function",
-          "line": 21,
-          "end_line": 24
+          "line": 25,
+          "end_line": 28
         },
         {
           "name": "Moments",
           "kind": "class",
-          "line": 28,
-          "end_line": 41
+          "line": 32,
+          "end_line": 45
         },
         {
           "name": "Moments.add",
           "kind": "function",
-          "line": 33,
-          "end_line": 37
+          "line": 37,
+          "end_line": 41
         },
         {
           "name": "Moments.summary",
           "kind": "function",
-          "line": 39,
-          "end_line": 41
+          "line": 43,
+          "end_line": 45
         },
         {
           "name": "bounded_add",
           "kind": "function",
-          "line": 44,
-          "end_line": 50
+          "line": 48,
+          "end_line": 54
         },
         {
           "name": "client_hello",
           "kind": "function",
-          "line": 53,
-          "end_line": 113
+          "line": 57,
+          "end_line": 125
         },
         {
           "name": "client_hello.vector",
           "kind": "function",
-          "line": 66,
-          "end_line": 76
+          "line": 78,
+          "end_line": 88
         },
         {
           "name": "decode",
           "kind": "function",
-          "line": 116,
-          "end_line": 205
+          "line": 128,
+          "end_line": 225
         },
         {
           "name": "DeviceWindow",
           "kind": "class",
-          "line": 209,
-          "end_line": 307
+          "line": 229,
+          "end_line": 327
         },
         {
           "name": "DeviceWindow.observe",
           "kind": "function",
-          "line": 246,
-          "end_line": 307
+          "line": 266,
+          "end_line": 327
         },
         {
           "name": "FeatureHistory",
           "kind": "class",
-          "line": 310,
-          "end_line": 411
+          "line": 330,
+          "end_line": 431
         },
         {
           "name": "FeatureHistory.__init__",
           "kind": "function",
-          "line": 311,
-          "end_line": 315
+          "line": 331,
+          "end_line": 335
         },
         {
           "name": "FeatureHistory.features",
           "kind": "function",
-          "line": 317,
-          "end_line": 411
+          "line": 337,
+          "end_line": 431
         }
       ],
       "imports": [
@@ -1746,8 +1746,8 @@
     {
       "path": "Controller/site_policy.py",
       "purpose": "Strict inventory/role/profile validation produces shadow identity/quality findings and separates unverified candidates from approved profiles.",
-      "sha256": "17e5c7b8248a7a7d755e1aca6ba3a4d03047566c169a2264ba953252461e8e25",
-      "canonical_bytes": 15540,
+      "sha256": "ee24503068af42e5727df0149bcb40977d8f35477b5521e51d22da23514289f5",
+      "canonical_bytes": 15567,
       "symbols": [
         {
           "name": "digest",
@@ -3721,116 +3721,152 @@
     {
       "path": "tests/test_home_collection.py",
       "purpose": "Tests rates/history/timestamps, IPv4/IPv6, optional parsers, resource limits, corrupt rows and local-doc path rejection.",
-      "sha256": "454d47ec92a46e796f1f3c5eb5dc80af2ac29dedbafddf7919b40d0b5b5dce33",
-      "canonical_bytes": 8582,
+      "sha256": "d0e1d40cf156070cced17e4f853cf7bcfde968aab96602987b64ef99c9dea540",
+      "canonical_bytes": 11680,
       "symbols": [
+        {
+          "name": "tls_client_hello",
+          "kind": "function",
+          "line": 24,
+          "end_line": 33
+        },
+        {
+          "name": "offload_frame",
+          "kind": "function",
+          "line": 36,
+          "end_line": 40
+        },
         {
           "name": "observation",
           "kind": "function",
-          "line": 23,
-          "end_line": 27
+          "line": 43,
+          "end_line": 47
         },
         {
           "name": "HomeTests",
           "kind": "class",
-          "line": 30,
-          "end_line": 175
+          "line": 50,
+          "end_line": 235
         },
         {
           "name": "HomeTests.collector",
           "kind": "function",
-          "line": 31,
-          "end_line": 33
+          "line": 51,
+          "end_line": 53
         },
         {
           "name": "HomeTests.test_novelty_is_measured_before_history_update",
           "kind": "function",
-          "line": 35,
-          "end_line": 40
+          "line": 55,
+          "end_line": 60
         },
         {
           "name": "HomeTests.test_window_rate_counts_and_ipv6",
           "kind": "function",
-          "line": 42,
-          "end_line": 54
+          "line": 62,
+          "end_line": 74
         },
         {
           "name": "HomeTests.test_daily_rotation_state_reload_and_schema_guard",
           "kind": "function",
-          "line": 56,
-          "end_line": 71
+          "line": 76,
+          "end_line": 91
         },
         {
           "name": "HomeTests.test_late_and_capacity_loss_are_explicit",
           "kind": "function",
-          "line": 73,
-          "end_line": 80
+          "line": 93,
+          "end_line": 100
         },
         {
           "name": "HomeTests.test_storage_limit_stops_writes",
           "kind": "function",
-          "line": 82,
-          "end_line": 85
+          "line": 102,
+          "end_line": 105
         },
         {
           "name": "HomeTests.test_rolling_buckets_expire",
           "kind": "function",
-          "line": 87,
-          "end_line": 92
+          "line": 107,
+          "end_line": 112
         },
         {
           "name": "HomeTests.test_dns_is_opt_in_and_names_are_reduced",
           "kind": "function",
-          "line": 94,
-          "end_line": 99
+          "line": 114,
+          "end_line": 119
         },
         {
           "name": "HomeTests.test_http_is_opt_in_and_fragmented_inputs_do_not_get_full_parse",
           "kind": "function",
-          "line": 101,
-          "end_line": 107
+          "line": 121,
+          "end_line": 127
         },
         {
           "name": "HomeTests.test_complete_tls_and_incomplete_tls",
           "kind": "function",
-          "line": 109,
-          "end_line": 121
+          "line": 129,
+          "end_line": 135
+        },
+        {
+          "name": "HomeTests.test_one_compatibility_ccs_before_retried_clienthello",
+          "kind": "function",
+          "line": 137,
+          "end_line": 143
+        },
+        {
+          "name": "HomeTests.test_ipv4_zero_length_offload_frame_uses_captured_datagram",
+          "kind": "function",
+          "line": 145,
+          "end_line": 155
+        },
+        {
+          "name": "HomeTests.test_ipv4_zero_length_never_counts_padding_or_snap_cut_bytes",
+          "kind": "function",
+          "line": 157,
+          "end_line": 169
+        },
+        {
+          "name": "HomeTests.test_ipv4_zero_length_frames_are_counted_and_hold_learning",
+          "kind": "function",
+          "line": 171,
+          "end_line": 181
         },
         {
           "name": "HomeTests.test_capped_cardinality_is_recorded",
           "kind": "function",
-          "line": 123,
-          "end_line": 129
+          "line": 183,
+          "end_line": 189
         },
         {
           "name": "HomeTests.test_audit_detects_corrupted_rates",
           "kind": "function",
-          "line": 131,
-          "end_line": 146
+          "line": 191,
+          "end_line": 206
         },
         {
           "name": "HomeTests.test_local_docs_route_and_traversal",
           "kind": "function",
-          "line": 148,
-          "end_line": 153
+          "line": 208,
+          "end_line": 213
         },
         {
           "name": "HomeTests.test_pair_periodicity_has_sample_support",
           "kind": "function",
-          "line": 155,
-          "end_line": 162
+          "line": 215,
+          "end_line": 222
         },
         {
           "name": "HomeTests.test_broadcast_does_not_create_a_device_profile",
           "kind": "function",
-          "line": 164,
-          "end_line": 168
+          "line": 224,
+          "end_line": 228
         },
         {
           "name": "HomeTests.test_ethernet_padding_is_not_application_payload",
           "kind": "function",
-          "line": 170,
-          "end_line": 175
+          "line": 230,
+          "end_line": 235
         }
       ],
       "imports": [
@@ -3846,6 +3882,7 @@
         "scapy.layers.inet6",
         "scapy.layers.l2",
         "site_features",
+        "site_policy",
         "struct",
         "sys",
         "tempfile",

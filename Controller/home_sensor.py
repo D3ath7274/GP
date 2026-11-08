@@ -57,6 +57,9 @@ def collection_contract(networks, metadata=False, content=False, max_sources=128
             "parsers": {"G11_G14": "header summaries, no full TCP session reassembly",
                         "G15": "single-question UDP DNS only",
                         "G16": "complete ClientHello in one TCP packet, custom fingerprint",
+                        # Version marker: older directories and approved profiles used
+                        # the declared IPv4 length 0 and missed hellos after a CCS record.
+                        "decoder": "ipv4-zero-length-uses-captured-datagram; one-ccs-before-clienthello",
                         "G17": "complete HTTP/1 request headers in one TCP packet"}}
 
 
@@ -176,6 +179,7 @@ class HomeCollection:
             self.health[packet["protocol"] + "_packets"] += 1
             self.health["truncated_packets"] += bool(packet.get("capture_truncated"))
             self.health["unsupported_jumbograms"] += bool(packet.get("unsupported_jumbogram"))
+            self.health["ipv4_zero_length_frames"] += bool(packet.get("ipv4_zero_length"))
             for protocol in ("dns", "tls", "http"):
                 self.health[protocol + "_parse_errors"] += bool(packet.get(protocol + "_error"))
             for address, outbound in ((packet["src"], True), (packet["dst"], False)):
