@@ -1,6 +1,6 @@
 {
   "version": "ai-codebase-snapshot-v1",
-  "reference_base_commit": "39ba63d74f76587ffeab86f85119876a8ab3d500",
+  "reference_base_commit": "6d0f8e08c5300fe252588597cbe4eb8dd2ab1a65",
   "scope": "Tracked paths; code/contracts/fixtures use LF-normalized hashes; joblib/H5 artifacts use raw hashes. canonical_bytes is the hashed length. Documentation narratives need review. Untracked/private/generated dependencies are excluded.",
   "context_sha256": "6c2f0587688764d820ff17c3bb85ea6f2aed9dcbb14525ceec3636792036fcd0",
   "files": [
@@ -2501,8 +2501,8 @@
     {
       "path": "docs-site/docs.json",
       "purpose": "Mintlify branding/navigation selects authored pages and separate legacy-Ryu versus policy-workbench API groups.",
-      "sha256": "5a22d0a2ec7cc5e85cc56ab3821b6236fd1a1071f7759e63c3055b822a155b77",
-      "canonical_bytes": 4553
+      "sha256": "98806655e81ccaba28d8171a328eee51cced342497f3820c43fada7d69aac38c",
+      "canonical_bytes": 4595
     },
     {
       "path": "docs-site/documentation-map.json",
@@ -2581,8 +2581,8 @@
     {
       "path": "docs-site/reference/file-purposes.json",
       "purpose": "Authored exact tracked-path roles and local-only exclusions drive complete handbook coverage without ingesting private data.",
-      "sha256": "d52e05d1c25b7effc46f6edc5509cfcf9e3bac19a9546bd86a030345da2909cc",
-      "canonical_bytes": 29529
+      "sha256": "4e12c772a84cb07f2b60fcd37e8fa7d1f5a67b124dcd4d10c494d83bbd186d38",
+      "canonical_bytes": 29803
     },
     {
       "path": "docs-site/roadmap/delivery-phases.mdx",
@@ -2591,6 +2591,10 @@
     {
       "path": "docs-site/roadmap/final-service-scope.mdx",
       "purpose": "Authored documentation page: Final service scope and competitor coverage. Trace all 70 specification capabilities to current code, planned phases and release evidence."
+    },
+    {
+      "path": "docs-site/roadmap/market-landscape.mdx",
+      "purpose": "Authored documentation page: Market landscape and project adjustments. How 28 of the closest products and open tools compare with S01–S70, where the market is ahead, where the project can differ, and suggested adjustments."
     },
     {
       "path": "docs-site/security/configuration.mdx",

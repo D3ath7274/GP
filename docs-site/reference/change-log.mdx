@@ -2,6 +2,14 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-10 · Market landscape and project adjustments
+
+Added [Market landscape and project adjustments](/roadmap/market-landscape) under Start here → Product direction. It records a comparison of 28 commercial products and open tools closest to the project. The comparison was made with a separate local research workspace that is not tracked in this repository. That workspace collected official pages with Scrapling: an honest user agent, robots.txt respected and blocks recorded, not bypassed. It read 161 of 183 sources and checked each source-based statement against the fetched text.
+
+The page sets market adoption, measured against peer products, beside the project's foundation from the S01–S70 statuses for 20 capability areas. Six policy areas are standard among policy managers but early here. No surveyed source documents a multi-vendor join of behavioral evidence, rule revision and path proof (S19, S38, S53, S67, S70). Investigation, cloud coverage and AI assistants are common but have no S ID. The page lists open tools to evaluate (Batfish, NetFlow/IPFIX input, Zeek, Suricata, Aerleon, Kitsune) and six suggested adjustments for a team decision.
+
+The [service scope](/roadmap/final-service-scope), [delivery phases](/roadmap/delivery-phases) and home page link to it. Operator impact: planning material only. No executable source, schema, model artifact, API contract, S01–S70 status or phase gate changed, and no tool is adopted. Verification is recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-08 · Parse errors from chance matches in encrypted data
 
 The first replay of a video-streaming session with the fixed decoder reported 4 `tls_parse_errors`. A frame scan of that session and the three Siege hours found that every TLS and HTTP parse error in them was an incoming segment from TCP port 443 in the middle of an encrypted stream. `client_hello()` accepted any payload with `0x16` first and `0x01` at offset 5, which random bytes match about once per 65,536 segments; their record-version bytes were random. The HTTP check flagged any unterminated payload that began with 3–12 capital letters and a space, about once per 220,000 segments. Parse errors are run-latched quality faults. Chance matches would therefore have held almost every long live run from baseline approval for reasons unrelated to measurement quality.

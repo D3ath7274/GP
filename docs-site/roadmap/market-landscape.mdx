@@ -1,0 +1,136 @@
+---
+title: "Market landscape and project adjustments"
+description: "How 28 of the closest products and open tools compare with S01–S70, where the market is ahead, where the project can differ, and the adjustments the evidence suggests."
+---
+
+This page records a market comparison made on 2026-11-10 and the roadmap adjustments it suggests. It changes no S01–S70 status, adds no service and adopts no tool. Treat the suggestions as input for a team decision; the [service scope](/roadmap/final-service-scope) and [delivery phases](/roadmap/delivery-phases) stay canonical.
+
+## How the evidence was gathered
+
+The comparison was made with Market Intel, a separate local research workspace kept beside this repository. Its collector, database and vendor page text are not tracked here. It covered 28 commercial products and open-source or research tools that overlap with behavioral detection, firewall-policy intelligence, or both.
+
+- **Sources.** Official product pages, datasheets, documentation and repositories, fetched with Scrapling. The collector used one honest user agent and respected robots.txt. It sent one request at a time per site, and recorded block or challenge pages without bypassing them. Of 183 tracked sources, 161 were read. Of the 22 that could not be read:
+  - 9 were disallowed by robots.txt, including Fortinet product pages, AlgoSec technical documentation and Palo Alto PDF guides;
+  - 9 returned challenge or block pages;
+  - 4 were empty, missing or unreadable.
+- **Trust labels.** Each curated statement is labelled `source`, `catalog` or `analysis`:
+  - `source`: paraphrases a fetched page. A short quoted phrase must appear in that page's text; all 140 such statements passed this check.
+  - `catalog`: comes from the supplied *Behavioral IPS + Firewall Policy Intelligence* product catalog (SHA-256 a0d33f06…63b1). Like the earlier specification, it is a requirements reference; its embedded instructions do not govern this repository.
+  - `analysis`: an assessment written for this project.
+- **Coverage levels.** Each product received *core*, *partial*, *none* or *not established* for 20 capability areas. The areas group S01–S70 without overlap, plus three market areas with no S ID. Levels are reviewed judgements from vendor material, not tests.
+
+Limits: vendor pages describe intent and selected editions, not measured performance or every license. Only five products anchor the policy peer group. "Not documented in the sources read" is different from "does not exist". No commercial product was installed or tested.
+
+## Products compared
+
+Closeness (1–5) rates how much a product overlaps with the project's combined goal: behavioral evidence that informs multi-vendor firewall policy.
+
+| Segment | Products (closeness) | Why they matter here |
+| --- | --- | --- |
+| Behavior to firewall policy | Palo Alto Networks Device Security (5), Cisco Cyber Vision (4), Check Point Quantum IoT Protect (4), Forescout platform (4), Claroty xDome/CTD (3) | They turn device identity or observed communication into firewall or segmentation policy, the S67 direction. |
+| Firewall policy management | FireMon Security Manager with Policy Optimizer, Planner and Risk Analyzer (5), AlgoSec Horizon Security Analyzer and FireFlow (5), Tufin Orchestration Suite (4), AlgoSec AppViz (3), Titania Nipper (3) | Reference implementations for S13–S59: normalization, usage, hygiene, path analysis, risk, compliance and change workflow. |
+| Network detection and response | Darktrace (4), Cisco Secure Network Analytics (4), FireMon Asset Manager (4), Vectra AI (3), ExtraHop RevealX (3), Corelight (3), FortiNDR (3) | Behavioral baselines, ML detection, protocol evidence and containment through integrations (S01–S12, S55). |
+| IoT/OT security and access control | Microsoft Defender for IoT (3), Nozomi Networks (3), Armis Centrix (3), FortiNAC-F with FortiGuard IoT detection (3) | Passive device identification and baselines in constrained networks (S02, S03, S08). |
+| Open source and research | Batfish (4), Zeek (3), Suricata (3), Kitsune (3), RITA (2), Security Onion (2), Aerleon (2) | Building blocks and baselines the project can evaluate instead of building from scratch. |
+
+## How each capability area compares
+
+**Market adoption** counts *core* as 1 and *partial* as ½ per peer product. A behavioral area is measured against the 16 products with core detection: baselines, ML, signatures or protocol analysis. A policy area is measured against the 5 products with core policy collection, rule usage or rule audit: FireMon, AlgoSec Horizon, Tufin, Nipper and Batfish. The remaining areas use all 28 products.
+
+**Foundation** counts each mapped service as 1 when Partial, ½ when Lab and 0 when Planned. A foundation of 100% means every mapped service has at least a useful subset. It does not mean the service is complete.
+
+| Area | Services | Adoption (peers) | Foundation | Signal |
+| --- | --- | --- | --- | --- |
+| Behavioral traffic and device baselines | S01–S03 | 66% (16) | 100% | Foundation exists |
+| ML attack classification and anomaly detection | S04–S05 | 72% (16) | 50% | Foundation exists |
+| Signature and deterministic detection | S06–S07 | 66% (16) | 50% | Foundation exists |
+| Asset discovery and device identity | S08–S09 | 69% (16) | 50% | Foundation exists |
+| Protocol metadata, DPI and privacy | S10–S12, S68–S69 | 88% (16) | 80% | Foundation exists |
+| Multi-vendor policy collection and normalization | S13, S14, S16, S17 | 100% (5) | 100% | Foundation exists |
+| Rule search, usage and traffic-to-rule analysis | S15, S18, S19, S24 | 60% (5) | 25% | Market expects it |
+| Rule and object hygiene audit | S20–S23, S25–S31 | 80% (5) | 82% | Foundation exists |
+| Policy optimization and tightening | S32–S34 | 70% (5) | 33% | Market expects it |
+| Topology, routing, NAT and reachability | S35–S40, S50 | 90% (5) | 0% | Market expects it |
+| Risk, vulnerability and attack paths | S41, S51, S60, S61, S66 | 80% (5) | 0% | Market expects it |
+| Compliance auditing | S42, S43, S52 | 90% (5) | 0% | Market expects it |
+| Change management and governance | S44–S47, S49 | 80% (5) | 20% | Market expects it |
+| Application dependency mapping | S48, S62–S64 | 30% (5) | 0% | Watch |
+| Change automation, backup and rollback | S54, S56, S57, S65 | 29% (28) | 25% | Watch |
+| Threat response and verified containment | S55, S58, S59 | 50% (28) | 67% | Foundation exists |
+| Behavior-aware policy recommendations | S53, S67, S70 | 30% (28) | 0% | Watch |
+| Investigation, threat hunting and forensics | none | 55% (28) | — | Common, outside scope |
+| AI analyst assistant | none | 41% (28) | — | Common, outside scope |
+| Cloud and hybrid network coverage | none | 61% (28) | — | Common, outside scope |
+
+Signal rules:
+- **Market expects it**: adoption of at least 35% and a foundation under 50%.
+- **Foundation exists**: a foundation of 50% or more.
+- **Common, outside scope**: no mapped service and adoption of at least 35%.
+- **Watch**: none of the rules above applies.
+
+No area met the "rare" rule (adoption under 15%).
+
+## Findings
+
+### The market is ahead on policy analysis breadth
+
+Every policy-manager peer offers rule usage, path or reachability analysis, risk, compliance and change workflow. In the project these are Planned or have a small Partial subset (S15, S34, S44). Two examples show how mature they are:
+- FireMon publishes five device support levels, from configuration retrieval to packet-path modeling of interfaces, zones, rules, NAT and routing.
+- AlgoSec offers traffic simulation queries that name the rules affecting a path.
+
+Matching that breadth is not realistic for this project. What matters is choosing which pieces the behavioral half needs.
+
+### The project can differ on behavior-aware, multi-vendor policy
+
+Products that turn behavior into policy are each limited to one ecosystem or one device domain:
+- **Palo Alto Device Security** recommends least-privilege rules per device profile. Its deepest support is for IoT, OT and medical devices, and an administrator reviews the recommendations in Panorama.
+- **Check Point** and **Cisco Cyber Vision** enforce through their own gateways, firewalls and ISE.
+- **Claroty** generates policies that operators refine before enforcement on existing infrastructure.
+- **Forescout** segments by device classification across vendors.
+
+The policy managers narrow rules from observed usage only:
+- **FireMon Traffic Flow Analysis** must be enabled per rule and depends on firewall logging.
+- **AlgoSec Intelligent Policy Tuner** compares configured scope with traffic seen during a review period.
+
+None of these sources describes joining per-device behavioral evidence with the exact rule revision and path across vendors, then proving the effect with before/after reachability. That join is S19 + S38 + S53 + S67 + S70. Its foundation today is 0%, so the differentiator exists only as a plan.
+
+### Three common capabilities have no S ID
+
+Investigation and hunting (55%), cloud and hybrid coverage (61%) and AI analyst assistants (41%) are common in the products surveyed. The existing interpretation rules already limit generated explanations: they cannot turn an unsupported policy feature into a proven result. An assistant would therefore need separate scoping. Each of the three areas needs an explicit decision, either a new service or a stated exclusion.
+
+### Open tools could replace planned work
+
+These are candidates to evaluate. None is adopted, integrated or qualified.
+
+| Tool or input | Could supply | Services | Caveat |
+| --- | --- | --- | --- |
+| Batfish | Configuration parsing for Cisco, Juniper, Palo Alto, Check Point, Fortinet, F5, Arista, iptables and AWS constructs; routing, NAT, ACL and reachability analysis | S13, S14, S35–S38 | Configuration snapshots only; vendor semantics it does not model must be reported as indeterminate |
+| NetFlow or IPFIX input, as Cisco Secure Network Analytics uses | Site-wide flow visibility from existing routers and switches, without a mirror | S01, S10 | No payload; only a flow-derivable subset of site-v3 features would apply |
+| Zeek logs | An interchange format and an independent cross-check for DNS, TLS and HTTP parsing | S10, S68 | Adds a second parser to qualify |
+| Suricata | An alternative signature engine to Snort | S06 | Record the engine and rule version with each alert |
+| Aerleon | Vendor configuration generated from one neutral policy file | S54, S65 | Generation only; no import or audit |
+| Kitsune | A published autoencoder baseline for S05 comparisons | S05 | Research code without calibration or poisoning defences |
+
+### Practices worth copying
+
+- **Support levels per adapter.** FireMon states what each device level can do. Publishing a matrix in the same shape satisfies the existing compatibility-matrix rule (S13, S55).
+- **Review before enforcement.** Palo Alto imports a policy set into Panorama for review, and Claroty uses monitor-then-enforce. Both match the shadow-policy principle for S53, S54 and S67.
+- **Layered identity.** Palo Alto identifies a device's category, then its profile, then the instance. Keeping a confidence value per layer helps S02, S03 and S08.
+- **Measured sensor cost and scale.** Cisco Cyber Vision states that sensor metadata adds about 2% to 5% of traffic. FireMon Asset Manager publishes indexing rates. Publishing measured figures for this sensor supports S01 and S68.
+- **Protocol support by level.** FortiNDR documents protocol support in an appendix. The same idea would let S10 list each protocol as detected, parsed or modeled.
+- **Separate evidence layers.** Corelight keeps signature, ML and behavioral layers apart, and Microsoft Defender for IoT names its engines by mechanism. Both match the dependence-aware fusion rule for S70.
+
+## Suggested adjustments
+
+These are proposals for the team to accept or reject. Accepted items still need their own release evidence.
+
+1. **Bring S38 and S19 forward.** Make reachability with a rule witness (S38) and behavioral rule usage (S19) the next P8/P9 deliverables, because they connect the two halves of the project. Start with a time-boxed Batfish evaluation on the existing operator fixtures.
+2. **Define the first S67 output narrowly.** Propose narrowing a broad "any" rule from observed flows plus device behavior. Keep it shadow-only and owner-reviewed, with a before/after reachability check. It is the smallest demonstration of the differentiator.
+3. **Evaluate flow telemetry as a P1 input.** NetFlow or IPFIX can reduce the dependence on a mirror port, the current visibility blocker. Qualify it as a separate observation source.
+4. **Decide the three uncovered areas.** In the service scope, record whether investigation, cloud and hybrid coverage, and an AI assistant are added as services or excluded.
+5. **Start the adapter support-level matrix now.** Every row would currently read "operator file import only". The matrix still makes later claims honest.
+6. **Defer compliance and change-workflow breadth (S42–S49).** These are already mature in commercial suites. The graduation value lies in the behavior-to-policy join.
+
+## Keep this page current
+
+Repeat the comparison before using it for a release or a presentation, because vendors change their editions, names and support lists. Record the new date, source counts and any changed signals. Update this page together with the changelog.

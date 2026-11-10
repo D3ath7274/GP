@@ -1,5 +1,14 @@
 # Validation
 
+## Market landscape page · 2026-11-10
+
+The adoption, foundation and signal values in the table were read from the research workspace's `/api/capabilities` response. That response was computed from 28 curated product profiles and the S01–S70 statuses imported from this repository's final-service-scope.mdx. The foundation values were recomputed by hand for rule hygiene (9/11), change governance (1/5), protocol metadata (4/5) and response (2/3). The workspace's own checks passed:
+- 13 collector unit tests, including that every S01–S70 maps to exactly one area;
+- 140 of 140 source statements verified by phrase match against the fetched text;
+- TypeScript, ESLint and a production build.
+
+Source counts (161 read of 183; 9 robots-disallowed, 9 blocked, 4 empty, missing or unreadable) match its database. The supplied catalog's SHA-256 was computed from the file. The documentation sync, feature catalog, AI handbook (148 tracked paths) and whitespace checks passed, as did Mintlify validation, broken-link and accessibility checks on 52 MDX pages. The accessibility check repeats its existing theme-colour note, which meets WCAG AA. The local documentation preview served the new page with HTTP 200. Content and navigation changed only.
+
 ## Parse errors from chance matches in encrypted data · 2026-11-08
 
 A frame scanner with the previous decoder (`site_features.py` at eb1c58a, SHA-256 prefix 67e89e33, equal to the t530 runtime fingerprint) listed every frame flagged `tls_error` or `http_error`. It covered the three Siege hours and the video-streaming session. All 5 TLS and 5 HTTP cases were incoming segments from TCP port 443 with 1,400-byte payloads. The TLS cases had random record-version bytes. The HTTP cases began with random capital letters and a space, and two continued with `*`.

@@ -22,6 +22,7 @@
 | Documentation map, Git hook, staged guard and push/PR validation | Develop and verify changes |
 | User-supplied 70-capability product specification and current-source assessment | Final service scope and competitor coverage |
 | Canonical delivery-phases, P0–P6 IPS gates and P7–P13 policy-management services | Delivery phases and service release gates |
+| External competitor research (28 products, peer adoption per S01–S70 area, suggested adjustments) | Market landscape and project adjustments |
 | firewall_policy.py, policy_store.py, policy_http.py, policy_inventory.py and reference fixtures | Test the read-only policy workbench; Policy workbench: code and rationale |
 | Ordinary router LAN connection, single-NIC switch/bridged-AP layout, management gates and timed PC/phone/Internet tests | Home pilot: one Ethernet port, wired and Wi-Fi; Select deployment placement |
 | collection_io.py, pure collection contract, run fingerprints, preflight and golden/runtime qualifiers | Qualify collection before a long pilot; Qualification and audit: code and rationale |

@@ -106,6 +106,7 @@
     "docs-site/reference/feature-methods.json": "Authored primary-source recommended measurement, units, current limits and qualification for all schema-qualified columns and planned groups.",
     "docs-site/reference/file-purposes.json": "Authored exact tracked-path roles and local-only exclusions drive complete handbook coverage without ingesting private data.",
     "docs-site/roadmap/delivery-phases.mdx": "Authored documentation page: Delivery phases and service release gates. Extend the IPS roadmap with read-only policy analysis, governance, application services and verified automation.",
+    "docs-site/roadmap/market-landscape.mdx": "Authored documentation page: Market landscape and project adjustments. How 28 of the closest products and open tools compare with S01–S70, where the market is ahead, where the project can differ, and suggested adjustments.",
     "docs-site/roadmap/final-service-scope.mdx": "Authored documentation page: Final service scope and competitor coverage. Trace all 70 specification capabilities to current code, planned phases and release evidence.",
     "docs-site/security/configuration.mdx": "Authored documentation page: Configuration and management access. Operator/reference explanation with claims scoped by the associated source and qualified evidence.",
     "docs-site/security/shadow-policy.mdx": "Authored documentation page: Shadow policy and reviewed baselines. Set device roles before collection, hold unsuitable windows and approve descriptive profiles offline.",
