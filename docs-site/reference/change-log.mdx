@@ -2,6 +2,17 @@
 title: "Implementation changelog"
 ---
 
+## 2026-11-12 · Link or expand terms on first use
+
+AGENTS.md and docs-site/AGENTS.md now require a link or a full form in parentheses the first time a reply, commit message or page mentions any of these:
+- a stage, milestone or phase;
+- a service ID (S01–S70) or feature group (G1–G24);
+- an abbreviation, technology, tool or vendor-specific term.
+
+The link points to the term's reference: a docs page, a repository file, or the vendor's or tool's documentation. For AI replies the rule applies again in each new reply. The [maintenance page](/developers/maintenance) states the same convention for contributors.
+
+Operator impact: writing convention only. No executable source, schema, model artifact, API contract, service status or phase gate changed. Verification is recorded in DOCUMENTATION_VALIDATION.md.
+
 ## 2026-11-10 · Market landscape and project adjustments
 
 Added [Market landscape and project adjustments](/roadmap/market-landscape) under Start here → Product direction. It records a comparison of 28 commercial products and open tools closest to the project. The comparison was made with a separate local research workspace that is not tracked in this repository. That workspace collected official pages with Scrapling: an honest user agent, robots.txt respected and blocks recorded, not bypassed. It read 161 of 183 sources and checked each source-based statement against the fetched text.

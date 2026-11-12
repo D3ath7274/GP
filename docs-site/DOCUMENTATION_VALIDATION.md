@@ -1,5 +1,15 @@
 # Validation
 
+## Term-linking convention · 2026-11-12
+
+Writing rule only: AGENTS.md, docs-site/AGENTS.md, the maintenance page and the changelog changed. The staged checks passed:
+- documentation sync, which classified the change as having no implementation changes;
+- the feature catalog;
+- the AI handbook (148 tracked paths; only the reference commit changed);
+- the whitespace check.
+
+Mintlify validation, broken-link and accessibility checks passed on 52 MDX pages. The accessibility check repeats its existing theme-colour note, which meets WCAG AA.
+
 ## Market landscape page · 2026-11-10
 
 The adoption, foundation and signal values in the table were read from the research workspace's `/api/capabilities` response. That response was computed from 28 curated product profiles and the S01–S70 statuses imported from this repository's final-service-scope.mdx. The foundation values were recomputed by hand for rule hygiene (9/11), change governance (1/5), protocol metadata (4/5) and response (2/3). The workspace's own checks passed:
